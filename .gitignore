@@ -19,3 +19,6 @@ docs/
 # porque anula la excepción !.env.example de arriba.
 .vercel/
 .neon
+
+# Ledger local de subagentes
+.superpowers/
