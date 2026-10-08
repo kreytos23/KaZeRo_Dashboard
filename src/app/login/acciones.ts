@@ -4,7 +4,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { conDb } from '@/db/client';
-import { COOKIE_PRE, COOKIE_SESION, opcionesCookie } from '@/server/auth/cookies';
+import { COOKIE_PRE, COOKIE_SESION, opcionesBorrado, opcionesCookie } from '@/server/auth/cookies';
 import { datosRed } from '@/server/auth/red';
 import { POLITICA, iniciarLogin, verificarSegundoFactor } from '@/server/auth/servicio';
 import { env } from '@/server/env';
@@ -49,7 +49,7 @@ export async function accionVerificar(_: EstadoForm, fd: FormData): Promise<Esta
       error: r.motivo === 'bloqueado' ? mensajeBloqueo(r.minutosRestantes) : 'Código incorrecto o ya usado.',
     };
   }
-  jar.delete(COOKIE_PRE);
+  jar.set(COOKIE_PRE, '', opcionesBorrado());
   jar.set(COOKIE_SESION, r.token, opcionesCookie(POLITICA.sesionDias * 24 * 60 * 60));
   redirect('/panel');
 }
