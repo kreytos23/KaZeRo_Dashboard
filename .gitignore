@@ -22,3 +22,8 @@ docs/
 
 # Ledger local de subagentes
 .superpowers/
+
+.neon-prueba.json
+playwright/.datos/
+next-env.d.ts
+*.tsbuildinfo
