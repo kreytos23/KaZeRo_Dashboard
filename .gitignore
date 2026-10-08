@@ -2,6 +2,8 @@ node_modules/
 .next/
 .env*
 !.env.example
+# El CLI de Vercel vuelve a agregar `.env*` al final al hacer link/env pull: bórralo,
+# porque anula la excepción !.env.example de arriba.
 .vercel/
 coverage/
 playwright-report/
@@ -12,3 +14,7 @@ scripts/ocr-benchmark/capturas/
 
 # Planeación, specs y reglas: solo en local (repo público, ver lecciones §8)
 docs/
+
+# El CLI de Vercel vuelve a agregar `.env*` al final al hacer link/env pull: bórralo,
+# porque anula la excepción !.env.example de arriba.
+.vercel/
