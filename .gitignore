@@ -18,3 +18,4 @@ docs/
 # El CLI de Vercel vuelve a agregar `.env*` al final al hacer link/env pull: bórralo,
 # porque anula la excepción !.env.example de arriba.
 .vercel/
+.neon
