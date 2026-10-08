@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+import { GuardaBdError, describirUrl, verificarDestino } from '../../scripts/lib/guarda-bd';
+
+const dev = 'postgresql://neondb_owner:x@ep-dev-1.us-east-2.aws.neon.tech/neondb?sslmode=require';
+const prod = 'postgresql://neondb_owner:y@ep-prod-9.us-east-2.aws.neon.tech/neondb?sslmode=require';
+const hostProd = 'ep-prod-9.us-east-2.aws.neon.tech';
+
+describe('verificarDestino', () => {
+  it('describe usuario, host y base sin exponer la contraseña', () => {
+    expect(describirUrl(dev)).toEqual({
+      usuario: 'neondb_owner',
+      host: 'ep-dev-1.us-east-2.aws.neon.tech',
+      baseDatos: 'neondb',
+    });
+  });
+
+  it('pasa cuando la terminal coincide con .env.local y no es producción', () => {
+    const d = verificarDestino({
+      variable: 'DATABASE_URL_OWNER',
+      efectiva: dev,
+      delArchivo: dev,
+      hostProduccion: hostProd,
+    });
+    expect(d.esProduccion).toBe(false);
+  });
+
+  it('falla si la variable de la terminal no coincide con .env.local (variable exportada de antes)', () => {
+    expect(() =>
+      verificarDestino({
+        variable: 'DATABASE_URL_OWNER',
+        efectiva: prod,
+        delArchivo: dev,
+        hostProduccion: hostProd,
+      }),
+    ).toThrow(/no coincide con la de \.env\.local/);
+  });
+
+  it('el mensaje no incluye la contraseña', () => {
+    try {
+      verificarDestino({ variable: 'DATABASE_URL_OWNER', efectiva: prod, delArchivo: dev });
+    } catch (e) {
+      expect(String((e as Error).message)).not.toMatch(/:y@|:x@/);
+    }
+  });
+
+  it('exige confirmación para producción', () => {
+    expect(() => verificarDestino({ variable: 'X', efectiva: prod, hostProduccion: hostProd })).toThrow(
+      GuardaBdError,
+    );
+    expect(() => verificarDestino({ variable: 'X', efectiva: prod, hostProduccion: hostProd })).toThrow(
+      /PRODUCCIÓN/,
+    );
+  });
+
+  it('acepta producción con KAZERO_OTRA_BD=confirmo', () => {
+    const d = verificarDestino({
+      variable: 'X',
+      efectiva: prod,
+      hostProduccion: hostProd,
+      confirmacion: 'confirmo',
+    });
+    expect(d.esProduccion).toBe(true);
+  });
+
+  it('detecta producción también por el host con -pooler', () => {
+    const pooled = prod.replace('ep-prod-9', 'ep-prod-9-pooler');
+    expect(() => verificarDestino({ variable: 'X', efectiva: pooled, hostProduccion: hostProd })).toThrow(
+      /PRODUCCIÓN/,
+    );
+  });
+
+  it('falla si la variable no existe', () => {
+    expect(() => verificarDestino({ variable: 'DATABASE_URL_OWNER' })).toThrow(
+      /DATABASE_URL_OWNER no está definida/,
+    );
+  });
+});
