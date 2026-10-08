@@ -5,8 +5,20 @@ export class GuardaBdError extends Error {
   override name = 'GuardaBdError';
 }
 
-export function describirUrl(url: string) {
-  const u = new URL(url);
+/**
+ * `new URL` lanza un TypeError que lleva la cadena completa en `input` (con la contraseña).
+ * Lo traducimos a un GuardaBdError que no contiene el valor ni encadena el error original.
+ */
+function parsearUrl(url: string, etiqueta = 'URL de base de datos'): URL {
+  try {
+    return new URL(url);
+  } catch {
+    throw new GuardaBdError(`${etiqueta} no es una URL válida (no se muestra por seguridad).`);
+  }
+}
+
+export function describirUrl(url: string, etiqueta?: string) {
+  const u = parsearUrl(url, etiqueta);
   return {
     usuario: decodeURIComponent(u.username),
     host: u.hostname,
@@ -14,8 +26,8 @@ export function describirUrl(url: string) {
   };
 }
 
-export function hostNormalizado(urlOHost: string): string {
-  const host = urlOHost.includes('://') ? new URL(urlOHost).hostname : urlOHost;
+export function hostNormalizado(urlOHost: string, etiqueta?: string): string {
+  const host = urlOHost.includes('://') ? parsearUrl(urlOHost, etiqueta).hostname : urlOHost;
   return host.replace(/-pooler(?=\.)/, '');
 }
 
@@ -33,20 +45,22 @@ export interface OpcionesGuarda {
  */
 export function verificarDestino(o: OpcionesGuarda) {
   if (!o.efectiva) throw new GuardaBdError(`${o.variable} no está definida.`);
-  const destino = describirUrl(o.efectiva);
+  const destino = describirUrl(o.efectiva, o.variable);
   const confirmado = o.confirmacion === 'confirmo';
 
   if (o.delArchivo !== undefined && o.delArchivo !== o.efectiva && !confirmado) {
     throw new GuardaBdError(
       `La ${o.variable} de tu terminal (host ${destino.host}) no coincide con la de .env.local ` +
-        `(host ${describirUrl(o.delArchivo).host}). Probablemente quedó exportada de una sesión anterior. ` +
+        `(host ${describirUrl(o.delArchivo, `${o.variable} de .env.local`).host}). ` +
+        `Probablemente quedó exportada de una sesión anterior. ` +
         `Quítala con "unset ${o.variable}" (PowerShell: Remove-Item Env:${o.variable}) o, si de verdad ` +
         `quieres otra base, repite con KAZERO_OTRA_BD=confirmo.`,
     );
   }
 
   const esProduccion =
-    !!o.hostProduccion && hostNormalizado(destino.host) === hostNormalizado(o.hostProduccion);
+    !!o.hostProduccion &&
+    hostNormalizado(destino.host) === hostNormalizado(o.hostProduccion, 'KAZERO_HOST_PROD');
   if (esProduccion && !confirmado) {
     throw new GuardaBdError(
       `Destino = PRODUCCIÓN (${destino.host}). Repite con KAZERO_OTRA_BD=confirmo si es intencional.`,

@@ -5,6 +5,16 @@ const dev = 'postgresql://neondb_owner:x@ep-dev-1.us-east-2.aws.neon.tech/neondb
 const prod = 'postgresql://neondb_owner:y@ep-prod-9.us-east-2.aws.neon.tech/neondb?sslmode=require';
 const hostProd = 'ep-prod-9.us-east-2.aws.neon.tech';
 
+/** Devuelve el error lanzado por `fn`, o undefined si no lanzó nada. */
+function capturar(fn: () => unknown): unknown {
+  try {
+    fn();
+  } catch (e) {
+    return e;
+  }
+  return undefined;
+}
+
 describe('verificarDestino', () => {
   it('describe usuario, host y base sin exponer la contraseña', () => {
     expect(describirUrl(dev)).toEqual({
@@ -36,11 +46,33 @@ describe('verificarDestino', () => {
   });
 
   it('el mensaje no incluye la contraseña', () => {
+    expect.assertions(2);
     try {
       verificarDestino({ variable: 'DATABASE_URL_OWNER', efectiva: prod, delArchivo: dev });
     } catch (e) {
+      expect(e).toBeInstanceOf(GuardaBdError);
       expect(String((e as Error).message)).not.toMatch(/:y@|:x@/);
     }
+  });
+
+  it('describirUrl no expone la cadena de conexión si la URL es inválida', () => {
+    const err = capturar(() => describirUrl('no es una url :secreto'));
+    expect(err).toBeInstanceOf(GuardaBdError);
+    expect((err as Error).message).not.toContain('secreto');
+    expect(String(err)).not.toContain('secreto');
+    expect(JSON.stringify(err)).not.toContain('secreto');
+    expect((err as { cause?: unknown }).cause).toBeUndefined();
+  });
+
+  it('verificarDestino nombra la variable inválida sin mostrar su valor', () => {
+    const err = capturar(() =>
+      verificarDestino({ variable: 'DATABASE_URL_OWNER', efectiva: 'no es una url :secreto' }),
+    );
+    expect(err).toBeInstanceOf(GuardaBdError);
+    expect((err as Error).message).toMatch(/DATABASE_URL_OWNER/);
+    expect((err as Error).message).not.toContain('secreto');
+    expect(String(err)).not.toContain('secreto');
+    expect(JSON.stringify(err)).not.toContain('secreto');
   });
 
   it('exige confirmación para producción', () => {
