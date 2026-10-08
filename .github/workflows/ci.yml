@@ -1,0 +1,185 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # En main no se cancela: un deploy a medias es peor que esperar.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '24'
+  KAZERO_COMMIT_SHA: ${{ github.sha }}
+
+jobs:
+  calidad:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm format:check
+      - run: pnpm audit --prod --audit-level high
+
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+  integracion:
+    # Los PRs desde forks no reciben secretos (repo público): se omite en lugar de fallar.
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:integracion
+
+  build:
+    needs: [calidad, unit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Cache de build de Next.js
+        uses: actions/cache@v4
+        with:
+          path: .next/cache
+          key: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('src/**', 'next.config.ts') }}
+          restore-keys: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
+      - run: pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: next-build
+          path: |
+            .next
+            !.next/cache
+          include-hidden-files: true
+          retention-days: 1
+
+  e2e:
+    needs: [build, integracion]
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v5
+        with: { name: next-build, path: .next }
+      - name: Cache de navegadores de Playwright
+        id: cache-pw
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+      - if: steps.cache-pw.outputs.cache-hit != 'true'
+        run: pnpm exec playwright install --with-deps chromium
+      - if: steps.cache-pw.outputs.cache-hit == 'true'
+        run: pnpm exec playwright install-deps chromium
+      - run: pnpm test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with: { name: playwright-report, path: playwright-report, retention-days: 7 }
+
+  deploy-preview:
+    needs: [e2e]
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: preview
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Migrar rama development (la usan los previews)
+        run: pnpm db:migrar
+        env:
+          DATABASE_URL_OWNER: ${{ secrets.DATABASE_URL_OWNER }}
+      - run: pnpm exec vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+      - run: pnpm exec vercel build --token=${{ secrets.VERCEL_TOKEN }}
+      - id: deploy
+        run: echo "url=$(pnpm exec vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})" >> "$GITHUB_OUTPUT"
+      - run: pnpm smoke "${{ steps.deploy.outputs.url }}"
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number,
+              body: `Preview listo (smoke OK): ${{ steps.deploy.outputs.url }}\nCommit: ${context.sha.slice(0, 7)}`,
+            });
+
+  deploy-produccion:
+    needs: [e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    # El environment "production" exige aprobación manual antes de tocar la BD y el dominio.
+    environment: production
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - name: Migrar producción (con guarda; la confirmación es explícita aquí)
+        run: pnpm db:migrar
+        env:
+          DATABASE_URL_OWNER: ${{ secrets.DATABASE_URL_OWNER }}
+          KAZERO_HOST_PROD: ${{ secrets.KAZERO_HOST_PROD }}
+          KAZERO_OTRA_BD: confirmo
+      - run: pnpm exec vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+      - run: pnpm exec vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Deploy sin asignar dominio (staged)
+        id: deploy
+        run: echo "url=$(pnpm exec vercel deploy --prebuilt --prod --skip-domain --token=${{ secrets.VERCEL_TOKEN }})" >> "$GITHUB_OUTPUT"
+      - name: Smoke contra el deployment antes de recibir tráfico
+        run: pnpm smoke "${{ steps.deploy.outputs.url }}"
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - name: Promover exactamente ese deployment (sin rebuild)
+        run: pnpm exec vercel promote "${{ steps.deploy.outputs.url }}" --yes --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Smoke contra el dominio de producción
+        run: pnpm smoke https://kazero-dashboard.vercel.app
+        env:
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
