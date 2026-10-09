@@ -69,6 +69,26 @@ export function verificarDestino(o: OpcionesGuarda) {
   return { ...destino, esProduccion };
 }
 
+/**
+ * Igual que la comprobación terminal-vs-.env.local de verificarDestino, pero para secretos que no son
+ * URLs (p. ej. KAZERO_TOTP_KEY). Nunca incluye los valores en el mensaje.
+ */
+export function verificarSecreto(o: {
+  variable: string;
+  efectiva?: string;
+  delArchivo?: string;
+  confirmacion?: string;
+}) {
+  if (o.efectiva === undefined || o.delArchivo === undefined) return;
+  if (o.efectiva !== o.delArchivo && o.confirmacion !== 'confirmo') {
+    throw new GuardaBdError(
+      `La ${o.variable} de tu terminal no coincide con la de .env.local (no se muestran los valores). ` +
+        `Probablemente quedó exportada de una sesión anterior. Quítala con "unset ${o.variable}" ` +
+        `(PowerShell: Remove-Item Env:${o.variable}) o, si es intencional, repite con KAZERO_OTRA_BD=confirmo.`,
+    );
+  }
+}
+
 /** Punto de entrada de todo script que escribe en BD: imprime el destino y lo valida. */
 export function prepararDestino(variable: string, accion: string, rutaEnv = '.env.local'): string {
   const archivo = existsSync(rutaEnv) ? parse(readFileSync(rutaEnv)) : {};

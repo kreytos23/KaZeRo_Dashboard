@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GuardaBdError, describirUrl, prepararDestino, verificarDestino } from '../../scripts/lib/guarda-bd';
+import {
+  GuardaBdError,
+  describirUrl,
+  prepararDestino,
+  verificarDestino,
+  verificarSecreto,
+} from '../../scripts/lib/guarda-bd';
 
 const dev = 'postgresql://neondb_owner:x@ep-dev-1.us-east-2.aws.neon.tech/neondb?sslmode=require';
 const prod = 'postgresql://neondb_owner:y@ep-prod-9.us-east-2.aws.neon.tech/neondb?sslmode=require';
@@ -117,5 +123,33 @@ describe('prepararDestino en CI', () => {
     expect(() => prepararDestino('DATABASE_URL_OWNER', 'prueba', 'no-existe.env')).toThrow(
       /KAZERO_HOST_PROD/,
     );
+  });
+
+  it('no falla en CI cuando KAZERO_HOST_PROD está definida y el destino no es producción', () => {
+    vi.stubEnv('CI', 'true');
+    vi.stubEnv('KAZERO_HOST_PROD', hostProd);
+    vi.stubEnv('DATABASE_URL_OWNER', dev);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    expect(() => prepararDestino('DATABASE_URL_OWNER', 'prueba', 'no-existe.env')).not.toThrow();
+    vi.restoreAllMocks();
+  });
+});
+
+describe('verificarSecreto', () => {
+  it('pasa si coincide, si falta en la terminal o si hay confirmación', () => {
+    expect(() => verificarSecreto({ variable: 'K', efectiva: 'a', delArchivo: 'a' })).not.toThrow();
+    expect(() => verificarSecreto({ variable: 'K', efectiva: 'a' })).not.toThrow();
+    expect(() =>
+      verificarSecreto({ variable: 'K', efectiva: 'a', delArchivo: 'b', confirmacion: 'confirmo' }),
+    ).not.toThrow();
+  });
+
+  it('falla si difiere de .env.local sin mostrar ningún valor', () => {
+    const err = capturar(() =>
+      verificarSecreto({ variable: 'K', efectiva: 'valor-terminal', delArchivo: 'valor-archivo' }),
+    );
+    expect(err).toBeInstanceOf(GuardaBdError);
+    expect((err as Error).message).toMatch(/K/);
+    expect((err as Error).message).not.toMatch(/valor-terminal|valor-archivo/);
   });
 });

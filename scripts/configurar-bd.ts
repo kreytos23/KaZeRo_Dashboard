@@ -23,7 +23,8 @@ if (modo === 'produccion' && !process.argv.includes('--confirmo')) {
 }
 
 function ejecutar(cmd: string, args: string[], entrada: string) {
-  const r = spawnSync(ES_WINDOWS ? `${cmd}.cmd` : cmd, args, {
+  // Solo pnpm es un shim .cmd en Windows; gh es gh.exe y cmd.exe lo resuelve por PATHEXT.
+  const r = spawnSync(ES_WINDOWS && cmd === 'pnpm' ? 'pnpm.cmd' : cmd, args, {
     input: entrada,
     stdio: ['pipe', 'ignore', 'inherit'],
     shell: ES_WINDOWS,
@@ -63,21 +64,29 @@ const owner = cadenaConexion(rama);
 const d = describirUrl(owner);
 console.log(`[bd:configurar] Rama ${rama} → ${d.usuario}@${d.host}/${d.baseDatos}`);
 
+if (modo === 'produccion') {
+  // Re-ejecutar rotaría la llave TOTP y el admin existente ya no podría entrar: se aborta ANTES de migrar.
+  // En una BD nueva la tabla admin aún no existe, de ahí to_regclass.
+  const hayTabla = await conDbUrl(owner, (db) =>
+    db.execute<{ existe: boolean }>(sql`SELECT (to_regclass('public.admin') IS NOT NULL) AS existe`),
+  );
+  if (hayTabla.rows[0]?.existe) {
+    const existentes = await conDbUrl(owner, (db) =>
+      db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM admin`),
+    );
+    if ((existentes.rows[0]?.n ?? 0) > 0) {
+      console.error(
+        'Producción ya tiene admin. No se cambió nada (ni migraciones ni contraseñas): rotar rompería su TOTP. ' +
+          'Para rotar, hazlo como tarea aparte.',
+      );
+      process.exit(1);
+    }
+  }
+}
+
 await migrar(owner);
 console.log('  ✓ Migraciones aplicadas');
 
-if (modo === 'produccion') {
-  // Re-ejecutar rotaría la llave TOTP y el admin existente ya no podría entrar: se aborta antes de cambiar nada.
-  const existentes = await conDbUrl(owner, (db) =>
-    db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM admin`),
-  );
-  if ((existentes.rows[0]?.n ?? 0) > 0) {
-    console.error(
-      'Producción ya tiene admin. No se rota nada (romperías su TOTP). Para rotar, hazlo como tarea aparte.',
-    );
-    process.exit(1);
-  }
-}
 const app = await asignarPasswordApp(owner, { pooled: true });
 console.log('  ✓ kazero_app con LOGIN y contraseña nueva');
 const llaveTotp = randomBytes(32).toString('base64');
@@ -91,7 +100,8 @@ if (modo === 'desarrollo') {
     KAZERO_HOST_PROD: hostProd,
   });
   vercelEnv('DATABASE_URL', 'preview', app);
-  vercelEnv('KAZERO_TOTP_KEY', 'preview', randomBytes(32).toString('base64'));
+  // Los Previews usan la rama development: deben descifrar los admins creados con la llave local.
+  vercelEnv('KAZERO_TOTP_KEY', 'preview', llaveTotp);
   ghSecret('DATABASE_URL_OWNER', 'preview', owner);
 } else {
   vercelEnv('DATABASE_URL', 'production', app);

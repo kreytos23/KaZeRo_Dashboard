@@ -13,17 +13,18 @@ export async function crearAdmin(db: Db, datos: { email: string; password: strin
   const secretoTotp = nuevoSecretoTotp();
   const codigosRecuperacion = nuevosCodigosRecuperacion();
 
-  const [fila] = await db
-    .insert(admin)
-    .values({
-      email,
-      passwordHash: await hashPassword(datos.password),
-      totpSecretCifrado: cifrar(secretoTotp, llaveTotp),
-    })
-    .returning({ id: admin.id });
-  const id = fila!.id;
-  await db
-    .insert(codigoRecuperacion)
-    .values(codigosRecuperacion.map((c) => ({ adminId: id, hash: hashCodigoRecuperacion(c) })));
+  const passwordHash = await hashPassword(datos.password);
+  // Atómico: un admin sin códigos de recuperación dejaría a producción abortando para siempre.
+  const id = await db.transaction(async (tx) => {
+    const [fila] = await tx
+      .insert(admin)
+      .values({ email, passwordHash, totpSecretCifrado: cifrar(secretoTotp, llaveTotp) })
+      .returning({ id: admin.id });
+    const nuevoId = fila!.id;
+    await tx
+      .insert(codigoRecuperacion)
+      .values(codigosRecuperacion.map((c) => ({ adminId: nuevoId, hash: hashCodigoRecuperacion(c) })));
+    return nuevoId;
+  });
   return { id, secretoTotp, uriTotp: uriTotp(secretoTotp, email), codigosRecuperacion };
 }
