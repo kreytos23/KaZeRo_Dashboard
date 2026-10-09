@@ -139,14 +139,14 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - name: Migrar rama development (la usan los previews)
+      - run: pnpm exec vercel pull --yes --environment=preview
+      - run: pnpm exec vercel build
+      - name: Migrar rama development tras el build (la usan los previews; un build roto no migra)
         run: pnpm db:migrar
         env:
           DATABASE_URL_OWNER: ${{ secrets.DATABASE_URL_OWNER }}
           # La guarda se niega si DATABASE_URL_OWNER apunta a producción por error.
           KAZERO_HOST_PROD: ${{ vars.KAZERO_HOST_PROD }}
-      - run: pnpm exec vercel pull --yes --environment=preview
-      - run: pnpm exec vercel build
       - id: deploy
         run: |
           url="$(pnpm exec vercel deploy --prebuilt)"
@@ -182,14 +182,14 @@ jobs:
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - name: Migrar producción (con guarda; la confirmación es explícita aquí)
+      - run: pnpm exec vercel pull --yes --environment=production
+      - run: pnpm exec vercel build --prod
+      - name: Migrar producción tras el build (un build roto no migra; con guarda y confirmación explícita)
         run: pnpm db:migrar
         env:
           DATABASE_URL_OWNER: ${{ secrets.DATABASE_URL_OWNER }}
           KAZERO_HOST_PROD: ${{ vars.KAZERO_HOST_PROD }}
           KAZERO_OTRA_BD: confirmo
-      - run: pnpm exec vercel pull --yes --environment=production
-      - run: pnpm exec vercel build --prod
       - name: Deploy sin asignar dominio (staged)
         id: deploy
         run: |
