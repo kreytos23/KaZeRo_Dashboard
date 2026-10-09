@@ -8,12 +8,19 @@ const ES_WINDOWS = process.platform === 'win32';
  */
 function neon(args: string[]): string {
   const proyecto = process.env.NEON_PROJECT_ID ? ['--project-id', process.env.NEON_PROJECT_ID] : [];
-  return execFileSync(ES_WINDOWS ? 'pnpm.cmd' : 'pnpm', ['exec', 'neon', ...args, ...proyecto], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'inherit'],
-    // En Windows, los .cmd requieren shell (Node ≥ 20 rechaza spawn de .cmd sin ella). Los args son fijos.
-    shell: ES_WINDOWS,
-  });
+  try {
+    return execFileSync(ES_WINDOWS ? 'pnpm.cmd' : 'pnpm', ['exec', 'neon', ...args, ...proyecto], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'inherit'],
+      // En Windows, los .cmd requieren shell (Node ≥ 20 rechaza spawn de .cmd sin ella). Los args son fijos.
+      shell: ES_WINDOWS,
+    });
+  } catch (err) {
+    // El error original lleva stdout (en connection-string, la cadena con contraseña) y los logs de
+    // Actions son públicos: se relanza uno nuevo sin stdout, stderr ni cause.
+    const status = (err as { status?: unknown }).status ?? 'desconocido';
+    throw new Error(`neon ${args[0]} ${args[1] ?? ''} falló (status ${String(status)})`);
+  }
 }
 
 export function crearRama(nombre: string, padre: string, horasDeVida: number): void {
