@@ -73,11 +73,18 @@ export function verificarDestino(o: OpcionesGuarda) {
 export function prepararDestino(variable: string, accion: string, rutaEnv = '.env.local'): string {
   const archivo = existsSync(rutaEnv) ? parse(readFileSync(rutaEnv)) : {};
   const efectiva = process.env[variable] ?? archivo[variable];
+  const hostProduccion = process.env.KAZERO_HOST_PROD || archivo.KAZERO_HOST_PROD;
+  // En CI no hay .env.local: sin KAZERO_HOST_PROD la guarda no distinguiría producción (fail-open).
+  if (process.env.CI === 'true' && !hostProduccion) {
+    throw new GuardaBdError(
+      'KAZERO_HOST_PROD no está definida en CI: la guarda no puede reconocer producción.',
+    );
+  }
   const destino = verificarDestino({
     variable,
     efectiva,
     delArchivo: archivo[variable],
-    hostProduccion: process.env.KAZERO_HOST_PROD ?? archivo.KAZERO_HOST_PROD,
+    hostProduccion,
     confirmacion: process.env.KAZERO_OTRA_BD,
   });
   console.log(`[guarda-bd] Acción: ${accion}`);

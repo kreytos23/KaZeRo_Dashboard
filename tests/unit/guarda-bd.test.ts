@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { GuardaBdError, describirUrl, verificarDestino } from '../../scripts/lib/guarda-bd';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { GuardaBdError, describirUrl, prepararDestino, verificarDestino } from '../../scripts/lib/guarda-bd';
 
 const dev = 'postgresql://neondb_owner:x@ep-dev-1.us-east-2.aws.neon.tech/neondb?sslmode=require';
 const prod = 'postgresql://neondb_owner:y@ep-prod-9.us-east-2.aws.neon.tech/neondb?sslmode=require';
@@ -104,6 +104,18 @@ describe('verificarDestino', () => {
   it('falla si la variable no existe', () => {
     expect(() => verificarDestino({ variable: 'DATABASE_URL_OWNER' })).toThrow(
       /DATABASE_URL_OWNER no está definida/,
+    );
+  });
+});
+
+describe('prepararDestino en CI', () => {
+  afterEach(() => vi.unstubAllEnvs());
+  it('falla si CI no define KAZERO_HOST_PROD (sin esa variable la guarda no puede reconocer producción)', () => {
+    vi.stubEnv('CI', 'true');
+    vi.stubEnv('KAZERO_HOST_PROD', '');
+    vi.stubEnv('DATABASE_URL_OWNER', 'postgresql://neondb_owner:x@ep-dev-1.us-east-2.aws.neon.tech/neondb');
+    expect(() => prepararDestino('DATABASE_URL_OWNER', 'prueba', 'no-existe.env')).toThrow(
+      /KAZERO_HOST_PROD/,
     );
   });
 });
