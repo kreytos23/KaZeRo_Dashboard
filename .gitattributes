@@ -1,0 +1,7 @@
+# LF en todo el repo: Prettier exige LF y core.autocrlf=true en Windows
+# dejaba la copia de trabajo en CRLF (format:check fallaba y git status mostraba ruido).
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.webp binary
+*.ico binary

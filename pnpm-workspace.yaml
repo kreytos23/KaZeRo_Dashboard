@@ -1,0 +1,37 @@
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+minimumReleaseAgeExclude:
+  - '@playwright/test@1.64.0'
+  - '@vercel/backends@18.0.0'
+  - '@vercel/build-utils@14.20.0'
+  - '@vercel/cervel@0.1.78'
+  - '@vercel/container@18.0.0'
+  - '@vercel/elysia@18.0.0'
+  - '@vercel/express@18.0.0'
+  - '@vercel/fastify@18.0.0'
+  - '@vercel/gatsby-plugin-vercel-builder@2.2.70'
+  - '@vercel/go@21.0.0'
+  - '@vercel/h3@18.0.0'
+  - '@vercel/hono@18.0.0'
+  - '@vercel/hydrogen@19.0.0'
+  - '@vercel/koa@18.0.0'
+  - '@vercel/nestjs@18.0.0'
+  - '@vercel/next@22.0.0'
+  - '@vercel/node@23.0.0'
+  - '@vercel/python@24.0.0'
+  - '@vercel/redwood@20.0.0'
+  - '@vercel/remix-builder@23.0.0'
+  - '@vercel/ruby@20.0.0'
+  - '@vercel/rust@19.0.0'
+  - '@vercel/static-build@20.0.0'
+  - '@vercel/vc-native-darwin-arm64@63.1.0'
+  - '@vercel/vc-native-darwin-x64@63.1.0'
+  - '@vercel/vc-native-linux-arm64@63.1.0'
+  - '@vercel/vc-native-linux-x64@63.1.0'
+  - '@vercel/vc-native-win32-arm64@63.1.0'
+  - '@vercel/vc-native-win32-x64@63.1.0'
+  - neon@8.0.12
+  - playwright-core@1.64.0
+  - playwright@1.64.0
+  - vercel@63.1.0

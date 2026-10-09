@@ -19,3 +19,11 @@ docs/
 # porque anula la excepción !.env.example de arriba.
 .vercel/
 .neon
+
+# Ledger local de subagentes
+.superpowers/
+
+.neon-prueba.json
+playwright/.datos/
+next-env.d.ts
+*.tsbuildinfo
