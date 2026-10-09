@@ -61,6 +61,26 @@ describe('cifrado AES-256-GCM', () => {
     p[3] = Buffer.from('otro').toString('base64url');
     expect(() => descifrar(p.join('.'), llave)).toThrow();
   });
+  const voltearByte = (b64: string) => {
+    const b = Buffer.from(b64, 'base64url');
+    b[0] = b[0]! ^ 0xff;
+    return b.toString('base64url');
+  };
+  it('detecta un byte cambiado en el tag', () => {
+    const p = cifrar('secreto', llave).split('.');
+    p[2] = voltearByte(p[2]!);
+    expect(() => descifrar(p.join('.'), llave)).toThrow();
+  });
+  it('detecta un byte cambiado en el IV', () => {
+    const p = cifrar('secreto', llave).split('.');
+    p[1] = voltearByte(p[1]!);
+    expect(() => descifrar(p.join('.'), llave)).toThrow();
+  });
+  it('rechaza un tag truncado (8 bytes)', () => {
+    const p = cifrar('secreto', llave).split('.');
+    p[2] = Buffer.from(p[2]!, 'base64url').subarray(0, 8).toString('base64url');
+    expect(() => descifrar(p.join('.'), llave)).toThrow();
+  });
   it('rechaza llaves que no son de 32 bytes', () => {
     expect(() => cifrar('x', Buffer.alloc(16).toString('base64'))).toThrow(/32 bytes/);
   });
