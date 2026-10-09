@@ -14,7 +14,9 @@ test('una cookie de sesión inventada no abre el panel', async ({ page, context,
     {
       name: '__Host-kz_sesion',
       value: randomBytes(32).toString('base64url'),
-      url: baseURL!,
+      // Con `url` Chrome rechaza la cookie __Host- en http; host + path=/ la deja host-only, como la real.
+      domain: new URL(baseURL!).hostname,
+      path: '/',
       secure: true,
       httpOnly: true,
       sameSite: 'Lax',
