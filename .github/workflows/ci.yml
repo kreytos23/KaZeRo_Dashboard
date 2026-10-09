@@ -231,9 +231,25 @@ jobs:
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}
           VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
       - name: Promover exactamente ese deployment (sin rebuild)
-        run: pnpm exec vercel promote "$DEPLOY_URL" --yes
+        # API REST: `vercel promote` con token de equipo responde "User not found (404)" en CI.
+        # Se promueve por id y se espera a que el dominio apunte a ese mismo deployment.
+        run: |
+          api="https://api.vercel.com"
+          auth="Authorization: Bearer ${VERCEL_TOKEN}"
+          host="${DEPLOY_URL#https://}"
+          id="$(curl -fsS -H "$auth" "${api}/v13/deployments/${host}?teamId=${VERCEL_ORG_ID}" | jq -r '.id')"
+          [ -n "$id" ] && [ "$id" != "null" ] || { echo "::error::No se obtuvo el id de ${host}."; exit 1; }
+          curl -fsS -X POST -H "$auth" "${api}/v10/projects/${VERCEL_PROJECT_ID}/promote/${id}?teamId=${VERCEL_ORG_ID}" > /dev/null
+          for _ in $(seq 1 30); do
+            actual="$(curl -fsS -H "$auth" "${api}/v13/deployments/${DOMINIO_PROD}?teamId=${VERCEL_ORG_ID}" | jq -r '.id')"
+            if [ "$actual" = "$id" ]; then echo "El dominio ${DOMINIO_PROD} apunta a ${id}."; exit 0; fi
+            sleep 5
+          done
+          echo "::error::El dominio ${DOMINIO_PROD} no apuntó al deployment ${id} en 150 s."
+          exit 1
         env:
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          DOMINIO_PROD: kazero-dashboard.vercel.app
       - name: Smoke contra el dominio de producción
         run: pnpm smoke https://kazero-dashboard.vercel.app
         env:
