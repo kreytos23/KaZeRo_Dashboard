@@ -140,7 +140,7 @@ jobs:
         with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec vercel pull --yes --environment=preview
-      - run: pnpm exec vercel build
+      - run: pnpm exec vercel build --target=preview
       - name: Migrar rama development tras el build (la usan los previews; un build roto no migra)
         run: pnpm db:migrar
         env:
@@ -149,8 +149,18 @@ jobs:
           KAZERO_HOST_PROD: ${{ vars.KAZERO_HOST_PROD }}
       - id: deploy
         run: |
-          url="$(pnpm exec vercel deploy --prebuilt)"
+          url="$(pnpm exec vercel deploy --prebuilt --target=preview)"
           echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Verificar que el deploy quedó en preview (falla si no)
+        run: |
+          target="$(pnpm exec vercel inspect "$DEPLOY_URL" --format=json 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).target??''))")"
+          if [ "$target" != "preview" ]; then
+            echo "::error::El deploy de preview quedó con target=${target:-desconocido}; se aborta para no publicar un PR en producción."
+            exit 1
+          fi
+          echo "Target verificado: $target"
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
       - run: pnpm smoke "$DEPLOY_URL"
         env:
           DEPLOY_URL: ${{ steps.deploy.outputs.url }}
@@ -195,6 +205,16 @@ jobs:
         run: |
           url="$(pnpm exec vercel deploy --prebuilt --prod --skip-domain)"
           echo "url=$url" >> "$GITHUB_OUTPUT"
+      - name: Verificar que el deploy quedó en production (falla si no)
+        run: |
+          target="$(pnpm exec vercel inspect "$DEPLOY_URL" --format=json 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).target??''))")"
+          if [ "$target" != "production" ]; then
+            echo "::error::El deploy de producción quedó con target=${target:-desconocido}; se aborta sin promover."
+            exit 1
+          fi
+          echo "Target verificado: $target"
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
       - name: Smoke contra el deployment antes de recibir tráfico
         run: pnpm smoke "$DEPLOY_URL"
         env:
