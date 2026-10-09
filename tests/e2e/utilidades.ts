@@ -17,5 +17,7 @@ export async function codigoTotpNoUsado(secreto: string): Promise<string> {
     paso = Math.floor(Date.now() / 30_000);
   }
   writeFileSync(RUTA_PASO, String(paso));
-  return generarCodigoTotp(secreto);
+  // El código se genera para el paso ANOTADO: si el reloj cruzara al siguiente paso entre medias, sin esto
+  // el código sería de paso+1 y la siguiente llamada lo repetiría (rechazado por reutilizar el paso).
+  return generarCodigoTotp(secreto, new Date(paso * 30_000));
 }
