@@ -75,6 +75,13 @@ describe('login en dos pasos', () => {
     ).toEqual({ ok: false, motivo: 'sesion' });
   });
 
+  it('el pre-token nunca vale como sesión completa', async () => {
+    const t = new Date('2026-10-08T12:00:00Z');
+    const pre = await app((db) => iniciarLogin(db, { email: EMAIL, password: PASSWORD, ...red }, t));
+    if (!pre.ok) throw new Error('login falló');
+    expect(await app((db) => validarSesion(db, pre.preToken, t))).toBeNull();
+  });
+
   it('contraseña incorrecta y correo inexistente dan el mismo motivo', async () => {
     const t = new Date();
     const a = await app((db) => iniciarLogin(db, { email: EMAIL, password: 'mala-mala-mala', ...red }, t));

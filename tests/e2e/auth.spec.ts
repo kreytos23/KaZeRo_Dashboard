@@ -1,7 +1,25 @@
+import { randomBytes } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { codigoTotpNoUsado, datosAdmin } from './utilidades';
 
 test('una ruta privada sin sesión manda a iniciar sesión', async ({ page }) => {
+  await page.goto('/panel');
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole('heading', { name: 'Iniciar sesión' })).toBeVisible();
+});
+
+test('una cookie de sesión inventada no abre el panel', async ({ page, context, baseURL }) => {
+  // El proxy solo mira que la cookie exista: la validación real (layout del panel) debe rechazarla.
+  await context.addCookies([
+    {
+      name: '__Host-kz_sesion',
+      value: randomBytes(32).toString('base64url'),
+      url: baseURL!,
+      secure: true,
+      httpOnly: true,
+      sameSite: 'Lax',
+    },
+  ]);
   await page.goto('/panel');
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole('heading', { name: 'Iniciar sesión' })).toBeVisible();
