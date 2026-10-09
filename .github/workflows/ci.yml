@@ -153,7 +153,12 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Verificar que el deploy quedó en preview (falla si no)
         run: |
-          target="$(pnpm exec vercel inspect "$DEPLOY_URL" --format=json 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).target??''))")"
+          # API REST (no el CLI: `vercel inspect --format=json` no imprime en stdout en CI).
+          # curl -f y jq fallan cerrado; en la API un deploy de preview tiene target null.
+          host="${DEPLOY_URL#https://}"
+          resp="$(curl -fsS -H "Authorization: Bearer ${VERCEL_TOKEN}" "https://api.vercel.com/v13/deployments/${host}?teamId=${VERCEL_ORG_ID}")"
+          [ "$(jq -r '.url' <<<"$resp")" = "$host" ] || { echo "::error::La API no devolvió el deployment ${host}."; exit 1; }
+          target="$(jq -r '.target // "preview"' <<<"$resp")"
           if [ "$target" != "preview" ]; then
             echo "::error::El deploy de preview quedó con target=${target:-desconocido}; se aborta para no publicar un PR en producción."
             exit 1
@@ -207,7 +212,12 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
       - name: Verificar que el deploy quedó en production (falla si no)
         run: |
-          target="$(pnpm exec vercel inspect "$DEPLOY_URL" --format=json 2>/dev/null | node -e "let d='';process.stdin.on('data',c=>d+=c).on('end',()=>console.log(JSON.parse(d).target??''))")"
+          # API REST (no el CLI: `vercel inspect --format=json` no imprime en stdout en CI).
+          # curl -f y jq fallan cerrado; en la API un deploy de preview tiene target null.
+          host="${DEPLOY_URL#https://}"
+          resp="$(curl -fsS -H "Authorization: Bearer ${VERCEL_TOKEN}" "https://api.vercel.com/v13/deployments/${host}?teamId=${VERCEL_ORG_ID}")"
+          [ "$(jq -r '.url' <<<"$resp")" = "$host" ] || { echo "::error::La API no devolvió el deployment ${host}."; exit 1; }
+          target="$(jq -r '.target // "preview"' <<<"$resp")"
           if [ "$target" != "production" ]; then
             echo "::error::El deploy de producción quedó con target=${target:-desconocido}; se aborta sin promover."
             exit 1
