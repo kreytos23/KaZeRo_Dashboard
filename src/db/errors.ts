@@ -1,4 +1,5 @@
-const SQLSTATE = /^[0-9A-Z]{5}$/;
+// Todo SQLSTATE de Postgres lleva al menos un dígito (XX000, P0001, HV00R); así se descartan EPERM, EBUSY…
+const SQLSTATE = /^(?=.*\d)[0-9A-Z]{5}$/;
 
 function buscarEnCadena(err: unknown, campo: 'code' | 'constraint', valido: (v: string) => boolean) {
   const vistos = new Set<unknown>();

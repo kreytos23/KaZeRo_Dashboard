@@ -16,6 +16,18 @@ describe('pgCode / pgConstraint', () => {
   it('ignora códigos que no son SQLSTATE (p. ej. ECONNRESET)', () => {
     expect(pgCode({ code: 'ECONNRESET' })).toBeUndefined();
   });
+  it('ignora códigos de 5 letras de Node sin dígitos (EPERM, EBUSY, EXDEV)', () => {
+    expect(pgCode({ code: 'EPERM' })).toBeUndefined();
+    expect(pgCode({ code: 'EBUSY' })).toBeUndefined();
+    expect(pgCode({ code: 'EXDEV' })).toBeUndefined();
+  });
+  it('salta un code que no es SQLSTATE y sigue buscando en cause', () => {
+    const envuelto = { code: 'EPERM', cause: { code: '23505' } };
+    expect(pgCode(envuelto)).toBe('23505');
+  });
+  it('acepta SQLSTATE con letras y dígitos (XX000, P0001, HV00R)', () => {
+    for (const c of ['XX000', 'P0001', 'HV00R']) expect(pgCode({ code: c })).toBe(c);
+  });
   it('no se cicla con causes circulares', () => {
     const a: { cause?: unknown } = {};
     a.cause = a;
