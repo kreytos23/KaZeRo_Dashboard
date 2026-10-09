@@ -1,8 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { stdin, stdout } from 'node:process';
-import { createInterface } from 'node:readline/promises';
 import { sql } from 'drizzle-orm';
 import { parse } from 'dotenv';
 import { conDbUrl } from '../src/db/pool';
@@ -10,6 +8,7 @@ import { crearAdmin } from '../src/server/auth/admin';
 import { describirUrl, hostNormalizado } from './lib/guarda-bd';
 import { asignarPasswordApp, migrar } from './lib/migrar';
 import { cadenaConexion } from './lib/neon';
+import { pedirDatosAdmin } from './lib/pedir-admin';
 
 const ES_WINDOWS = process.platform === 'win32';
 const modo = process.argv[2];
@@ -64,6 +63,18 @@ const owner = cadenaConexion(rama);
 const d = describirUrl(owner);
 console.log(`[bd:configurar] Rama ${rama} → ${d.usuario}@${d.host}/${d.baseDatos}`);
 
+let datosAdmin: { email: string; password: string } | undefined;
+let hostProd: string | undefined;
+
+if (modo === 'desarrollo') {
+  // Si `development` resolviera al mismo host que producción, se pisaría producción: se aborta antes de tocar nada.
+  hostProd = hostNormalizado(cadenaConexion('production'));
+  if (hostNormalizado(owner) === hostProd) {
+    console.error('La rama development apunta al mismo host que producción. No se cambió nada.');
+    process.exit(1);
+  }
+}
+
 if (modo === 'produccion') {
   // Re-ejecutar rotaría la llave TOTP y el admin existente ya no podría entrar: se aborta ANTES de migrar.
   // En una BD nueva la tabla admin aún no existe, de ahí to_regclass.
@@ -77,11 +88,17 @@ if (modo === 'produccion') {
     if ((existentes.rows[0]?.n ?? 0) > 0) {
       console.error(
         'Producción ya tiene admin. No se cambió nada (ni migraciones ni contraseñas): rotar rompería su TOTP. ' +
-          'Para rotar, hazlo como tarea aparte.',
+          'Para rotar, hazlo como tarea aparte.\n' +
+          'Si se perdieron la URI TOTP o los códigos de recuperación: con el rol dueño (neondb_owner) borra ' +
+          'los códigos de recuperación (codigo_recuperacion) y el admin (admin) de producción, y vuelve a ' +
+          'ejecutar este comando.',
       );
       process.exit(1);
     }
   }
+  // Correo y contraseña se piden y validan ANTES de cualquier cambio: un dato inválido no deja
+  // migraciones aplicadas ni secretos rotados a medias.
+  datosAdmin = await pedirDatosAdmin('\nCorreo del admin de producción: ');
 }
 
 await migrar(owner);
@@ -92,12 +109,11 @@ console.log('  ✓ kazero_app con LOGIN y contraseña nueva');
 const llaveTotp = randomBytes(32).toString('base64');
 
 if (modo === 'desarrollo') {
-  const hostProd = hostNormalizado(cadenaConexion('production'));
   actualizarEnvLocal({
     DATABASE_URL: app,
     DATABASE_URL_OWNER: owner,
     KAZERO_TOTP_KEY: llaveTotp,
-    KAZERO_HOST_PROD: hostProd,
+    KAZERO_HOST_PROD: hostProd!,
   });
   vercelEnv('DATABASE_URL', 'preview', app);
   // Los Previews usan la rama development: deben descifrar los admins creados con la llave local.
@@ -112,15 +128,9 @@ if (modo === 'desarrollo') {
   ejecutar('gh', ['variable', 'set', 'KAZERO_HOST_PROD'], hostNormalizado(owner));
   console.log('  ✓ GitHub variable de repo: KAZERO_HOST_PROD');
 
-  // El admin se crea aquí, con la llave TOTP aún en memoria: Vercel no vuelve a mostrar valores Sensitive
+  // El admin (datos ya validados arriba) se crea aquí, con la llave TOTP aún en memoria: Vercel no vuelve a mostrar valores Sensitive
   // y así la llave de producción nunca toca el disco.
-  const rl = createInterface({ input: stdin, output: stdout });
-  const email = (await rl.question('\nCorreo del admin de producción: ')).trim();
-  const password = await rl.question(
-    'Contraseña (mín. 12; se verá al teclear, limpia la terminal después): ',
-  );
-  rl.close();
-  const a = await conDbUrl(owner, (db) => crearAdmin(db, { email, password }, llaveTotp));
+  const a = await conDbUrl(owner, (db) => crearAdmin(db, datosAdmin!, llaveTotp));
   console.log('\nAgrega esta cuenta en tu app autenticadora (Google Authenticator, 1Password, etc.):');
   console.log(`  ${a.uriTotp}`);
   console.log('\nCódigos de recuperación (guárdalos fuera de la computadora; cada uno sirve una vez):');

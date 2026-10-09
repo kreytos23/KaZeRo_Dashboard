@@ -7,11 +7,12 @@ import { conDb } from '@/db/client';
 import { COOKIE_PRE, COOKIE_SESION, opcionesBorrado, opcionesCookie } from '@/server/auth/cookies';
 import { datosRed } from '@/server/auth/red';
 import { POLITICA, iniciarLogin, verificarSegundoFactor } from '@/server/auth/servicio';
+import { esquemaCorreo } from '@/server/auth/validacion';
 import { env } from '@/server/env';
 
 export type EstadoForm = { error?: string };
 
-const esquemaLogin = z.object({ email: z.email().max(200), password: z.string().min(1).max(200) });
+const esquemaLogin = z.object({ email: esquemaCorreo, password: z.string().min(1).max(200) });
 const esquemaCodigo = z.object({ codigo: z.string().trim().min(6).max(20) });
 
 const mensajeBloqueo = (m?: number) =>

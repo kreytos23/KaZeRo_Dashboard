@@ -1,10 +1,9 @@
-import { stdin, stdout } from 'node:process';
-import { createInterface } from 'node:readline/promises';
 import { existsSync, readFileSync } from 'node:fs';
 import { config, parse } from 'dotenv';
 import { conDbUrl } from '../src/db/pool';
 import { crearAdmin } from '../src/server/auth/admin';
 import { prepararDestino, verificarSecreto } from './lib/guarda-bd';
+import { pedirDatosAdmin } from './lib/pedir-admin';
 
 // No pisa variables ya exportadas: si la terminal trae otra DATABASE_URL_OWNER, la guarda lo detecta.
 config({ path: '.env.local', quiet: true });
@@ -19,10 +18,7 @@ verificarSecreto({
 });
 if (!llave) throw new Error('Falta KAZERO_TOTP_KEY del MISMO entorno que la BD de destino.');
 
-const rl = createInterface({ input: stdin, output: stdout });
-const email = (await rl.question('Correo del admin: ')).trim();
-const password = await rl.question('Contraseña (mín. 12; se verá al teclear, limpia la terminal después): ');
-rl.close();
+const { email, password } = await pedirDatosAdmin('Correo del admin: ');
 
 const a = await conDbUrl(url, (db) => crearAdmin(db, { email, password }, llave));
 console.log('\nAgrega esta cuenta en tu app autenticadora (Google Authenticator, 1Password, etc.):');
