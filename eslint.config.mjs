@@ -19,6 +19,7 @@ const configuracion = [
   {
     ignores: [
       '.next/**',
+      '.vercel/**',
       'drizzle/**',
       'playwright-report/**',
       'test-results/**',
