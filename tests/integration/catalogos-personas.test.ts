@@ -66,6 +66,17 @@ describe('vendedores (R-40)', () => {
       app((db) => crearVendedor(db, { nombre: 'NELLY', tipo: 'casa', comisionPct: '0.00' })),
     ).rejects.toThrow('Ya existe un vendedor con ese nombre.');
   });
+  it('valida la comisión antes de la BD, con mensaje claro', async () => {
+    const mensaje = 'La comisión debe ser un número entre 0 y 100 con hasta 2 decimales.';
+    for (const comisionPct of ['abc', '10%', '', '100.01', '-1', '1.234', '1e2']) {
+      await expect(
+        app((db) => crearVendedor(db, { nombre: 'Rosa', tipo: 'casa', comisionPct })),
+      ).rejects.toThrow(mensaje);
+    }
+    const id = await app((db) => crearVendedor(db, { nombre: 'Rosa', tipo: 'casa', comisionPct: '12.5' }));
+    const v = (await app((db) => obtenerVendedor(db, id)))!;
+    await expect(app((db) => actualizarVendedor(db, { ...v, comisionPct: '10%' }))).rejects.toThrow(mensaje);
+  });
   it('soloActivos filtra los inactivos', async () => {
     const id = await app((db) =>
       crearVendedor(db, { nombre: 'BLNail', tipo: 'consignacion', comisionPct: '18.00' }),

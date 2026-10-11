@@ -30,15 +30,27 @@ function nombreValido(nombre: string): string {
   return limpio;
 }
 
+/** Número 0..100 con hasta 2 decimales, validado antes de llegar a la columna numeric. */
+function comisionValida(valor: string): string {
+  const limpio = valor.trim();
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(limpio) || Number(limpio) > 100)
+    throw new ErrorNegocio(
+      'vendedor_comision_invalida',
+      'La comisión debe ser un número entre 0 y 100 con hasta 2 decimales.',
+    );
+  return limpio;
+}
+
 export function crearVendedor(
   db: Ejecutor,
   d: { nombre: string; tipo: TipoVendedor; comisionPct: string },
 ): Promise<string> {
   const nombre = nombreValido(d.nombre);
+  const comisionPct = comisionValida(d.comisionPct);
   return conErroresDeNegocio(async () => {
     const [v] = await db
       .insert(vendedor)
-      .values({ nombre, tipo: d.tipo, comisionPct: d.comisionPct })
+      .values({ nombre, tipo: d.tipo, comisionPct })
       .returning({ id: vendedor.id });
     return v!.id;
   });
@@ -56,13 +68,14 @@ export function actualizarVendedor(
   },
 ): Promise<void> {
   const nombre = nombreValido(d.nombre);
+  const comisionPct = comisionValida(d.comisionPct);
   return conErroresDeNegocio(async () => {
     const filas = await db
       .update(vendedor)
       .set({
         nombre,
         tipo: d.tipo,
-        comisionPct: d.comisionPct,
+        comisionPct,
         activo: d.activo,
         version: sql`${vendedor.version} + 1`,
       })

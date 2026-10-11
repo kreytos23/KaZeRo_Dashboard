@@ -200,6 +200,7 @@ describe('exhibidores', () => {
     const { exhibidorId } = await preparar();
     await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EX01'] }));
     // Simula la FK de un movimiento con exhibidor_id tomada por otra transacción abierta.
+    let pendiente: Promise<unknown> = Promise.resolve();
     const resultado = await conDbUrl(urlApp(), (db) =>
       db.transaction(async (tx) => {
         await tx
@@ -207,12 +208,15 @@ describe('exhibidores', () => {
           .from(exhibidor)
           .where(sql`${exhibidor.id} = ${exhibidorId}`)
           .for('key share');
+        pendiente = app((d2) => regresarPiezas(d2, { exhibidorId, codigos: ['EX01'] }));
         return Promise.race([
-          app((d2) => regresarPiezas(d2, { exhibidorId, codigos: ['EX01'] })).then(() => 'ok'),
+          pendiente.then(() => 'ok'),
           new Promise<string>((r) => setTimeout(() => r('bloqueado'), 8000)),
         ]);
       }),
     );
+    // Si falló por bloqueo, espera a que termine para que no se cruce con el truncarTodo de la siguiente prueba.
+    await Promise.allSettled([pendiente]);
     expect(resultado).toBe('ok');
   });
 

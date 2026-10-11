@@ -41,6 +41,19 @@ const MENSAJES: Record<string, string> = {
   admin_email_uq: 'Ya existe un administrador con ese correo.',
 };
 
+function mensajesPg(err: unknown): string[] {
+  const out: string[] = [];
+  const vistos = new Set<unknown>();
+  let actual: unknown = err;
+  while (actual !== null && typeof actual === 'object' && !vistos.has(actual)) {
+    vistos.add(actual);
+    const m = (actual as { message?: unknown }).message;
+    if (typeof m === 'string') out.push(m);
+    actual = (actual as { cause?: unknown }).cause;
+  }
+  return out;
+}
+
 export function traducirErrorPg(err: unknown): ErrorNegocio | null {
   const constraint = pgConstraint(err);
   if (constraint && MENSAJES[constraint]) return new ErrorNegocio(constraint, MENSAJES[constraint]);
@@ -52,8 +65,12 @@ export function traducirErrorPg(err: unknown): ErrorNegocio | null {
       'conflicto_concurrente',
       'Otra operación modificó estos datos al mismo tiempo. Intenta de nuevo.',
     );
-  // Texto que no es un uuid (id manipulado en la URL o el formulario).
-  if (code === '22P02') return new ErrorNegocio('no_encontrado', 'Registro no encontrado.');
+  if (code === '22P02') {
+    // Solo el uuid mal formado (id manipulado) es "no encontrado"; el resto (numeric, enum, integer…) es dato inválido.
+    if (mensajesPg(err).some((m) => /type uuid/i.test(m)))
+      return new ErrorNegocio('no_encontrado', 'Registro no encontrado.');
+    return new ErrorNegocio('dato_invalido', 'Uno de los datos no tiene un formato válido.');
+  }
   return null;
 }
 

@@ -22,9 +22,19 @@ describe('traducción de errores de Postgres', () => {
     }
   });
   it('traduce un uuid inválido como registro no encontrado', () => {
-    const e = traducirErrorPg(envuelto({ code: '22P02' }));
+    const e = traducirErrorPg(
+      envuelto({ code: '22P02', message: 'invalid input syntax for type uuid: "no-es-uuid"' }),
+    );
     expect(e?.codigo).toBe('no_encontrado');
     expect(e?.message).toBe('Registro no encontrado.');
+  });
+  it('un 22P02 que no es de uuid es un dato inválido, no "no encontrado"', () => {
+    const e = traducirErrorPg(
+      envuelto({ code: '22P02', message: 'invalid input syntax for type numeric: "abc"' }),
+    );
+    expect(e?.codigo).toBe('dato_invalido');
+    expect(e?.message).toBe('Uno de los datos no tiene un formato válido.');
+    expect(traducirErrorPg(envuelto({ code: '22P02' }))?.codigo).toBe('dato_invalido');
   });
   it('no inventa traducciones para errores desconocidos', () => {
     expect(traducirErrorPg(new Error('x'))).toBeNull();

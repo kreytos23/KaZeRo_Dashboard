@@ -62,6 +62,7 @@ function codigosValidos(codigos: string[]): string[] {
  *
  * enviar y regresar NO suben exhibidor.version a propósito: el resumen de piezas es derivado y
  * `cerrarExhibidor` vuelve a contar bajo este mismo bloqueo.
+ * La fila del vendedor no se bloquea: una desactivación concurrente puede dejar pasar un envío (aceptado).
  * Futuro servicio de pedidos: la transición apartada → en_exhibidor debe bloquear el exhibidor
  * igual (NO KEY UPDATE) y rechazar si está cerrado.
  */
