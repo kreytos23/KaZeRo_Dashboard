@@ -1,0 +1,45 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { conDb } from '@/db/client';
+import type { EstadoAccion } from '@/features/ui/estado';
+import { ejecutarAccion, texto, uuidDe, uuidOpcionalDe, versionDe } from '@/server/acciones';
+import { requerirSesion } from '@/server/auth/sesion-actual';
+import { actualizarCliente, crearCliente } from '@/server/clientes/servicio';
+
+export async function accionCrearCliente(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  await requerirSesion();
+  return ejecutarAccion(async () => {
+    await conDb((db) =>
+      crearCliente(db, { nombre: texto(fd, 'nombre'), referencia: texto(fd, 'referencia') }),
+    );
+    revalidatePath('/panel/clientes');
+    return 'Cliente agregado.';
+  });
+}
+
+export async function accionEditarCliente(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  await requerirSesion();
+  return ejecutarAccion(async () => {
+    const id = uuidDe(fd, 'id');
+    const version = versionDe(fd);
+    const vendedorHabitualId = uuidOpcionalDe(fd, 'vendedorHabitualId');
+    await conDb((db) =>
+      actualizarCliente(db, {
+        id,
+        version,
+        nombre: texto(fd, 'nombre'),
+        referencia: texto(fd, 'referencia'),
+        telefono: texto(fd, 'telefono'),
+        cumpleanos: texto(fd, 'cumpleanos'),
+        redSocial: texto(fd, 'redSocial'),
+        usuarioRed: texto(fd, 'usuarioRed'),
+        vendedorHabitualId,
+        notas: texto(fd, 'notas'),
+      }),
+    );
+    revalidatePath(`/panel/clientes/${id}`);
+    revalidatePath('/panel/clientes');
+    return 'Cambios guardados.';
+  });
+}
