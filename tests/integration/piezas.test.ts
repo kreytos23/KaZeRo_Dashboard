@@ -95,6 +95,19 @@ describe('alta por lote', () => {
     }
     expect(new Set(fichas.map((f) => f!.categoriaId)).size).toBe(1);
   });
+  it('si el material o el proveedor no se pueden asignar, aborta el lote en vez de guardarlo vacío', async () => {
+    // Σ final: JS la pasa a ς y lower() de Postgres a σ, así que el SELECT de vuelta no encuentra el nombre.
+    const fila = (c: string, mat: string, prov: string) =>
+      [c, 'Anillos', 'Pieza', mat, prov, '10', '20'].join('\t');
+    const lote = (texto: string) => parsearLote(texto).filas;
+    await expect(app((db) => altaLote(db, lote(fila('AG01', 'ΟΔΟΣ', ''))))).rejects.toThrow(
+      'Línea 1: no se pudo asignar el material.',
+    );
+    await expect(
+      app((db) => altaLote(db, lote([fila('AG01', 'Oro', ''), fila('AG02', '', 'ΟΔΟΣ')].join('\n')))),
+    ).rejects.toThrow('Línea 2: no se pudo asignar el proveedor.');
+    expect(await app((db) => obtenerPiezaPorCodigo(db, 'AG01'))).toBeNull();
+  });
   it('rechaza lotes sin filas o con más de 500 filas', async () => {
     await expect(app((db) => altaLote(db, []))).rejects.toThrow('El lote no tiene piezas.');
     const filas = Array.from({ length: 501 }, (_, i) => ({

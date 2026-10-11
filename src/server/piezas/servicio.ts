@@ -109,7 +109,8 @@ export async function altaPieza(db: Ejecutor, d: DatosPieza): Promise<{ id: stri
  */
 export async function altaLote(db: Ejecutor, filas: FilaLote[]): Promise<{ creadas: number }> {
   if (filas.length === 0) throw new ErrorNegocio('lote_vacio', 'El lote no tiene piezas.');
-  if (filas.length > MAX_FILAS_LOTE) throw new ErrorNegocio('lote', 'Máximo 500 piezas por lote.');
+  if (filas.length > MAX_FILAS_LOTE)
+    throw new ErrorNegocio('lote', `Máximo ${MAX_FILAS_LOTE} piezas por lote.`);
   const validas = filas.map((f) => ({ fila: f, v: validarPieza(f) }));
   return conErroresDeNegocio(() =>
     db.transaction(async (tx) => {
@@ -156,12 +157,14 @@ export async function altaLote(db: Ejecutor, filas: FilaLote[]): Promise<{ cread
         const categoriaId = idDe(categorias, fila.categoria);
         if (!categoriaId)
           throw new ErrorNegocio('lote', `Línea ${fila.linea}: no se pudo asignar la categoría.`);
-        return {
-          ...v,
-          categoriaId,
-          materialId: idDe(materiales, fila.material),
-          proveedorId: idDe(proveedores, fila.proveedor),
-        };
+        // Con texto pero sin id (p. ej. normalización distinta en JS y en Postgres): mejor abortar que guardar vacío.
+        const materialId = idDe(materiales, fila.material);
+        if (fila.material && !materialId)
+          throw new ErrorNegocio('lote', `Línea ${fila.linea}: no se pudo asignar el material.`);
+        const proveedorId = idDe(proveedores, fila.proveedor);
+        if (fila.proveedor && !proveedorId)
+          throw new ErrorNegocio('lote', `Línea ${fila.linea}: no se pudo asignar el proveedor.`);
+        return { ...v, categoriaId, materialId, proveedorId };
       });
       const insertadas = await tx.insert(pieza).values(valores).returning({ id: pieza.id });
       await tx
