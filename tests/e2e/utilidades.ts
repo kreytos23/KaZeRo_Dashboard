@@ -2,6 +2,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { generarCodigoTotp } from '../../src/server/auth/totp';
 
 export const RUTA_DATOS = 'playwright/.datos/admin.json';
+export const RUTA_ESTADO = 'playwright/.datos/estado.json';
+export const RUTA_ESTADO_REGEN = 'playwright/.datos/estado-regen.json';
+export const RUTA_DATOS_REGEN = 'playwright/.datos/admin-regen.json';
 export const RUTA_PASO = 'playwright/.datos/ultimo-paso';
 
 export function datosAdmin(): { email: string; password: string; secretoTotp: string } {
@@ -20,4 +23,9 @@ export async function codigoTotpNoUsado(secreto: string): Promise<string> {
   // El código se genera para el paso ANOTADO: si el reloj cruzara al siguiente paso entre medias, sin esto
   // el código sería de paso+1 y la siguiente llamada lo repetiría (rechazado por reutilizar el paso).
   return generarCodigoTotp(secreto, new Date(paso * 30_000));
+}
+
+/** Admin aparte para regenerar el TOTP: la acción revoca sus otras sesiones y cambia su secreto. */
+export function datosAdminRegen(): { email: string; password: string } {
+  return JSON.parse(readFileSync(RUTA_DATOS_REGEN, 'utf8'));
 }
