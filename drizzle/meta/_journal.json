@@ -15,6 +15,20 @@
       "when": 1791448377601,
       "tag": "0001_rol_app",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791696375969,
+      "tag": "0002_many_layla_miller",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791696376823,
+      "tag": "0003_inventario_reglas",
+      "breakpoints": true
     }
   ]
 }

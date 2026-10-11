@@ -4,6 +4,9 @@ import * as schema from './schema';
 
 export type Db = NeonDatabase<typeof schema>;
 
+/** La conexión directa o una transacción en curso: los servicios aceptan ambas. */
+export type Ejecutor = Db | Parameters<Parameters<Db['transaction']>[0]>[0];
+
 /**
  * Pool por request: en funciones serverless Neon recomienda crearlo y cerrarlo dentro del handler.
  * Node 24 trae WebSocket global, así que no hace falta configurar neonConfig.webSocketConstructor.
