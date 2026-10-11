@@ -13,3 +13,10 @@ export async function requerirSesion() {
   if (!s) redirect('/login');
   return s;
 }
+
+/** Para Route Handlers: devuelve null en vez de redirigir (la ruta responde 401 JSON). */
+export async function sesionDeApi() {
+  const token = (await cookies()).get(COOKIE_SESION)?.value;
+  if (!token) return null;
+  return conDb((db) => validarSesion(db, token));
+}
