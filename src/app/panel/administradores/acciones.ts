@@ -32,7 +32,8 @@ export async function accionAgregarAdmin(_: EstadoEnrolamiento, fd: FormData): P
       {
         adminActualId: adminId,
         passwordActual: texto(fd, 'passwordActual'),
-        email: texto(fd, 'email'),
+        // `usuarioActual` (campo oculto para el gestor de contraseñas) se ignora a propósito.
+        email: texto(fd, 'correoNuevo'),
         password: texto(fd, 'password'),
         confirmacion: texto(fd, 'confirmacion'),
         ...red,

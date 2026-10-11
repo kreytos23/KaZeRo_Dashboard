@@ -11,8 +11,10 @@ const FECHA = new Intl.DateTimeFormat('es-MX', {
 export const metadata = { title: 'Administradores' };
 
 export default async function PaginaAdministradores() {
-  await requerirSesion();
+  const { adminId } = await requerirSesion();
   const admins = await conDb((db) => listarAdmins(db));
+  // No es secreto: es el usuario de esta cuenta, para que el gestor de contraseñas empareje bien.
+  const emailActual = admins.find((a) => a.id === adminId)?.email ?? '';
   return (
     <section className="flex max-w-3xl flex-col gap-8">
       <h1 className="text-2xl font-semibold">Administradores</h1>
@@ -25,11 +27,11 @@ export default async function PaginaAdministradores() {
       </ul>
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Agregar administrador</h2>
-        <FormAgregarAdmin />
+        <FormAgregarAdmin emailActual={emailActual} />
       </div>
       <div className="flex flex-col gap-3">
         <h2 className="text-lg font-semibold">Regenerar mi TOTP</h2>
-        <FormRegenerarTotp />
+        <FormRegenerarTotp emailActual={emailActual} />
       </div>
     </section>
   );

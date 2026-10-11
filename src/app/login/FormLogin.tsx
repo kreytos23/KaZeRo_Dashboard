@@ -10,9 +10,12 @@ export function FormLogin() {
       <label className="flex flex-col gap-1 text-sm font-medium">
         Correo
         <input
+          id="login-correo"
           name="email"
           type="email"
           autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
           required
           className="min-h-11 rounded-lg border border-borde-campo bg-white px-3"
         />
@@ -20,6 +23,7 @@ export function FormLogin() {
       <label className="flex flex-col gap-1 text-sm font-medium">
         Contraseña
         <input
+          id="login-password"
           name="password"
           type="password"
           autoComplete="current-password"

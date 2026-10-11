@@ -48,6 +48,25 @@ function Enrolamiento({
   );
 }
 
+/**
+ * Campo de usuario oculto para el gestor de contraseñas: la "contraseña actual" es la de ESTA cuenta, así que
+ * Chrome debe emparejarla con el correo del administrador en sesión y no con otro campo del formulario.
+ * El servidor lo ignora (la identidad sale de la sesión).
+ */
+function UsuarioActual({ email }: { email: string }) {
+  return (
+    <input
+      type="text"
+      name="usuarioActual"
+      autoComplete="username"
+      value={email}
+      readOnly
+      hidden
+      aria-hidden
+    />
+  );
+}
+
 /** Despacha con onSubmit para conservar el control; las contraseñas siempre se vacían tras enviar. */
 function useAccion(accion: Accion) {
   const [estado, despachar, pendiente] = useActionState(accion, {});
@@ -62,7 +81,7 @@ function useAccion(accion: Accion) {
   return { estado, pendiente, onSubmit };
 }
 
-function Alta({ onOcultar }: { onOcultar: () => void }) {
+function Alta({ onOcultar, emailActual }: { onOcultar: () => void; emailActual: string }) {
   const { estado, pendiente, onSubmit } = useAccion(accionAgregarAdmin);
   if (estado.enrolamiento)
     return (
@@ -74,11 +93,24 @@ function Alta({ onOcultar }: { onOcultar: () => void }) {
     );
   return (
     <form onSubmit={onSubmit} aria-busy={pendiente} className="flex max-w-md flex-col gap-3">
+      {/* Primero la credencial de esta cuenta (con su usuario oculto); después, la del administrador nuevo. */}
+      <UsuarioActual email={emailActual} />
+      <Campo
+        etiqueta="Tu contraseña actual"
+        name="passwordActual"
+        type="password"
+        autoComplete="current-password"
+        required
+      />
       <Campo
         etiqueta="Correo del nuevo administrador"
-        name="email"
+        name="correoNuevo"
         type="email"
         autoComplete="off"
+        autoCapitalize="none"
+        spellCheck={false}
+        data-1p-ignore
+        data-lpignore="true"
         required
         maxLength={200}
       />
@@ -98,13 +130,6 @@ function Alta({ onOcultar }: { onOcultar: () => void }) {
         required
         minLength={12}
       />
-      <Campo
-        etiqueta="Tu contraseña actual"
-        name="passwordActual"
-        type="password"
-        autoComplete="current-password"
-        required
-      />
       {estado.error && (
         <p role="alert" className="aviso-error">
           {estado.error}
@@ -121,7 +146,7 @@ function Alta({ onOcultar }: { onOcultar: () => void }) {
   );
 }
 
-function Regenerar({ onOcultar }: { onOcultar: () => void }) {
+function Regenerar({ onOcultar, emailActual }: { onOcultar: () => void; emailActual: string }) {
   const { estado, pendiente, onSubmit } = useAccion(accionRegenerarTotp);
   if (estado.enrolamiento)
     return (
@@ -137,6 +162,7 @@ function Regenerar({ onOcultar }: { onOcultar: () => void }) {
         Úsalo si perdiste el teléfono. Tu TOTP y códigos actuales dejan de servir y se cierran tus demás
         sesiones.
       </p>
+      <UsuarioActual email={emailActual} />
       <Campo
         etiqueta="Tu contraseña actual"
         name="passwordActual"
@@ -161,12 +187,12 @@ function Regenerar({ onOcultar }: { onOcultar: () => void }) {
 }
 
 /** Al ocultar se cambia la `key`: el estado con el secreto se descarta por completo. */
-export function FormAgregarAdmin() {
+export function FormAgregarAdmin({ emailActual }: { emailActual: string }) {
   const [n, setN] = useState(0);
-  return <Alta key={n} onOcultar={() => setN((x) => x + 1)} />;
+  return <Alta key={n} emailActual={emailActual} onOcultar={() => setN((x) => x + 1)} />;
 }
 
-export function FormRegenerarTotp() {
+export function FormRegenerarTotp({ emailActual }: { emailActual: string }) {
   const [n, setN] = useState(0);
-  return <Regenerar key={n} onOcultar={() => setN((x) => x + 1)} />;
+  return <Regenerar key={n} emailActual={emailActual} onOcultar={() => setN((x) => x + 1)} />;
 }
