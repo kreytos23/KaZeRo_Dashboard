@@ -71,6 +71,14 @@
     outline-offset: 2px;
   }
 
+  /* En los campos de fecha el foco real vive en sus segmentos internos (día, mes, año): sin esto el
+     campo entero no muestra anillo con teclado, solo el segmento resaltado por el navegador. */
+  input[type='date']:focus-within,
+  input[type='time']:focus-within {
+    outline: 2px solid var(--color-primario);
+    outline-offset: 2px;
+  }
+
   /* Tailwind 4 deja `cursor: default` en los botones: todo lo que se puede accionar muestra la mano. */
   a[href],
   button,
