@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
-import { accesoLog, admin } from '@/db/schema';
+import { accesoLog, admin, sesion } from '@/db/schema';
 import { codigoRecuperacion } from '@/db/schema';
 import { crearAdmin } from '@/server/auth/admin';
 import { agregarAdmin, listarAdmins, regenerarTotp } from '@/server/auth/administradores';
@@ -18,6 +18,8 @@ import { llaveTotp, truncarTodo, urlApp, urlOwner } from './utilidades';
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 const red = { ip: '203.0.113.9', userAgent: 'vitest' };
 const PASS = 'contraseña-actual-123';
+// Para las altas que no llegan al bloqueo: la sesión actual no interviene.
+const SIN_SESION = '00000000-0000-4000-8000-000000000000';
 
 let adminId: string;
 let secreto: string;
@@ -52,6 +54,20 @@ async function loginConCodigo(email: string, password: string, codigo: string, t
   return app((db) => verificarSegundoFactor(db, { preToken: pre.preToken, codigo, ...red }, llaveTotp(), t));
 }
 
+/** Inicia sesión de verdad (fila en `sesion`) y devuelve su token e id. */
+async function sesionReal(t: Date) {
+  const s = await login('duena@kazero.mx', PASS, secreto, t);
+  if (!s.ok) throw new Error('login falló');
+  const v = await app((db) => validarSesion(db, s.token, t));
+  if (!v) throw new Error('sesión inválida');
+  return { token: s.token, sesionId: v.sesionId };
+}
+
+const revocadaAt = (id: string) =>
+  conDbUrl(urlOwner(), (db) =>
+    db.select({ r: sesion.revocadaAt }).from(sesion).where(eq(sesion.id, id)),
+  ).then((f) => f[0]!.r);
+
 const eventos = (email: string) =>
   app((db) => db.select({ evento: accesoLog.evento }).from(accesoLog).where(eq(accesoLog.email, email))).then(
     (f) => f.map((x) => x.evento),
@@ -64,6 +80,7 @@ describe('agregar administrador', () => {
         db,
         {
           adminActualId: adminId,
+          sesionActualId: SIN_SESION,
           passwordActual: 'mala-mala-mala',
           email: 'cliente@kazero.mx',
           password: 'otra-contraseña-123',
@@ -84,6 +101,7 @@ describe('agregar administrador', () => {
         db,
         {
           adminActualId: adminId,
+          sesionActualId: SIN_SESION,
           passwordActual: PASS,
           email: ' Cliente@Kazero.mx ',
           password: 'otra-contraseña-123',
@@ -112,6 +130,7 @@ describe('agregar administrador', () => {
   it('rechaza correos repetidos y contraseñas débiles', async () => {
     const base = {
       adminActualId: adminId,
+      sesionActualId: SIN_SESION,
       passwordActual: PASS,
       password: 'otra-contraseña-123',
       confirmacion: 'otra-contraseña-123',
@@ -199,25 +218,54 @@ describe('regenerar TOTP', () => {
     expect(await eventos('duena@kazero.mx')).toContain('password_fallido');
   });
 
-  it('la re-autenticación cuenta para el bloqueo por intentos', async () => {
+  it('la re-autenticación cuenta para el bloqueo por intentos y al bloquearse revoca la sesión actual', async () => {
     const t0 = new Date('2026-10-09T12:00:00Z');
-    const intento = () =>
+    const { token, sesionId } = await sesionReal(t0);
+    const intento = (passwordActual: string) =>
       app((db) =>
-        regenerarTotp(
-          db,
-          { adminId, sesionActualId: adminId, passwordActual: 'mala-mala-mala', ...red },
-          llaveTotp(),
-          t0,
-        ),
+        regenerarTotp(db, { adminId, sesionActualId: sesionId, passwordActual, ...red }, llaveTotp(), t0),
       );
-    for (let i = 0; i < 5; i++) expect(await intento()).toMatchObject({ ok: false });
-    const r = await app((db) =>
-      regenerarTotp(db, { adminId, sesionActualId: adminId, passwordActual: PASS, ...red }, llaveTotp(), t0),
-    );
+    for (let i = 0; i < 4; i++) expect(await intento('mala-mala-mala')).toMatchObject({ ok: false });
+    expect(await revocadaAt(sesionId)).toBeNull(); // aún no hay bloqueo: la sesión sigue viva
+    expect(await intento('mala-mala-mala')).toMatchObject({ ok: false });
+    const r = await intento(PASS);
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain('Demasiados intentos');
     // La interfaz usa este indicador para llevar al login con el motivo (sin PII) cuando se revoca la sesión.
     expect(r).toMatchObject({ bloqueado: true });
+    expect(await revocadaAt(sesionId)).toEqual(t0);
+    expect(await app((db) => validarSesion(db, token, t0))).toBeNull();
+  });
+});
+
+describe('bloqueo al agregar administrador', () => {
+  it('al bloquearse la re-autenticación revoca la sesión actual y devuelve bloqueado', async () => {
+    const t0 = new Date('2026-10-09T12:00:00Z');
+    const { token, sesionId } = await sesionReal(t0);
+    const intento = (passwordActual: string) =>
+      app((db) =>
+        agregarAdmin(
+          db,
+          {
+            adminActualId: adminId,
+            sesionActualId: sesionId,
+            passwordActual,
+            email: 'cliente@kazero.mx',
+            password: 'otra-contraseña-123',
+            confirmacion: 'otra-contraseña-123',
+            ...red,
+          },
+          llaveTotp(),
+          t0,
+        ),
+      );
+    for (let i = 0; i < 5; i++) expect(await intento('mala-mala-mala')).toMatchObject({ ok: false });
+    const r = await intento(PASS);
+    expect(r).toMatchObject({ ok: false, bloqueado: true });
+    if (!r.ok) expect(r.error).toContain('Demasiados intentos');
+    expect(await revocadaAt(sesionId)).toEqual(t0);
+    expect(await app((db) => validarSesion(db, token, t0))).toBeNull();
+    expect(await app((db) => listarAdmins(db))).toHaveLength(1);
   });
 });
 

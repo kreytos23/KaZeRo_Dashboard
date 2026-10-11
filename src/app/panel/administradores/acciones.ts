@@ -24,13 +24,14 @@ async function presentar(r: ResultadoEnrolamiento): Promise<EstadoEnrolamiento> 
 }
 
 export async function accionAgregarAdmin(_: EstadoEnrolamiento, fd: FormData): Promise<EstadoEnrolamiento> {
-  const { adminId } = await requerirSesion();
+  const { adminId, sesionId } = await requerirSesion();
   const red = await datosRed();
   const r = await conDb((db) =>
     agregarAdmin(
       db,
       {
         adminActualId: adminId,
+        sesionActualId: sesionId,
         passwordActual: texto(fd, 'passwordActual'),
         // `usuarioActual` (campo oculto para el gestor de contraseñas) se ignora a propósito.
         email: texto(fd, 'correoNuevo'),
@@ -41,6 +42,8 @@ export async function accionAgregarAdmin(_: EstadoEnrolamiento, fd: FormData): P
       env().KAZERO_TOTP_KEY,
     ),
   );
+  // El bloqueo revocó esta sesión: se sale a /login con un motivo fijo, igual que al regenerar el TOTP.
+  if (!r.ok && r.bloqueado) redirect('/login?motivo=bloqueado');
   // Solo se refresca la lista; el secreto vive en el estado del cliente y no se descarta.
   if (r.ok) revalidatePath('/panel/administradores');
   return presentar(r);

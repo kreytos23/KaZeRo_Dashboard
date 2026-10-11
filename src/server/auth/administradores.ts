@@ -21,6 +21,24 @@ function mensajeReauth(r: { motivo: 'credenciales' | 'bloqueado'; minutosRestant
     : 'Tu contraseña actual no es correcta.';
 }
 
+/**
+ * Sesión robada: quien la tenga no puede seguir probando contraseñas; al bloquearse la re-autenticación
+ * se revoca la sesión actual y la interfaz sale a /login?motivo=bloqueado.
+ */
+async function rechazoReauth(
+  tx: Ejecutor,
+  r: { motivo: 'credenciales' | 'bloqueado'; minutosRestantes?: number },
+  s: { adminId: string; sesionActualId: string },
+  ahora: Date,
+): Promise<ResultadoEnrolamiento> {
+  if (r.motivo !== 'bloqueado') return { ok: false, error: mensajeReauth(r) };
+  await tx
+    .update(sesion)
+    .set({ revocadaAt: ahora })
+    .where(and(eq(sesion.id, s.sesionActualId), eq(sesion.adminId, s.adminId), isNull(sesion.revocadaAt)));
+  return { ok: false, error: mensajeReauth(r), bloqueado: true };
+}
+
 /** Un ErrorNegocio traducido (p. ej. correo repetido por carrera) se devuelve como fallo de formulario. */
 async function comoResultado(fn: () => Promise<ResultadoEnrolamiento>): Promise<ResultadoEnrolamiento> {
   try {
@@ -42,6 +60,7 @@ export async function agregarAdmin(
   db: Db,
   e: {
     adminActualId: string;
+    sesionActualId: string;
     passwordActual: string;
     email: string;
     password: string;
@@ -56,7 +75,8 @@ export async function agregarAdmin(
   return comoResultado(() =>
     db.transaction(async (tx): Promise<ResultadoEnrolamiento> => {
       const r = await reautenticarAdmin(tx, e.adminActualId, e.passwordActual, e, ahora);
-      if (!r.ok) return { ok: false, error: mensajeReauth(r) };
+      if (!r.ok)
+        return rechazoReauth(tx, r, { adminId: e.adminActualId, sesionActualId: e.sesionActualId }, ahora);
       const [existe] = await tx
         .select({ id: admin.id })
         .from(admin)
@@ -85,22 +105,7 @@ export async function regenerarTotp(
   return comoResultado(() =>
     db.transaction(async (tx): Promise<ResultadoEnrolamiento> => {
       const r = await reautenticarAdmin(tx, e.adminId, e.passwordActual, e, ahora);
-      if (!r.ok) {
-        // Sesión robada: quien la tenga no puede seguir probando contraseñas; se revoca la actual al bloquearse.
-        if (r.motivo === 'bloqueado') {
-          await tx
-            .update(sesion)
-            .set({ revocadaAt: ahora })
-            .where(
-              and(eq(sesion.id, e.sesionActualId), eq(sesion.adminId, e.adminId), isNull(sesion.revocadaAt)),
-            );
-        }
-        return {
-          ok: false,
-          error: mensajeReauth(r),
-          ...(r.motivo === 'bloqueado' && { bloqueado: true as const }),
-        };
-      }
+      if (!r.ok) return rechazoReauth(tx, r, e, ahora);
       const secreto = nuevoSecretoTotp();
       const codigos = nuevosCodigosRecuperacion();
       await tx
