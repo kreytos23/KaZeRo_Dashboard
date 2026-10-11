@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decidirAcceso } from '@/server/seguridad/acceso';
+import { cacheControlPara, decidirAcceso } from '@/server/seguridad/acceso';
 
 describe('decidirAcceso (proxy)', () => {
   it.each([
@@ -11,6 +11,8 @@ describe('decidirAcceso (proxy)', () => {
     ['/robots.txt', false, 'pasar'],
     ['/icon.png', false, 'pasar'],
     ['/apple-icon.png', false, 'pasar'],
+    ['/favicon.ico', false, 'pasar'],
+    ['/favicon.icoX', false, 'redirigir_login'],
     ['/icon.png/x', false, 'redirigir_login'],
     ['/icon.pngx', false, 'redirigir_login'],
     ['/icon.svg', false, 'redirigir_login'],
@@ -53,5 +55,36 @@ describe('decidirAcceso (proxy)', () => {
     ['/api/busqueda/indice', true, 'pasar'],
   ] as const)('%s con cookie=%s → %s', (ruta, cookie, esperado) => {
     expect(decidirAcceso(ruta, cookie)).toBe(esperado);
+  });
+});
+
+describe('cacheControlPara (proxy)', () => {
+  const PUBLICA = 'public, max-age=86400';
+  it.each([
+    '/icon.png',
+    '/apple-icon.png',
+    '/favicon.ico',
+    '/marca/logo-k.webp',
+    '/marca/logo-horizontal.webp',
+    '/marca/otro.png',
+  ])('%s: recurso estático público, cache de un día (sin immutable: el nombre no lleva hash)', (ruta) => {
+    expect(cacheControlPara(ruta)).toBe(PUBLICA);
+  });
+  it.each([
+    '/',
+    '/login',
+    '/panel',
+    '/panel/vendedores',
+    '/api/busqueda/indice',
+    '/api/health',
+    '/robots.txt',
+    '/favicon.icoX',
+    '/icon.png/',
+    '/marca/sub/logo.webp',
+    '/marca/logo-k.webp/',
+    '/marca/Logo-K.webp',
+    '/marca/..%2fpanel.webp',
+  ])('%s: HTML/API o ruta dudosa, nunca se cachea', (ruta) => {
+    expect(cacheControlPara(ruta)).toBe('private, no-store');
   });
 });

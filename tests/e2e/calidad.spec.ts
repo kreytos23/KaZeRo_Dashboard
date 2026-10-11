@@ -122,8 +122,14 @@ test.describe('sin sesión', () => {
       const r = await request.get(ruta, { maxRedirects: 0 });
       expect(r.status(), ruta).toBe(200);
       expect(r.headers()['content-type'], ruta).toContain(tipo);
-      // favicon.ico no pasa por el proxy, pero las cabeceras estáticas de next.config lo cubren.
       expect(r.headers()['x-content-type-options'], ruta).toBe('nosniff');
+      // Binarios públicos: un día de caché, sin immutable (el nombre no lleva hash).
+      expect(r.headers()['cache-control'], ruta).toBe('public, max-age=86400');
+    }
+    // El HTML y las APIs siguen sin caché.
+    for (const ruta of ['/login', '/api/health']) {
+      const r = await request.get(ruta, { maxRedirects: 0 });
+      expect(r.headers()['cache-control'], ruta).toContain('no-store');
     }
     // Fuera de la lista exacta, /marca exige sesión como cualquier otra ruta.
     const r = await request.get('/marca/sub/logo.webp', { maxRedirects: 0 });

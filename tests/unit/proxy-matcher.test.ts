@@ -5,17 +5,17 @@ import { config } from '@/proxy';
 const cubre = (ruta: string) => new RegExp(`^${config.matcher[0]}$`).test(ruta);
 
 describe('matcher del proxy', () => {
-  it('excluye solo los estáticos exactos', () => {
+  it('excluye solo los estáticos de _next (con hash, inmutables)', () => {
     expect(cubre('/_next/static/chunks/a.js')).toBe(false);
     expect(cubre('/_next/image')).toBe(false);
     expect(cubre('/_next/image/x')).toBe(false);
-    expect(cubre('/favicon.ico')).toBe(false);
   });
   it('lo demás pasa por el proxy (cabeceras de seguridad y CSP), incluidas variantes parecidas', () => {
     for (const ruta of [
       '/',
       '/panel',
       '/no-existe',
+      '/favicon.ico',
       '/favicon.icoX',
       '/favicon.ico/x',
       '/_next/staticx',

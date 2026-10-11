@@ -1,8 +1,8 @@
 // Rutas públicas y sus subrutas por segmento, más archivos públicos que solo valen exactos.
 const PUBLICAS = ['/login', '/api/health'];
-// Iconos que Next genera desde src/app (el login sin sesión también los pide). `/favicon.ico` no
-// pasa por el proxy (ver matcher en src/proxy.ts), así que no hace falta listarlo.
-const ARCHIVOS_PUBLICOS = ['/robots.txt', '/icon.png', '/apple-icon.png'];
+// Iconos que Next genera desde src/app (el login sin sesión también los pide).
+const ICONOS = ['/icon.png', '/apple-icon.png', '/favicon.ico'];
+const ARCHIVOS_PUBLICOS = ['/robots.txt', ...ICONOS];
 // Imágenes de marca de public/marca: un único segmento con nombre simple, sin subcarpetas.
 const IMAGEN_MARCA = /^\/marca\/[a-z0-9-]+\.(?:webp|png)$/;
 
@@ -29,4 +29,13 @@ function esPublica(ruta: string) {
 export function decidirAcceso(ruta: string, tieneCookie: boolean): DecisionAcceso {
   if (tieneCookie || esPublica(ruta)) return 'pasar';
   return ruta === '/api' || ruta.startsWith('/api/') ? 'no_autenticado' : 'redirigir_login';
+}
+
+/**
+ * Solo los iconos y las imágenes de marca (binarios públicos, sin datos) se cachean, por un día y sin
+ * `immutable`: sus nombres no llevan hash y un cambio de logo debe verse al día siguiente. HTML y APIs
+ * nunca se cachean (lecciones §5). Se compara contra la ruta exacta, igual que en `esPublica`.
+ */
+export function cacheControlPara(ruta: string): string {
+  return ICONOS.includes(ruta) || IMAGEN_MARCA.test(ruta) ? 'public, max-age=86400' : 'private, no-store';
 }

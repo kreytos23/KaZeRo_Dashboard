@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { COOKIE_SESION } from '@/server/auth/cookies';
-import { decidirAcceso } from '@/server/seguridad/acceso';
+import { cacheControlPara, decidirAcceso } from '@/server/seguridad/acceso';
 import { construirCsp } from '@/server/seguridad/cabeceras';
 
 /**
@@ -24,15 +24,17 @@ export function proxy(req: NextRequest) {
     res = NextResponse.next({ request: { headers: cabeceras } });
   }
   res.headers.set('Content-Security-Policy', csp);
-  // El panel nunca se cachea (lecciones §5).
-  res.headers.set('Cache-Control', 'private, no-store');
+  // El panel nunca se cachea (lecciones §5); los iconos y el logo públicos, un día.
+  res.headers.set(
+    'Cache-Control',
+    decision === 'pasar' ? cacheControlPara(req.nextUrl.pathname) : 'private, no-store',
+  );
   return res;
 }
 
 export const config = {
-  // Se excluyen solo los estáticos exactos: `/favicon.icoX` o `/_next/staticx` (que dan 404) también
-  // deben pasar por el proxy para llevar CSP y cabeceras de seguridad. `/icon.png`, `/apple-icon.png` y
-  // `/marca/*.webp` pasan y son públicas (acceso.ts). `/favicon.ico` se excluye a propósito: es un binario
-  // público sin HTML (la CSP no aplica) y las cabeceras estáticas de next.config (nosniff, HSTS…) sí lo cubren.
-  matcher: ['/((?!_next/static/|_next/image(?:/|$)|favicon\\.ico$).*)'],
+  // Se excluyen solo los estáticos de Next (con hash): `/_next/staticx` (que da 404) también debe pasar
+  // por el proxy para llevar CSP y cabeceras de seguridad. `/icon.png`, `/apple-icon.png`, `/favicon.ico`
+  // y `/marca/*.webp` pasan, son públicas (acceso.ts) y el proxy les da su Cache-Control de un día.
+  matcher: ['/((?!_next/static/|_next/image(?:/|$)).*)'],
 };
