@@ -14,6 +14,18 @@ describe('traducción de errores de Postgres', () => {
       'pieza_transicion',
     );
   });
+  it('traduce interbloqueos y fallos de serialización', () => {
+    for (const code of ['40P01', '40001']) {
+      const e = traducirErrorPg(envuelto({ code }));
+      expect(e?.codigo).toBe('conflicto_concurrente');
+      expect(e?.message).toBe('Otra operación modificó estos datos al mismo tiempo. Intenta de nuevo.');
+    }
+  });
+  it('traduce un uuid inválido como registro no encontrado', () => {
+    const e = traducirErrorPg(envuelto({ code: '22P02' }));
+    expect(e?.codigo).toBe('no_encontrado');
+    expect(e?.message).toBe('Registro no encontrado.');
+  });
   it('no inventa traducciones para errores desconocidos', () => {
     expect(traducirErrorPg(new Error('x'))).toBeNull();
   });

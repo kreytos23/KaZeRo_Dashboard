@@ -1,5 +1,7 @@
+import { sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
+import { exhibidor } from '@/db/schema';
 import {
   cerrarExhibidor,
   crearExhibidor,
@@ -8,9 +10,9 @@ import {
   obtenerExhibidor,
   regresarPiezas,
 } from '@/server/exhibidores/servicio';
-import { altaPieza, historial, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
+import { altaPieza, cambiarEstado, historial, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { actualizarVendedor, crearVendedor, obtenerVendedor } from '@/server/vendedores/servicio';
-import { truncarTodo, urlApp } from './utilidades';
+import { truncarTodo, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 
@@ -141,7 +143,7 @@ describe('exhibidores', () => {
     await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EX01'] }));
     let e = (await app((db) => obtenerExhibidor(db, exhibidorId)))!;
     await expect(app((db) => cerrarExhibidor(db, { exhibidorId, version: e.version }))).rejects.toThrow(
-      'Regresa o vende sus 1 piezas antes de cerrarlo.',
+      'Regresa o vende 1 pieza antes de cerrarlo.',
     );
     await app((db) => regresarPiezas(db, { exhibidorId, codigos: ['EX01'] }));
     e = (await app((db) => obtenerExhibidor(db, exhibidorId)))!;
@@ -171,5 +173,88 @@ describe('exhibidores', () => {
     await expect(
       app((db) => crearExhibidor(db, { vendedorId, nombre: 'X', fechaEnvio: '2026-02-30' })),
     ).rejects.toThrow('La fecha de envío no es válida.');
+  });
+
+  it('ids que no son uuid dan error de negocio, no un error crudo', async () => {
+    await expect(app((db) => cerrarExhibidor(db, { exhibidorId: 'no-es-uuid', version: 1 }))).rejects.toThrow(
+      'Registro no encontrado.',
+    );
+    await expect(
+      app((db) => enviarPiezas(db, { exhibidorId: 'no-es-uuid', codigos: ['EX01'] })),
+    ).rejects.toThrow('Registro no encontrado.');
+  });
+
+  it('cerrar distingue piezas en exhibidor y apartadas, con plural correcto', async () => {
+    const { exhibidorId } = await preparar();
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EX01', 'EX02', 'EX03'] }));
+    await conDbUrl(urlOwner(), (db) =>
+      db.execute(sql`UPDATE pieza SET estado = 'apartada' WHERE codigo IN ('EX02', 'EX03')`),
+    );
+    const e = (await app((db) => obtenerExhibidor(db, exhibidorId)))!;
+    await expect(app((db) => cerrarExhibidor(db, { exhibidorId, version: e.version }))).rejects.toThrow(
+      'Regresa o vende 1 pieza antes de cerrarlo. Tiene 2 piezas apartadas pendientes de pedido.',
+    );
+  });
+
+  it('regresar no espera a un FOR KEY SHARE sobre el exhibidor (sin interbloqueo con cambiarEstado)', async () => {
+    const { exhibidorId } = await preparar();
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EX01'] }));
+    // Simula la FK de un movimiento con exhibidor_id tomada por otra transacción abierta.
+    const resultado = await conDbUrl(urlApp(), (db) =>
+      db.transaction(async (tx) => {
+        await tx
+          .select({ id: exhibidor.id })
+          .from(exhibidor)
+          .where(sql`${exhibidor.id} = ${exhibidorId}`)
+          .for('key share');
+        return Promise.race([
+          app((d2) => regresarPiezas(d2, { exhibidorId, codigos: ['EX01'] })).then(() => 'ok'),
+          new Promise<string>((r) => setTimeout(() => r('bloqueado'), 8000)),
+        ]);
+      }),
+    );
+    expect(resultado).toBe('ok');
+  });
+
+  it('cambiarEstado y regresarPiezas simultáneos sobre la misma pieza no se interbloquean', async () => {
+    const { exhibidorId } = await preparar();
+    for (let ronda = 0; ronda < 5; ronda++) {
+      await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EX01'] }));
+      const p = (await app((db) => obtenerPiezaPorCodigo(db, 'EX01')))!;
+      const r = await Promise.allSettled([
+        app((db) => cambiarEstado(db, { piezaId: p.id, version: p.version, aEstado: 'guardada' })),
+        app((db) => regresarPiezas(db, { exhibidorId, codigos: ['EX01'] })),
+      ]);
+      for (const x of r) {
+        if (x.status === 'rejected') expect((x.reason as Error).name).toBe('ErrorNegocio');
+      }
+      const despues = (await app((db) => obtenerPiezaPorCodigo(db, 'EX01')))!;
+      if (despues.estado === 'guardada') {
+        await app((db) =>
+          cambiarEstado(db, { piezaId: despues.id, version: despues.version, aEstado: 'disponible' }),
+        );
+      }
+    }
+  });
+
+  it('enviar y cerrar simultáneos: un solo resultado coherente y ningún error crudo', async () => {
+    const { exhibidorId } = await preparar();
+    const e = (await app((db) => obtenerExhibidor(db, exhibidorId)))!;
+    const [envio, cierre] = await Promise.allSettled([
+      app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EX01'] })),
+      app((db) => cerrarExhibidor(db, { exhibidorId, version: e.version })),
+    ]);
+    for (const x of [envio, cierre]) {
+      if (x.status === 'rejected') expect((x.reason as Error).name).toBe('ErrorNegocio');
+    }
+    const final = (await app((db) => obtenerExhibidor(db, exhibidorId)))!;
+    // O se envió (y cerrar fue rechazado por tener piezas) o se cerró (y enviar fue rechazado): nunca ambos.
+    if (final.estado === 'cerrado') {
+      expect(envio.status).toBe('rejected');
+      expect(final.piezasActuales).toBe(0);
+    } else {
+      expect(cierre.status).toBe('rejected');
+      expect(final.piezasActuales).toBe(1);
+    }
   });
 });

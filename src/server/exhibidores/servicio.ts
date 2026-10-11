@@ -51,14 +51,27 @@ function codigosValidos(codigos: string[]): string[] {
   return lista;
 }
 
-/** Orden de bloqueo fijo (exhibidor → piezas por id) para evitar deadlocks. Dos consultas en total. */
+/**
+ * Orden de bloqueo fijo (exhibidor → piezas por id). Dos consultas en total.
+ *
+ * El exhibidor se bloquea con NO KEY UPDATE y no con UPDATE: `cambiarEstado` (piezas) bloquea una pieza
+ * y luego inserta un movimiento con exhibidor_id, cuya FK toma FOR KEY SHARE sobre el exhibidor. Con
+ * FOR UPDATE: A (cambiarEstado) tiene la pieza P y espera al exhibidor X; B (regresarPiezas) tiene X y
+ * espera P → interbloqueo (40P01). NO KEY UPDATE no choca con KEY SHARE, pero sigue serializando
+ * enviar / regresar / cerrar entre sí.
+ *
+ * enviar y regresar NO suben exhibidor.version a propósito: el resumen de piezas es derivado y
+ * `cerrarExhibidor` vuelve a contar bajo este mismo bloqueo.
+ * Futuro servicio de pedidos: la transición apartada → en_exhibidor debe bloquear el exhibidor
+ * igual (NO KEY UPDATE) y rechazar si está cerrado.
+ */
 async function bloquear(tx: Ejecutor, exhibidorId: string, codigos: string[]) {
   const [e] = await tx
     .select({ estado: exhibidor.estado, vendedorActivo: vendedor.activo })
     .from(exhibidor)
     .innerJoin(vendedor, eq(vendedor.id, exhibidor.vendedorId))
     .where(eq(exhibidor.id, exhibidorId))
-    .for('update', { of: exhibidor });
+    .for('no key update', { of: exhibidor });
   if (!e) throw new ErrorNegocio('no_encontrado', 'El exhibidor no existe.');
   const piezas = await tx
     .select({
@@ -72,7 +85,16 @@ async function bloquear(tx: Ejecutor, exhibidorId: string, codigos: string[]) {
     .orderBy(asc(pieza.id))
     .for('update');
   const encontrados = new Set(piezas.map((p) => p.codigo));
-  return { ...e, piezas, faltantes: codigos.filter((c) => !encontrados.has(c)) };
+  // Los mensajes listan los códigos en el orden en que se escribieron (los ids son uuid aleatorios).
+  const orden = new Map(codigos.map((c, i) => [c, i]));
+  const porEscritura = <T extends { codigo: string }>(xs: T[]) =>
+    [...xs].sort((a, b) => orden.get(a.codigo)! - orden.get(b.codigo)!);
+  return {
+    ...e,
+    piezas,
+    porEscritura,
+    faltantes: codigos.filter((c) => !encontrados.has(c)),
+  };
 }
 
 export async function enviarPiezas(
@@ -82,11 +104,15 @@ export async function enviarPiezas(
   const codigos = codigosValidos(d.codigos);
   return conErroresDeNegocio(() =>
     db.transaction(async (tx) => {
-      const { estado, vendedorActivo, piezas, faltantes } = await bloquear(tx, d.exhibidorId, codigos);
+      const { estado, vendedorActivo, piezas, porEscritura, faltantes } = await bloquear(
+        tx,
+        d.exhibidorId,
+        codigos,
+      );
       if (estado === 'cerrado') throw new ErrorNegocio('exhibidor_cerrado', 'El exhibidor está cerrado.');
       if (!vendedorActivo)
         throw new ErrorNegocio('vendedor_inactivo', 'El vendedor del exhibidor está inactivo.');
-      const noDisponibles = piezas.filter((p) => p.estado !== 'disponible');
+      const noDisponibles = porEscritura(piezas.filter((p) => p.estado !== 'disponible'));
       if (faltantes.length || noDisponibles.length) {
         const partes = ['No se envió nada.'];
         if (faltantes.length) partes.push(`No existen: ${faltantes.join(', ')}.`);
@@ -126,8 +152,10 @@ export async function regresarPiezas(
   const codigos = codigosValidos(d.codigos);
   return conErroresDeNegocio(() =>
     db.transaction(async (tx) => {
-      const { piezas, faltantes } = await bloquear(tx, d.exhibidorId, codigos);
-      const ajenas = piezas.filter((p) => p.estado !== 'en_exhibidor' || p.exhibidorId !== d.exhibidorId);
+      const { piezas, porEscritura, faltantes } = await bloquear(tx, d.exhibidorId, codigos);
+      const ajenas = porEscritura(
+        piezas.filter((p) => p.estado !== 'en_exhibidor' || p.exhibidorId !== d.exhibidorId),
+      );
       if (faltantes.length || ajenas.length) {
         const partes = ['No se regresó nada.'];
         if (faltantes.length) partes.push(`No existen: ${faltantes.join(', ')}.`);
@@ -164,17 +192,28 @@ export async function cerrarExhibidor(
         .select({ version: exhibidor.version })
         .from(exhibidor)
         .where(eq(exhibidor.id, d.exhibidorId))
-        .for('update');
+        .for('no key update'); // ver el comentario de `bloquear`
       if (!e) throw new ErrorNegocio('no_encontrado', 'El exhibidor no existe.');
       if (e.version !== d.version) throw conflictoVersion();
       // Cualquier pieza ligada (en exhibidor o apartada) impide cerrarlo.
-      const [ligadas] = await tx
-        .select({ n: count() })
+      const ligadas = await tx
+        .select({ estado: pieza.estado, n: count() })
         .from(pieza)
-        .where(eq(pieza.exhibidorId, d.exhibidorId));
-      const n = ligadas?.n ?? 0;
-      if (n > 0)
-        throw new ErrorNegocio('exhibidor_con_piezas', `Regresa o vende sus ${n} piezas antes de cerrarlo.`);
+        .where(eq(pieza.exhibidorId, d.exhibidorId))
+        .groupBy(pieza.estado);
+      const nEn = ligadas.find((l) => l.estado === 'en_exhibidor')?.n ?? 0;
+      const nApartadas = ligadas.find((l) => l.estado === 'apartada')?.n ?? 0;
+      if (nEn + nApartadas > 0) {
+        const partes: string[] = [];
+        if (nEn) partes.push(`Regresa o vende ${nEn} ${nEn === 1 ? 'pieza' : 'piezas'} antes de cerrarlo.`);
+        if (nApartadas)
+          partes.push(
+            nApartadas === 1
+              ? 'Tiene 1 pieza apartada pendiente de pedido.'
+              : `Tiene ${nApartadas} piezas apartadas pendientes de pedido.`,
+          );
+        throw new ErrorNegocio('exhibidor_con_piezas', partes.join(' '));
+      }
       const filas = await tx
         .update(exhibidor)
         .set({ estado: 'cerrado', cerradoAt: new Date(), version: sql`${exhibidor.version} + 1` })

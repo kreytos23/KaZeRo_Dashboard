@@ -45,6 +45,15 @@ export function traducirErrorPg(err: unknown): ErrorNegocio | null {
   const constraint = pgConstraint(err);
   if (constraint && MENSAJES[constraint]) return new ErrorNegocio(constraint, MENSAJES[constraint]);
   if (pgCode(err) === '23503') return new ErrorNegocio('referencia', 'El registro relacionado no existe.');
+  const code = pgCode(err);
+  // Interbloqueo o fallo de serialización: la operación entera se revirtió, basta reintentar.
+  if (code === '40P01' || code === '40001')
+    return new ErrorNegocio(
+      'conflicto_concurrente',
+      'Otra operación modificó estos datos al mismo tiempo. Intenta de nuevo.',
+    );
+  // Texto que no es un uuid (id manipulado en la URL o el formulario).
+  if (code === '22P02') return new ErrorNegocio('no_encontrado', 'Registro no encontrado.');
   return null;
 }
 
