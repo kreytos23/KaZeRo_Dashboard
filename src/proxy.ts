@@ -1,12 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { COOKIE_SESION } from '@/server/auth/cookies';
+import { cacheControlPara, decidirAcceso } from '@/server/seguridad/acceso';
 import { construirCsp } from '@/server/seguridad/cabeceras';
-
-const PUBLICAS = ['/login', '/api/health', '/robots.txt'];
-
-function esPublica(ruta: string) {
-  return PUBLICAS.some((p) => ruta === p || ruta.startsWith(`${p}/`));
-}
 
 /**
  * Next 16: `proxy.ts` reemplaza a `middleware.ts`. Aquí solo se redirige si NO hay cookie (barato);
@@ -16,9 +11,12 @@ export function proxy(req: NextRequest) {
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const csp = construirCsp(nonce, process.env.NODE_ENV === 'development');
 
+  const decision = decidirAcceso(req.nextUrl.pathname, req.cookies.has(COOKIE_SESION));
   let res: NextResponse;
-  if (!esPublica(req.nextUrl.pathname) && !req.cookies.has(COOKIE_SESION)) {
+  if (decision === 'redirigir_login') {
     res = NextResponse.redirect(new URL('/login', req.url));
+  } else if (decision === 'no_autenticado') {
+    res = NextResponse.json({ error: 'no_autenticado' }, { status: 401 });
   } else {
     const cabeceras = new Headers(req.headers);
     cabeceras.set('x-nonce', nonce);
@@ -26,11 +24,17 @@ export function proxy(req: NextRequest) {
     res = NextResponse.next({ request: { headers: cabeceras } });
   }
   res.headers.set('Content-Security-Policy', csp);
-  // El panel nunca se cachea (lecciones §5).
-  res.headers.set('Cache-Control', 'private, no-store');
+  // El panel nunca se cachea (lecciones §5); los iconos y el logo públicos, un día.
+  res.headers.set(
+    'Cache-Control',
+    decision === 'pasar' ? cacheControlPara(req.nextUrl.pathname) : 'private, no-store',
+  );
   return res;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  // Se excluyen solo los estáticos de Next (con hash): `/_next/staticx` (que da 404) también debe pasar
+  // por el proxy para llevar CSP y cabeceras de seguridad. `/icon.png`, `/apple-icon.png`, `/favicon.ico`
+  // y `/marca/*.webp` pasan, son públicas (acceso.ts) y el proxy les da su Cache-Control de un día.
+  matcher: ['/((?!_next/static/|_next/image(?:/|$)).*)'],
 };

@@ -1,11 +1,22 @@
 import { randomBytes } from 'node:crypto';
-import { Pool } from '@neondatabase/serverless';
+import { Pool, type PoolClient } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { migrate } from 'drizzle-orm/neon-serverless/migrator';
 
+/**
+ * Límites de la sesión de migración: si un DDL espera un lock (p. ej. una transacción larga de la app
+ * en producción), falla a los 5 s en vez de quedarse esperando y bloquear a todos los que vienen detrás.
+ */
+const SESION_MIGRACION = ["SET lock_timeout = '5s'", "SET statement_timeout = '120s'"];
+
 export async function migrar(urlOwner: string): Promise<void> {
-  const pool = new Pool({ connectionString: urlOwner });
+  // Una sola conexión: los SET valen por sesión y así toda la migración corre en la misma.
+  const pool = new Pool({ connectionString: urlOwner, max: 1 });
   pool.on('error', () => {}); // evita que un cierre del servidor al borrar la rama tumbe el proceso
+  // pg encola estas sentencias en el cliente antes de entregarlo, así que corren antes que la migración.
+  pool.on('connect', (cliente: PoolClient) => {
+    for (const s of SESION_MIGRACION) void cliente.query(s);
+  });
   try {
     await migrate(drizzle({ client: pool }), { migrationsFolder: 'drizzle' });
   } finally {

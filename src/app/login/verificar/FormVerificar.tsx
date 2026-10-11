@@ -15,19 +15,21 @@ export function FormVerificar() {
           autoComplete="one-time-code"
           required
           autoFocus
-          className="min-h-11 rounded-lg border border-stone-300 px-3 tracking-widest"
+          className="min-h-11 rounded-lg border border-borde-campo bg-white px-3 tracking-widest"
         />
       </label>
-      <p className="text-xs text-stone-600">¿Sin tu teléfono? Escribe uno de tus códigos de recuperación.</p>
+      <p className="text-xs text-tinta-suave">
+        ¿Sin tu teléfono? Escribe uno de tus códigos de recuperación.
+      </p>
       {estado.error && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="aviso-error">
           {estado.error}
         </p>
       )}
       <button
         type="submit"
         disabled={pendiente}
-        className="min-h-11 rounded-lg bg-stone-900 font-medium text-white disabled:opacity-60"
+        className="min-h-11 rounded-lg bg-primario font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
       >
         Entrar
       </button>

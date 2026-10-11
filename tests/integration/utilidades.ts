@@ -5,6 +5,14 @@ export const urlApp = () => process.env.DATABASE_URL!;
 export const urlOwner = () => process.env.DATABASE_URL_OWNER!;
 export const llaveTotp = () => process.env.KAZERO_TOTP_KEY!;
 
+/** Limpia inventario, personas y auth. Solo el dueño puede TRUNCATE. */
+export function truncarTodo() {
+  return conDbUrl(urlOwner(), (db) =>
+    db.execute(sql`TRUNCATE movimiento_pieza, pieza, exhibidor, cliente, vendedor, categoria, material, proveedor,
+      codigo_recuperacion, sesion, acceso_log, idempotencia, admin RESTART IDENTITY CASCADE`),
+  );
+}
+
 /** Limpia las tablas de auth. Solo el dueño puede TRUNCATE (kazero_app no). */
 export function truncarAuth() {
   return conDbUrl(urlOwner(), (db) =>

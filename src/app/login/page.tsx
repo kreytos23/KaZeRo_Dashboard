@@ -1,10 +1,24 @@
 import { FormLogin } from './FormLogin';
+import { MarcoAcceso } from './MarcoAcceso';
+import { avisoDeMotivo } from './motivo';
 
-export default function PaginaLogin() {
+export const metadata = { title: 'Iniciar sesión' };
+
+export default async function PaginaLogin({
+  searchParams,
+}: {
+  searchParams: Promise<{ motivo?: string | string[] }>;
+}) {
+  const aviso = avisoDeMotivo((await searchParams).motivo);
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center gap-6 px-4">
+    <MarcoAcceso>
       <h1 className="text-2xl font-semibold">Iniciar sesión</h1>
+      {aviso && (
+        <p role="alert" className="aviso-error">
+          {aviso}
+        </p>
+      )}
       <FormLogin />
-    </main>
+    </MarcoAcceso>
   );
 }

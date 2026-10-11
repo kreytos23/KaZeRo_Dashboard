@@ -24,6 +24,8 @@ export const eventoAcceso = pgEnum('evento_acceso', [
   'logout',
   'logout_todos',
   'codigo_recuperacion_usado',
+  'admin_creado',
+  'totp_regenerado',
 ]);
 
 export const admin = pgTable(

@@ -1,0 +1,71 @@
+'use client';
+
+import { startTransition, useActionState, useEffect, useRef } from 'react';
+import { marcarIndiceSucio } from '@/search/eventos';
+import { ErroresCampo, useEnfocarPrimerInvalido } from './errores-campo';
+import type { EstadoAccion } from './estado';
+
+type Accion = (prev: EstadoAccion, fd: FormData) => Promise<EstadoAccion>;
+
+/**
+ * Se despacha con onSubmit + startTransition en vez del prop `action`: React 19 reinicia el formulario
+ * tras cualquier `action`, y con un error el usuario perdería lo que escribió.
+ */
+export function FormAccion({
+  accion,
+  textoBoton,
+  children,
+  limpiarAlGuardar = false,
+  className = 'flex flex-col gap-3',
+}: {
+  accion: Accion;
+  textoBoton: string;
+  children: React.ReactNode;
+  limpiarAlGuardar?: boolean;
+  className?: string;
+}) {
+  const [estado, despachar, pendiente] = useActionState(accion, {});
+  const form = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (!estado.ok) return;
+    marcarIndiceSucio();
+    if (limpiarAlGuardar) form.current?.reset();
+  }, [estado, limpiarAlGuardar]);
+
+  useEnfocarPrimerInvalido(form, estado);
+
+  return (
+    <form
+      ref={form}
+      className={className}
+      aria-busy={pendiente}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (pendiente) return;
+        const datos = new FormData(e.currentTarget);
+        startTransition(() => despachar(datos));
+      }}
+    >
+      <ErroresCampo.Provider value={estado.campos ?? {}}>{children}</ErroresCampo.Provider>
+      {estado.error && (
+        <p role="alert" className="aviso-error whitespace-pre-line">
+          {/* Con errores por campo, el detalle lo anuncia cada campo (aria-describedby): aquí solo un resumen. */}
+          {estado.campos ? 'Revisa los campos marcados.' : estado.error}
+        </p>
+      )}
+      {estado.ok && (
+        <p role="status" className="aviso-exito">
+          {estado.ok}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={pendiente}
+        className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
+      >
+        {textoBoton}
+      </button>
+    </form>
+  );
+}
