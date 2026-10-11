@@ -14,6 +14,7 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
   const [prefijo, setPrefijo] = useState('');
   const [codigo, setCodigo] = useState('');
   const [aviso, setAviso] = useState<string | null>(null);
+  const [sugiriendo, setSugiriendo] = useState(false);
   const form = useRef<HTMLFormElement>(null);
   useEnfocarPrimerInvalido(form, estado);
 
@@ -24,20 +25,32 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
     router.push(`/panel/inventario/${encodeURIComponent(estado.ok)}`);
   }, [estado, router]);
 
+  // Tras un alta exitosa el botón sigue deshabilitado hasta que llegue la navegación: sin doble alta.
+  const enviando = pendiente || Boolean(estado.ok);
+
   async function sugerir() {
-    const r = await accionSugerirCodigo(prefijo);
-    setAviso(r.error ?? null);
-    if (r.codigo) setCodigo(r.codigo);
+    if (sugiriendo) return;
+    setSugiriendo(true);
+    try {
+      const r = await accionSugerirCodigo(prefijo);
+      setAviso(r.error ?? null);
+      if (r.codigo) setCodigo(r.codigo);
+    } catch {
+      // Red caída o sesión vencida: la acción no llegó a responder.
+      setAviso('No se pudo sugerir el código. Intenta de nuevo.');
+    } finally {
+      setSugiriendo(false);
+    }
   }
 
   return (
     <form
       ref={form}
       className="flex max-w-xl flex-col gap-3"
-      aria-busy={pendiente}
+      aria-busy={enviando}
       onSubmit={(e) => {
         e.preventDefault();
-        if (pendiente) return;
+        if (enviando) return;
         const datos = new FormData(e.currentTarget);
         startTransition(() => despachar(datos));
       }}
@@ -55,7 +68,9 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
           <button
             type="button"
             onClick={sugerir}
-            className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
+            disabled={sugiriendo}
+            aria-busy={sugiriendo}
+            className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario enabled:hover:bg-secundario-suave disabled:opacity-60"
           >
             Sugerir código
           </button>
@@ -92,7 +107,7 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
       )}
       <button
         type="submit"
-        disabled={pendiente}
+        disabled={enviando}
         className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
       >
         Guardar pieza
