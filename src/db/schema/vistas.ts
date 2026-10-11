@@ -76,3 +76,10 @@ export const vExhibidor = pgView('v_exhibidor', {
   vendedorNombre: text('vendedor_nombre').notNull(),
   piezasActuales: integer('piezas_actuales').notNull(),
 }).existing();
+
+// Creada en 0007_admins_grants.sql: solo columnas no sensibles de admin.
+export const vAdmin = pgView('v_admin', {
+  id: uuid('id').notNull(),
+  email: text('email').notNull(),
+  createdAt: ts('created_at').notNull(),
+}).existing();

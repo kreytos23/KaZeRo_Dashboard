@@ -1,7 +1,8 @@
 import { eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
-import { accesoLog } from '@/db/schema';
+import { accesoLog, admin } from '@/db/schema';
+import { codigoRecuperacion } from '@/db/schema';
 import { crearAdmin } from '@/server/auth/admin';
 import { agregarAdmin, listarAdmins, regenerarTotp } from '@/server/auth/administradores';
 import {
@@ -20,6 +21,7 @@ const PASS = 'contraseña-actual-123';
 
 let adminId: string;
 let secreto: string;
+let codigosViejos: string[];
 
 beforeEach(async () => {
   await truncarTodo();
@@ -28,6 +30,7 @@ beforeEach(async () => {
   );
   adminId = a.id;
   secreto = a.secretoTotp;
+  codigosViejos = a.codigosRecuperacion;
 });
 
 async function login(email: string, password: string, sec: string, t: Date) {
@@ -41,6 +44,12 @@ async function login(email: string, password: string, sec: string, t: Date) {
       t,
     ),
   );
+}
+
+async function loginConCodigo(email: string, password: string, codigo: string, t: Date) {
+  const pre = await app((db) => iniciarLogin(db, { email, password, ...red }, t));
+  if (!pre.ok) return pre;
+  return app((db) => verificarSegundoFactor(db, { preToken: pre.preToken, codigo, ...red }, llaveTotp(), t));
 }
 
 const eventos = (email: string) =>
@@ -149,6 +158,64 @@ describe('regenerar TOTP', () => {
       true,
     );
     expect(await eventos('duena@kazero.mx')).toContain('totp_regenerado');
+    // Los códigos de recuperación anteriores ya no sirven; los nuevos sí.
+    const t2 = new Date('2026-10-09T13:00:00Z');
+    expect(await loginConCodigo('duena@kazero.mx', PASS, codigosViejos[0]!, t2)).toEqual({
+      ok: false,
+      motivo: 'codigo',
+    });
+    expect(
+      (
+        await loginConCodigo(
+          'duena@kazero.mx',
+          PASS,
+          r.codigosRecuperacion[0]!,
+          new Date('2026-10-09T13:20:00Z'),
+        )
+      ).ok,
+    ).toBe(true);
+  });
+
+  it('con la contraseña incorrecta no cambia nada', async () => {
+    const t0 = new Date('2026-10-09T12:00:00Z');
+    const s = await login('duena@kazero.mx', PASS, secreto, t0);
+    if (!s.ok) throw new Error('login falló');
+    const ses = (await app((db) => validarSesion(db, s.token, t0)))!;
+    const antes = await app((db) => db.select({ c: admin.totpSecretCifrado, v: admin.version }).from(admin));
+    const r = await app((db) =>
+      regenerarTotp(
+        db,
+        { adminId, sesionActualId: ses.sesionId, passwordActual: 'mala-mala-mala', ...red },
+        llaveTotp(),
+        t0,
+      ),
+    );
+    expect(r).toEqual({ ok: false, error: 'Tu contraseña actual no es correcta.' });
+    expect(
+      await app((db) => db.select({ c: admin.totpSecretCifrado, v: admin.version }).from(admin)),
+    ).toEqual(antes);
+    const usados = await app((db) => db.select({ u: codigoRecuperacion.usadoAt }).from(codigoRecuperacion));
+    expect(usados.every((f) => f.u === null)).toBe(true);
+    expect(await eventos('duena@kazero.mx')).toContain('password_fallido');
+  });
+
+  it('la re-autenticación cuenta para el bloqueo por intentos', async () => {
+    const t0 = new Date('2026-10-09T12:00:00Z');
+    const intento = () =>
+      app((db) =>
+        regenerarTotp(
+          db,
+          { adminId, sesionActualId: adminId, passwordActual: 'mala-mala-mala', ...red },
+          llaveTotp(),
+          t0,
+        ),
+      );
+    for (let i = 0; i < 5; i++) expect(await intento()).toMatchObject({ ok: false });
+    const r = await app((db) =>
+      regenerarTotp(db, { adminId, sesionActualId: adminId, passwordActual: PASS, ...red }, llaveTotp(), t0),
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('Demasiados intentos');
   });
 });
 

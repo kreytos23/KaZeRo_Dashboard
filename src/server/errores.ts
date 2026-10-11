@@ -38,6 +38,7 @@ const MENSAJES: Record<string, string> = {
   categoria_nombre_uq: 'Esa categoría ya existe.',
   material_nombre_uq: 'Ese material ya existe.',
   proveedor_nombre_uq: 'Ese proveedor ya existe.',
+  codigo_recuperacion_usado: 'Un código de recuperación usado no puede modificarse.',
   admin_email_uq: 'Ya existe un administrador con ese correo.',
 };
 

@@ -2,7 +2,7 @@ import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
 import { pgCode } from '@/db/errors';
-import { urlApp, urlOwner } from './utilidades';
+import { truncarTodo, urlApp, urlOwner } from './utilidades';
 
 async function codigoAl(url: string, consulta: ReturnType<typeof sql>) {
   try {
@@ -28,6 +28,28 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
   });
   it('sí puede actualizar el paso TOTP (lo usa el login)', async () => {
     expect(await codigoAl(urlApp(), sql`UPDATE admin SET totp_ultimo_paso = totp_ultimo_paso`)).toBe('ok');
+  });
+  it('no puede reescribir códigos de recuperación ni revivir uno usado', async () => {
+    await truncarTodo();
+    await conDbUrl(urlOwner(), async (db) => {
+      await db.execute(sql`INSERT INTO admin (id, email, password_hash, totp_secret_cifrado)
+        VALUES ('00000000-0000-0000-0000-000000000001', 'a@a.mx', 'h', 'c')`);
+      await db.execute(sql`INSERT INTO codigo_recuperacion (admin_id, hash, usado_at)
+        VALUES ('00000000-0000-0000-0000-000000000001', 'usado', now())`);
+    });
+    expect(await codigoAl(urlApp(), sql`UPDATE codigo_recuperacion SET hash = 'x'`)).toBe('42501');
+    expect(await codigoAl(urlApp(), sql`UPDATE codigo_recuperacion SET admin_id = admin_id`)).toBe('42501');
+    // Un código usado no cambia nunca más (trigger), aunque la columna usado_at sea actualizable.
+    expect(await codigoAl(urlApp(), sql`UPDATE codigo_recuperacion SET usado_at = NULL`)).toBe('P0001');
+    expect(await codigoAl(urlApp(), sql`UPDATE codigo_recuperacion SET usado_at = now()`)).toBe('P0001');
+  });
+  it('no puede elegir el rol al insertar un admin', async () => {
+    expect(
+      await codigoAl(
+        urlApp(),
+        sql`INSERT INTO admin (email, password_hash, totp_secret_cifrado, rol) VALUES ('r@r.mx','h','c','admin')`,
+      ),
+    ).toBe('42501');
   });
   it('sí puede leer y escribir sesiones', async () => {
     expect(await codigoAl(urlApp(), sql`SELECT count(*) FROM sesion`)).toBe('ok');

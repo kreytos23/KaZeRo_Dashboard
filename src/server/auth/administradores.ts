@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull, ne, sql } from 'drizzle-orm';
 import type { Db, Ejecutor } from '@/db/pool';
-import { admin, codigoRecuperacion, sesion } from '@/db/schema';
+import { admin, codigoRecuperacion, sesion, vAdmin } from '@/db/schema';
 import { conErroresDeNegocio, ErrorNegocio } from '@/server/errores';
 import { crearAdmin } from './admin';
 import { cifrar } from './cifrado';
@@ -33,9 +33,9 @@ async function comoResultado(fn: () => Promise<ResultadoEnrolamiento>): Promise<
 
 export function listarAdmins(db: Ejecutor) {
   return db
-    .select({ id: admin.id, email: admin.email, createdAt: admin.createdAt })
-    .from(admin)
-    .orderBy(asc(admin.createdAt));
+    .select({ id: vAdmin.id, email: vAdmin.email, createdAt: vAdmin.createdAt })
+    .from(vAdmin)
+    .orderBy(asc(vAdmin.createdAt));
 }
 
 export async function agregarAdmin(
@@ -85,7 +85,18 @@ export async function regenerarTotp(
   return comoResultado(() =>
     db.transaction(async (tx): Promise<ResultadoEnrolamiento> => {
       const r = await reautenticarAdmin(tx, e.adminId, e.passwordActual, e, ahora);
-      if (!r.ok) return { ok: false, error: mensajeReauth(r) };
+      if (!r.ok) {
+        // Sesión robada: quien la tenga no puede seguir probando contraseñas; se revoca la actual al bloquearse.
+        if (r.motivo === 'bloqueado') {
+          await tx
+            .update(sesion)
+            .set({ revocadaAt: ahora })
+            .where(
+              and(eq(sesion.id, e.sesionActualId), eq(sesion.adminId, e.adminId), isNull(sesion.revocadaAt)),
+            );
+        }
+        return { ok: false, error: mensajeReauth(r) };
+      }
       const secreto = nuevoSecretoTotp();
       const codigos = nuevosCodigosRecuperacion();
       await tx
@@ -104,6 +115,8 @@ export async function regenerarTotp(
       await tx
         .insert(codigoRecuperacion)
         .values(codigos.map((c) => ({ adminId: e.adminId, hash: hashCodigoRecuperacion(c) })));
+      // sesionActualId solo se usa en ne(): conservar esa sesión no exige comprobar que sea del admin
+      // (si no coincide con ninguna, simplemente se revocan todas).
       // Quien tuviera el TOTP viejo pierde sus sesiones; la actual se conserva.
       await tx
         .update(sesion)

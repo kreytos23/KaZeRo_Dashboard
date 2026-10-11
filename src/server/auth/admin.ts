@@ -1,5 +1,6 @@
 import type { Ejecutor } from '@/db/pool';
-import { admin, codigoRecuperacion } from '@/db/schema';
+import { sql } from 'drizzle-orm';
+import { codigoRecuperacion } from '@/db/schema';
 import { cifrar } from './cifrado';
 import { hashPassword, validarFortaleza } from './password';
 import { hashCodigoRecuperacion, nuevosCodigosRecuperacion } from './tokens';
@@ -20,11 +21,13 @@ export async function crearAdmin(
   const passwordHash = await hashPassword(datos.password);
   // Atómico: un admin sin códigos de recuperación dejaría a producción abortando para siempre.
   const id = await db.transaction(async (tx) => {
-    const [fila] = await tx
-      .insert(admin)
-      .values({ email, passwordHash, totpSecretCifrado: cifrar(secretoTotp, llaveTotp) })
-      .returning({ id: admin.id });
-    const nuevoId = fila!.id;
+    // INSERT crudo con solo las 3 columnas concedidas a kazero_app: Drizzle listaría también `rol` (DEFAULT)
+    // y la app no tiene privilegio para elegirlo.
+    const r = await tx.execute<{ id: string }>(
+      sql`INSERT INTO admin (email, password_hash, totp_secret_cifrado)
+          VALUES (${email}, ${passwordHash}, ${cifrar(secretoTotp, llaveTotp)}) RETURNING id`,
+    );
+    const nuevoId = r.rows[0]!.id;
     await tx
       .insert(codigoRecuperacion)
       .values(codigosRecuperacion.map((c) => ({ adminId: nuevoId, hash: hashCodigoRecuperacion(c) })));
