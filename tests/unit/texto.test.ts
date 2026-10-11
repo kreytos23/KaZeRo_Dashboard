@@ -7,6 +7,10 @@ describe('normalizar', () => {
     ['ORO LAMINADO', 'oro laminado'],
     ['Danya\t5to  norte', 'danya 5to norte'],
     ['', ''],
+    ['\tabc\n', 'abc'],
+    ['straße Ø Łódź', 'strasse o lodz'],
+    ['a  b', 'a b'],
+    ['ÁÉÍÓÚ Üñ', 'aeiou un'],
   ])('%j → %j', (entrada, salida) => expect(normalizar(entrada)).toBe(salida));
 });
 

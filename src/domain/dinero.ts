@@ -1,9 +1,11 @@
 // El dinero se maneja en centavos enteros: nunca flotantes (0.1 + 0.2 ≠ 0.3).
 
 export function pesosACentavos(texto: string): number | null {
-  const limpio = texto.trim().replace(/^\$/, '').replace(/,/g, '').trim();
-  if (!/^\d{1,9}(\.\d{1,2})?$/.test(limpio)) return null;
-  const [entero, decimales = ''] = limpio.split('.');
+  const limpio = texto.trim().replace(/^\$\s*/, '');
+  // Comas solo como separador de miles bien formado (1,234,567.89); '1,2' NO es un monto.
+  if (!/^(\d{1,3}(,\d{3})+|\d+)(\.\d{1,2})?$/.test(limpio)) return null;
+  const [entero, decimales = ''] = limpio.replace(/,/g, '').split('.');
+  if (entero!.length > 9) return null;
   return Number(entero) * 100 + Number(decimales.padEnd(2, '0'));
 }
 
@@ -15,7 +17,9 @@ export function centavosANumeric(c: number): string {
 export function numericACentavos(n: string): number {
   const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(n);
   if (!m) throw new RangeError('Valor numeric inválido.');
-  return Number(m[1]) * 100 + Number((m[2] ?? '').padEnd(2, '0'));
+  const c = Number(m[1]) * 100 + Number((m[2] ?? '').padEnd(2, '0'));
+  if (!Number.isSafeInteger(c)) throw new RangeError('Valor numeric fuera de rango.');
+  return c;
 }
 
 const FORMATO = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });

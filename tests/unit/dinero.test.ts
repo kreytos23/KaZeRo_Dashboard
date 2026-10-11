@@ -13,8 +13,14 @@ describe('dinero en centavos', () => {
     ['149.5', 14950],
     ['$1,234.50', 123450],
     [' 0 ', 0],
+    ['1,234,567.89', 123456789],
+    ['$ 149', 14900],
+    ['999999999.99', 99999999999],
   ])('pesosACentavos(%j) = %d', (t, c) => expect(pesosACentavos(t)).toBe(c));
-  it.each(['', 'abc', '-5', '1.234', '1,2,3.4.5'])('rechaza %j', (t) => expect(pesosACentavos(t)).toBeNull());
+  it.each(['', 'abc', '-5', '1.234', '1,2,3.4.5', '1,2', '12,34,5', ',5', '1,,000', '1234567890'])(
+    'rechaza %j',
+    (t) => expect(pesosACentavos(t)).toBeNull(),
+  );
   it('ida y vuelta con numeric de Postgres sin flotantes', () => {
     expect(centavosANumeric(123450)).toBe('1234.50');
     expect(centavosANumeric(5)).toBe('0.05');
