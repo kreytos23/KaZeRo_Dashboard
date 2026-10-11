@@ -13,7 +13,7 @@ type Red = { ip: string | null; userAgent: string | null };
 /** Los secretos, la URI y los códigos se devuelven una sola vez: no se registran ni se guardan en claro. */
 export type ResultadoEnrolamiento =
   | { ok: true; email: string; secretoTotp: string; uriTotp: string; codigosRecuperacion: string[] }
-  | { ok: false; error: string };
+  | { ok: false; error: string; /** Se superó el límite de intentos de contraseña. */ bloqueado?: true };
 
 function mensajeReauth(r: { motivo: 'credenciales' | 'bloqueado'; minutosRestantes?: number }) {
   return r.motivo === 'bloqueado'
@@ -95,7 +95,11 @@ export async function regenerarTotp(
               and(eq(sesion.id, e.sesionActualId), eq(sesion.adminId, e.adminId), isNull(sesion.revocadaAt)),
             );
         }
-        return { ok: false, error: mensajeReauth(r) };
+        return {
+          ok: false,
+          error: mensajeReauth(r),
+          ...(r.motivo === 'bloqueado' && { bloqueado: true as const }),
+        };
       }
       const secreto = nuevoSecretoTotp();
       const codigos = nuevosCodigosRecuperacion();

@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { conDb } from '@/db/client';
 import { agregarAdmin, regenerarTotp, type ResultadoEnrolamiento } from '@/server/auth/administradores';
 import { qrComoDataUrl } from '@/server/auth/qr';
@@ -54,7 +55,8 @@ export async function accionRegenerarTotp(_: EstadoEnrolamiento, fd: FormData): 
       env().KAZERO_TOTP_KEY,
     ),
   );
-  // Si el bloqueo revocó esta sesión, requerirSesion() redirige a /login en vez de dejar un panel roto.
+  // El bloqueo revocó esta sesión: se sale a /login con un motivo fijo (sin datos personales) en vez de dejar un panel roto.
+  if (!r.ok && r.bloqueado) redirect('/login?motivo=bloqueado');
   if (!r.ok) await requerirSesion();
   return presentar(r);
 }

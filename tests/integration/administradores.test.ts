@@ -216,6 +216,8 @@ describe('regenerar TOTP', () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain('Demasiados intentos');
+    // La interfaz usa este indicador para llevar al login con el motivo (sin PII) cuando se revoca la sesión.
+    expect(r).toMatchObject({ bloqueado: true });
   });
 });
 
