@@ -48,7 +48,7 @@
   --color-secundario-suave: var(--color-marca-salvia-suave);
 }
 
-/* La fuente la autoaloja next/font (layout.tsx) y expone esta variable; inline para resolverla en uso. */
+/* La fuente la sirve next/font/local desde src/app/fonts (layout.tsx) y expone esta variable; inline para resolverla en uso. */
 @theme inline {
   --font-sans: var(--font-marca), ui-sans-serif, system-ui, sans-serif;
 }

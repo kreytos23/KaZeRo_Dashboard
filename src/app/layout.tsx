@@ -1,12 +1,20 @@
 import type { Metadata, Viewport } from 'next';
-import { Nunito_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
 // Todo es panel privado: render dinámico, necesario también para el nonce de la CSP.
 export const dynamic = 'force-dynamic';
 
-// next/font descarga la fuente en el build y la sirve desde nuestro dominio (CSP: font-src 'self').
-const fuenteMarca = Nunito_Sans({ subsets: ['latin'], display: 'swap', variable: '--font-marca' });
+// Nunito Sans (OFL, ver fonts/OFL.txt) vive en el repo: el build no depende de Google Fonts y se sirve
+// desde nuestro dominio (CSP: font-src 'self'). Un solo archivo variable (latin, pesos 200-1000).
+const fuenteMarca = localFont({
+  src: './fonts/nunito-sans-latin-wght.woff2',
+  weight: '200 1000',
+  style: 'normal',
+  display: 'swap',
+  variable: '--font-marca',
+  adjustFontFallback: 'Arial',
+});
 
 export const metadata: Metadata = {
   title: { default: 'Kazero', template: '%s · Kazero' },
