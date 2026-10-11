@@ -1,0 +1,221 @@
+'use client';
+
+import { usePathname, useRouter } from 'next/navigation';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { EVENTO_INDICE_SUCIO } from './eventos';
+import { crearMotor, type Resultado } from './motor';
+import type { IndiceBusqueda } from './tipos';
+
+const CLAVE_RECIENTES = 'kazero:recientes';
+const MAX_RECIENTES = 20;
+
+type Estado = 'inactivo' | 'cargando' | 'listo' | 'sin_sesion' | 'error';
+
+// localStorage puede no existir o lanzar (modo privado): solo es una comodidad.
+// Se guardan únicamente claves (`pieza:<id>`), nunca nombres ni descripciones.
+function leerRecientes(): string[] {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(CLAVE_RECIENTES) ?? '[]');
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+function guardarReciente(clave: string) {
+  try {
+    const nuevos = [clave, ...leerRecientes().filter((c) => c !== clave)].slice(0, MAX_RECIENTES);
+    localStorage.setItem(CLAVE_RECIENTES, JSON.stringify(nuevos));
+  } catch {
+    /* sin almacenamiento: se ignora */
+  }
+}
+
+function esIndice(v: unknown): v is IndiceBusqueda {
+  if (typeof v !== 'object' || v === null) return false;
+  const i = v as Partial<IndiceBusqueda>;
+  return i.v === 1 && Array.isArray(i.piezas) && Array.isArray(i.clientes) && Array.isArray(i.vendedores);
+}
+
+function esCampoDeTexto(t: EventTarget | null): boolean {
+  if (!(t instanceof HTMLElement)) return false;
+  return ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.isContentEditable;
+}
+
+export function BuscadorGlobal() {
+  const router = useRouter();
+  const ruta = usePathname();
+  const id = useId();
+  const entrada = useRef<HTMLInputElement>(null);
+  const estadoRef = useRef<Estado>('inactivo');
+  const peticion = useRef(0);
+  const [estado, setEstado] = useState<Estado>('inactivo');
+  const [indice, setIndice] = useState<IndiceBusqueda | null>(null);
+  const [recientes, setRecientes] = useState<string[]>([]);
+  const [q, setQ] = useState('');
+  const [activo, setActivo] = useState(0);
+  const [abierto, setAbierto] = useState(false);
+
+  const cambiarEstado = useCallback((e: Estado) => {
+    estadoRef.current = e;
+    setEstado(e);
+  }, []);
+
+  const cargar = useCallback(async () => {
+    const mia = ++peticion.current;
+    cambiarEstado('cargando');
+    try {
+      const r = await fetch('/api/busqueda/indice', { cache: 'no-store' });
+      if (mia !== peticion.current) return; // llegó una carga más reciente
+      if (r.status === 401) {
+        setIndice(null);
+        cambiarEstado('sin_sesion');
+        router.replace('/login');
+        return;
+      }
+      if (!r.ok) {
+        cambiarEstado('error');
+        return;
+      }
+      const datos: unknown = await r.json();
+      if (mia !== peticion.current) return;
+      if (!esIndice(datos)) {
+        cambiarEstado('error');
+        return;
+      }
+      setIndice(datos);
+      cambiarEstado('listo');
+    } catch {
+      if (mia === peticion.current) cambiarEstado('error');
+    }
+  }, [cambiarEstado, router]);
+
+  // Carga perezosa: solo al enfocar el campo o al pulsar `/` por primera vez.
+  const asegurarCarga = useCallback(() => {
+    if (estadoRef.current === 'inactivo' || estadoRef.current === 'error') void cargar();
+  }, [cargar]);
+
+  // Un formulario avisó que guardó: si ya se había cargado, se recarga; si no, la próxima carga ya lo trae.
+  useEffect(() => {
+    const sucio = () => {
+      if (estadoRef.current !== 'inactivo') void cargar();
+    };
+    window.addEventListener(EVENTO_INDICE_SUCIO, sucio);
+    return () => window.removeEventListener(EVENTO_INDICE_SUCIO, sucio);
+  }, [cargar]);
+
+  // Al navegar (una alta pudo redirigir a su ficha) el índice puede haber cambiado.
+  const rutaAnterior = useRef(ruta);
+  useEffect(() => {
+    if (rutaAnterior.current === ruta) return;
+    rutaAnterior.current = ruta;
+    if (estadoRef.current === 'listo') void cargar();
+  }, [ruta, cargar]);
+
+  useEffect(() => {
+    const atajo = (e: KeyboardEvent) => {
+      if (e.key !== '/' || e.defaultPrevented || e.isComposing) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (esCampoDeTexto(e.target)) return;
+      e.preventDefault();
+      asegurarCarga();
+      entrada.current?.focus();
+    };
+    window.addEventListener('keydown', atajo);
+    return () => window.removeEventListener('keydown', atajo);
+  }, [asegurarCarga]);
+
+  const motor = useMemo(() => (indice ? crearMotor(indice) : null), [indice]);
+  const resultados = useMemo(() => (motor ? motor.buscar(q, recientes) : []), [motor, q, recientes]);
+  const visible = abierto && resultados.length > 0;
+  const idActivo = visible && resultados[activo] ? `${id}-op-${activo}` : undefined;
+
+  function abrir(r: Resultado) {
+    guardarReciente(r.clave);
+    setQ('');
+    setAbierto(false);
+    router.push(r.href);
+  }
+
+  let aviso: string | null = null;
+  if (estado === 'cargando' && !indice) aviso = 'Cargando búsqueda…';
+  else if (estado === 'sin_sesion') aviso = 'Tu sesión terminó. Inicia sesión de nuevo.';
+  else if (estado === 'error')
+    aviso = 'No se pudo cargar la búsqueda. Revisa tu conexión y vuelve a enfocar el campo.';
+  else if (estado === 'listo' && abierto && q.trim() && resultados.length === 0) aviso = 'Sin resultados';
+
+  return (
+    <div className="relative w-full max-w-md">
+      <label htmlFor={`${id}-q`} className="sr-only">
+        Buscar
+      </label>
+      <input
+        id={`${id}-q`}
+        ref={entrada}
+        type="search"
+        role="combobox"
+        aria-expanded={visible}
+        aria-controls={`${id}-lista`}
+        aria-activedescendant={idActivo}
+        aria-autocomplete="list"
+        autoComplete="off"
+        placeholder="Buscar pieza, cliente o vendedor ( / )"
+        value={q}
+        onFocus={() => {
+          asegurarCarga();
+          setRecientes(leerRecientes());
+          setAbierto(true);
+        }}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setActivo(0);
+          setAbierto(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            if (!abierto) setAbierto(true);
+            else setActivo((a) => Math.min(a + 1, resultados.length - 1));
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActivo((a) => Math.max(a - 1, 0));
+          } else if (e.key === 'Enter' && visible && resultados[activo]) {
+            e.preventDefault();
+            abrir(resultados[activo]);
+          } else if (e.key === 'Escape') {
+            setAbierto(false);
+          }
+        }}
+        onBlur={() => setAbierto(false)}
+        className="min-h-11 w-full rounded-lg border border-stone-300 px-3"
+      />
+      <div role="status" aria-live="polite" className={aviso ? 'mt-1 text-xs text-stone-700' : 'sr-only'}>
+        {aviso}
+      </div>
+      <ul
+        id={`${id}-lista`}
+        role="listbox"
+        aria-label="Resultados"
+        hidden={!visible}
+        className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-stone-200 bg-white shadow"
+      >
+        {visible &&
+          resultados.map((r, i) => (
+            <li
+              key={r.clave}
+              id={`${id}-op-${i}`}
+              role="option"
+              aria-selected={i === activo}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                abrir(r);
+              }}
+              className={`min-h-11 cursor-pointer px-3 py-2 ${i === activo ? 'bg-stone-100' : ''}`}
+            >
+              <span className="block text-sm font-medium">{r.titulo}</span>
+              <span className="block text-xs text-stone-600">{r.subtitulo}</span>
+            </li>
+          ))}
+      </ul>
+    </div>
+  );
+}
