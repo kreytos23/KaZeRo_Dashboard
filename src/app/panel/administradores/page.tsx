@@ -1,4 +1,4 @@
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { listarAdmins } from '@/server/auth/administradores';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { FormAgregarAdmin, FormRegenerarTotp } from './FormsAdmin';
@@ -12,7 +12,7 @@ export const metadata = { title: 'Administradores' };
 
 export default async function PaginaAdministradores() {
   const { adminId } = await requerirSesion();
-  const admins = await conDb((db) => listarAdmins(db));
+  const admins = await conDbLectura((db) => listarAdmins(db));
   // No es secreto: es el usuario de esta cuenta, para que el gestor de contraseñas empareje bien.
   const emailActual = admins.find((a) => a.id === adminId)?.email ?? '';
   return (

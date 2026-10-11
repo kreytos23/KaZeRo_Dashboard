@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { Campo } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -16,7 +16,7 @@ export default async function PaginaClientes({
   await requerirSesion();
   const bruto = (await searchParams).q;
   const q = (Array.isArray(bruto) ? bruto[0] : bruto)?.slice(0, 120) ?? '';
-  const clientes = await conDb((db) => listarClientes(db, { q, limite: 100 }));
+  const clientes = await conDbLectura((db) => listarClientes(db, { q, limite: 100 }));
   return (
     <section className="flex max-w-3xl flex-col gap-6">
       <h1 className="text-2xl font-semibold">Clientes</h1>

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { z } from 'zod';
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { hoyMX } from '@/domain/fechas';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
@@ -19,7 +19,7 @@ export default async function PaginaExhibidores({
   await requerirSesion();
   const filtro = z.uuid().safeParse((await searchParams).vendedor);
   // Una sola ronda: el id del filtro ya viene validado como uuid; uno inexistente da una lista vacía.
-  const [todos, exhibidores] = await conDb((db) =>
+  const [todos, exhibidores] = await conDbLectura((db) =>
     Promise.all([
       listarVendedores(db),
       listarExhibidores(db, { vendedorId: filtro.success ? filtro.data : undefined }),

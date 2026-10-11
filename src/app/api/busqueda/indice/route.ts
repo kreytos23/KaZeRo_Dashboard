@@ -1,4 +1,4 @@
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { sesionDeApi } from '@/server/auth/sesion-actual';
 import { construirIndice } from '@/server/busqueda/indice';
 
@@ -11,6 +11,6 @@ export async function GET() {
       { status: 401, headers: { 'Cache-Control': 'no-store' } },
     );
   }
-  const indice = await conDb((db) => construirIndice(db));
+  const indice = await conDbLectura((db) => construirIndice(db));
   return Response.json(indice, { headers: { 'Cache-Control': 'private, no-store' } });
 }

@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { codigoDeSegmento, tituloDeCodigo } from '@/domain/codigos';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { Campo, Selector } from '@/features/ui/Campo';
@@ -26,7 +26,7 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
   await requerirSesion();
   const codigo = codigoDeSegmento((await params).codigo);
   if (!codigo) notFound();
-  const datos = await conDb(async (db) => {
+  const datos = await conDbLectura(async (db) => {
     const p = await obtenerPiezaPorCodigo(db, codigo);
     return p ? { p, movimientos: await historial(db, p.id) } : null;
   });

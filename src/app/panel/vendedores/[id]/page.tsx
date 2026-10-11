@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { porcentajeLegible } from '@/domain/dinero';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
@@ -18,7 +18,7 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [v, exhibidores] = await conDb((db) =>
+  const [v, exhibidores] = await conDbLectura((db) =>
     Promise.all([obtenerVendedor(db, id.data), listarExhibidores(db, { vendedorId: id.data })]),
   );
   if (!v) notFound();

@@ -1,4 +1,4 @@
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { Campo } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -15,7 +15,7 @@ export const metadata = { title: 'Catálogos' };
 
 export default async function PaginaCatalogos() {
   await requerirSesion();
-  const listas = await conDb((db) => Promise.all(SECCIONES.map((s) => listarCatalogo(db, s.tipo))));
+  const listas = await conDbLectura((db) => Promise.all(SECCIONES.map((s) => listarCatalogo(db, s.tipo))));
   return (
     <section className="grid gap-8 md:grid-cols-3">
       <h1 className="text-2xl font-semibold md:col-span-3">Catálogos</h1>

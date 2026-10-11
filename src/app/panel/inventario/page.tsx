@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -17,7 +17,7 @@ export default async function PaginaInventario({
 }) {
   await requerirSesion();
   const f = leerFiltros(await searchParams);
-  const [piezas, categorias] = await conDb((db) =>
+  const [piezas, categorias] = await conDbLectura((db) =>
     Promise.all([
       listarPiezas(db, {
         q: f.q,

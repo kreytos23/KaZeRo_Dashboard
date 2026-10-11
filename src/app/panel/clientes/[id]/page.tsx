@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { AreaTexto, Campo, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -15,7 +15,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [c, vendedores] = await conDb((db) =>
+  const [c, vendedores] = await conDbLectura((db) =>
     Promise.all([obtenerCliente(db, id.data), listarVendedores(db)]),
   );
   if (!c) notFound();

@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { AreaTexto } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
@@ -17,7 +17,7 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [e, vendedor] = await conDb(async (db) => {
+  const [e, vendedor] = await conDbLectura(async (db) => {
     const ex = await obtenerExhibidor(db, id.data);
     return [ex, ex ? await obtenerVendedor(db, ex.vendedorId) : null] as const;
   });

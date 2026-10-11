@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { conDb } from '@/db/client';
+import { conDbLectura } from '@/db/client';
 import { porcentajeLegible } from '@/domain/dinero';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
@@ -12,7 +12,7 @@ export const metadata = { title: 'Vendedores' };
 
 export default async function PaginaVendedores() {
   await requerirSesion();
-  const vendedores = await conDb((db) => listarVendedores(db));
+  const vendedores = await conDbLectura((db) => listarVendedores(db));
   return (
     <section className="flex max-w-3xl flex-col gap-6">
       <h1 className="text-2xl font-semibold">Vendedores</h1>
