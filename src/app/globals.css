@@ -71,6 +71,30 @@
     outline-offset: 2px;
   }
 
+  /* Tailwind 4 deja `cursor: default` en los botones: todo lo que se puede accionar muestra la mano. */
+  a[href],
+  button,
+  summary,
+  select,
+  label[for],
+  label:has(input[type='checkbox'], input[type='radio']),
+  [role='button'],
+  [role='option'],
+  input[type='checkbox'],
+  input[type='radio'],
+  input[type='submit'],
+  input[type='button'],
+  input[type='file'] {
+    cursor: pointer;
+  }
+
+  /* Va después y con la misma o mayor especificidad: lo deshabilitado nunca muestra la mano. */
+  :is(button, input, select, textarea, summary):disabled,
+  :is(a, button, summary, label, input, select, [role])[aria-disabled='true'],
+  label:has(input:disabled) {
+    cursor: not-allowed;
+  }
+
   /* El gris por defecto de Tailwind (tinta al 50 %) queda en ~3:1; este cálido llega a 4.9:1 sobre blanco. */
   ::placeholder {
     color: #7e6c64;
