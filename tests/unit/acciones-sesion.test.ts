@@ -1,18 +1,22 @@
-﻿import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Cada Server Action es un POST pÃºblico (spec Â§13): debe validar la sesiÃ³n ella misma.
- * Esta guarda recorre todo `src/` y falla ante cualquier forma de saltÃ¡rsela.
+ * Cada Server Action es un POST público (spec §13): debe validar la sesión ella misma.
+ * Esta guarda recorre todo `src/` y falla ante cualquier forma de saltársela.
  */
 const SRC = join(process.cwd(), 'src');
 
-// Ãšnicos archivos que pueden ser 'use server'.
+// Únicos archivos que pueden ser 'use server'.
 const PERMITIDOS = [/^app\/login\/acciones\.ts$/, /^app\/panel(\/.+)?\/acciones\.ts$/];
-// Acciones que no exigen sesiÃ³n por diseÃ±o: el login aÃºn no la tiene y cerrar sesiÃ³n solo borra la cookie.
-const EXENTAS = new Set(['accionLogin', 'accionVerificar', 'accionCerrarSesion']);
+// Acciones que no exigen sesión por diseño: el login aún no la tiene y cerrar sesión solo borra la cookie.
+// Cada exenta vale SOLO en su archivo: el mismo nombre en otro acciones.ts pasa por la guarda.
+const EXENTAS: Readonly<Record<string, readonly string[]>> = {
+  'app/login/acciones.ts': ['accionLogin', 'accionVerificar'],
+  'app/panel/acciones.ts': ['accionCerrarSesion'],
+};
 
 function esDirectiva(n: ts.Node): boolean {
   return (
@@ -20,8 +24,9 @@ function esDirectiva(n: ts.Node): boolean {
   );
 }
 
-/** Devuelve las violaciones de un archivo de acciones (vacÃ­o = correcto). */
-function revisarAcciones(codigo: string, exentas: ReadonlySet<string> = EXENTAS): string[] {
+/** Devuelve las violaciones de un archivo de acciones (vacío = correcto). */
+function revisarAcciones(codigo: string, ruta = ''): string[] {
+  const exentas = new Set(EXENTAS[ruta] ?? []);
   const sf = ts.createSourceFile('acciones.ts', codigo, ts.ScriptTarget.Latest, true);
   const fallos: string[] = [];
 
@@ -37,20 +42,20 @@ function revisarAcciones(codigo: string, exentas: ReadonlySet<string> = EXENTAS)
 
   for (const st of sf.statements) {
     if (ts.isExportAssignment(st)) fallos.push('export default / export =');
-    else if (ts.isExportDeclaration(st) && !st.isTypeOnly) fallos.push('export { â€¦ } / export * from');
+    else if (ts.isExportDeclaration(st) && !st.isTypeOnly) fallos.push('export { … } / export * from');
     else if (ts.isVariableStatement(st) && st.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))
-      fallos.push('export const/let/var (una acciÃ³n debe ser una funciÃ³n async declarada)');
+      fallos.push('export const/let/var (una acción debe ser una función async declarada)');
     else if (ts.isClassDeclaration(st) && st.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword))
       fallos.push('export class');
     else if (
       ts.isFunctionDeclaration(st) &&
       st.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
     ) {
-      const nombre = st.name?.text ?? '(anÃ³nima)';
+      const nombre = st.name?.text ?? '(anónima)';
       if (st.modifiers.some((m) => m.kind === ts.SyntaxKind.DefaultKeyword))
         fallos.push('export default function');
       if (!st.modifiers.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword))
-        fallos.push(`${nombre}: la acciÃ³n exportada no es async`);
+        fallos.push(`${nombre}: la acción exportada no es async`);
       if (st.asteriskToken) fallos.push(`${nombre}: generador async`);
       if (exentas.has(nombre)) continue;
       const primera = st.body?.statements[0];
@@ -114,12 +119,12 @@ describe('guarda de Server Actions (todo src/)', () => {
 
   for (const a of conUseServer) {
     it(`${a.rel}: cumple la guarda`, () => {
-      expect(revisarAcciones(a.codigo)).toEqual([]);
+      expect(revisarAcciones(a.codigo, a.rel)).toEqual([]);
     });
   }
 });
 
-describe('la guarda detecta cada forma de saltÃ¡rsela', () => {
+describe('la guarda detecta cada forma de saltársela', () => {
   const ok = `'use server';
 import { requerirSesion } from '@/x';
 export async function accionA(_: E, fd: FormData) {
@@ -133,10 +138,10 @@ export async function accionB({ a }: { a: string }, [b]: string[]) {
 export type T = string;`;
   const con = (cuerpo: string) => `'use server';\n${cuerpo}`;
 
-  it('acepta una acciÃ³n correcta, incluso con parÃ¡metros desestructurados', () => {
+  it('acepta una acción correcta, incluso con parámetros desestructurados', () => {
     expect(revisarAcciones(ok)).toEqual([]);
   });
-  it('rechaza una acciÃ³n exportada como arrow function', () => {
+  it('rechaza una acción exportada como arrow function', () => {
     expect(
       revisarAcciones(con('export const accionX = async () => { await requerirSesion(); };')),
     ).not.toEqual([]);
@@ -151,7 +156,7 @@ export type T = string;`;
     expect(revisarAcciones(con("export { x } from './otro';"))).not.toEqual([]);
     expect(revisarAcciones(con("export * from './otro';"))).not.toEqual([]);
   });
-  it("rechaza 'use server' a nivel de funciÃ³n", () => {
+  it("rechaza 'use server' a nivel de función", () => {
     const codigo = `'use server';\nexport async function accionA() {\n  await requerirSesion();\n}\nfunction f() {\n  'use server';\n}`;
     expect(revisarAcciones(codigo)).not.toEqual([]);
     expect(
@@ -181,8 +186,17 @@ export type T = string;`;
     expect(revisarAcciones(con('export async function* a() { await requerirSesion(); }'))).not.toEqual([]);
     expect(revisarAcciones(con('export function a() { return 1; }'))).not.toEqual([]);
   });
-  it('respeta las exentas solo por nombre', () => {
-    expect(revisarAcciones(con('export async function accionCerrarSesion() { return 1; }'))).toEqual([]);
-    expect(revisarAcciones(con('export async function accionOtra() { return 1; }'))).not.toEqual([]);
+  it('las exentas solo valen en su propio archivo', () => {
+    const cerrar = con('export async function accionCerrarSesion() { return 1; }');
+    const login = con('export async function accionLogin() { return 1; }');
+    expect(revisarAcciones(cerrar, 'app/panel/acciones.ts')).toEqual([]);
+    expect(revisarAcciones(login, 'app/login/acciones.ts')).toEqual([]);
+    // El mismo nombre en otro archivo de acciones ya no se salta la guarda.
+    expect(revisarAcciones(cerrar, 'app/panel/clientes/acciones.ts')).not.toEqual([]);
+    expect(revisarAcciones(login, 'app/panel/acciones.ts')).not.toEqual([]);
+    expect(revisarAcciones(cerrar, 'app/login/acciones.ts')).not.toEqual([]);
+    expect(
+      revisarAcciones(con('export async function accionOtra() { return 1; }'), 'app/login/acciones.ts'),
+    ).not.toEqual([]);
   });
 });
