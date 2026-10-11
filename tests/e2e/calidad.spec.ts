@@ -48,8 +48,7 @@ test('el error de negocio aparece junto a su campo y conserva lo escrito', async
   await expect(campo).toHaveAttribute('aria-invalid', 'true');
   await expect(campo).toHaveValue(nombre);
   await expect(campo).toBeFocused();
-  await expect(page.locator('#nombre-error')).toHaveText('Ya existe un vendedor con ese nombre.');
-  await expect(campo).toHaveAttribute('aria-describedby', 'nombre-error');
+  await expect(campo).toHaveAccessibleDescription('Ya existe un vendedor con ese nombre.');
 });
 
 test('un monto inválido se marca en su campo y mueve el foco allí', async ({ page }) => {
@@ -63,8 +62,40 @@ test('un monto inválido se marca en su campo y mueve el foco allí', async ({ p
   await expect(precio).toHaveAttribute('aria-invalid', 'true');
   await expect(precio).toBeFocused();
   await expect(precio).toHaveValue('mucho');
-  await expect(page.locator('#precio-error')).toContainText('escribe un monto válido');
+  await expect(precio).toHaveAccessibleDescription(/escribe un monto válido/);
   await expect(page.getByLabel('Costo')).not.toHaveAttribute('aria-invalid', 'true');
+});
+
+test('dos formularios con el mismo campo describen cada uno su propio error', async ({ page }, info) => {
+  const m = info.project.name;
+  await page.goto('/panel/vendedores');
+  await page.getByLabel('Nombre').fill(`Vend ids ${m}`);
+  await page.getByLabel('Comisión (%)').fill('10');
+  await page.getByRole('button', { name: 'Agregar vendedor' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Vendedor agregado.' })).toBeVisible();
+  await page.goto('/panel/exhibidores');
+  await page.getByLabel('Vendedor', { exact: true }).selectOption({ label: `Vend ids ${m}` });
+  await page.getByLabel('Nombre del exhibidor').fill(`Exh ids ${m}`);
+  await page.getByRole('button', { name: 'Crear exhibidor' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Exhibidor creado.' })).toBeVisible();
+  await page.getByRole('link', { name: `Exh ids ${m}` }).click();
+
+  // Enviar y Regresar tienen ambos un campo "codigos": cada error debe colgar de su propio control.
+  const enviar = page.getByLabel('Códigos a enviar');
+  const regresar = page.getByLabel('Códigos a regresar');
+  await enviar.fill(' ');
+  await page.getByRole('button', { name: 'Enviar piezas' }).click();
+  await expect(enviar).toHaveAccessibleDescription('Escribe al menos un código.');
+  await regresar.fill('ZZ1 ZZ1');
+  await page.getByRole('button', { name: 'Regresar piezas' }).click();
+  await expect(regresar).toHaveAccessibleDescription('Códigos repetidos: ZZ1.');
+  await expect(enviar).toHaveAccessibleDescription('Escribe al menos un código.');
+  const ids = await Promise.all([enviar, regresar].map((c) => c.getAttribute('aria-describedby')));
+  expect(ids[0]).not.toBe(ids[1]);
+  await expect(page.locator('p[role="alert"]')).toHaveText([
+    'Revisa los campos marcados.',
+    'Revisa los campos marcados.',
+  ]);
 });
 
 test('el nombre accesible de un selector es solo su etiqueta', async ({ page }) => {

@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { conDb } from '@/db/client';
-import { esCodigoValido, normalizarCodigo, tituloDeCodigo } from '@/domain/codigos';
+import { codigoDeSegmento, tituloDeCodigo } from '@/domain/codigos';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
@@ -17,15 +17,6 @@ const FECHA = new Intl.DateTimeFormat('es-MX', {
   timeZone: 'America/Mexico_City',
 });
 
-function codigoDeUrl(crudo: string): string | null {
-  try {
-    const c = normalizarCodigo(decodeURIComponent(crudo));
-    return esCodigoValido(c) ? c : null;
-  } catch {
-    return null; // %-secuencia malformada
-  }
-}
-
 // El título sale del código de la URL (normalizado y validado): sin consulta extra a la BD.
 export async function generateMetadata({ params }: { params: Promise<{ codigo: string }> }) {
   return { title: tituloDeCodigo((await params).codigo) };
@@ -33,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ codigo: s
 
 export default async function FichaPieza({ params }: { params: Promise<{ codigo: string }> }) {
   await requerirSesion();
-  const codigo = codigoDeUrl((await params).codigo);
+  const codigo = codigoDeSegmento((await params).codigo);
   if (!codigo) notFound();
   const datos = await conDb(async (db) => {
     const p = await obtenerPiezaPorCodigo(db, codigo);

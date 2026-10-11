@@ -7,11 +7,16 @@ export function normalizarCodigo(c: string): string {
 
 /** Título de la ficha de una pieza a partir del segmento de la URL; sin consulta y sin reflejar texto no válido. */
 export function tituloDeCodigo(segmento: string): string {
+  return codigoDeSegmento(segmento) ?? 'Pieza';
+}
+
+/** Código válido y normalizado a partir del segmento de la URL; null si está malformado o no es un código. */
+export function codigoDeSegmento(segmento: string): string | null {
   try {
     const c = normalizarCodigo(decodeURIComponent(segmento));
-    return esCodigoValido(c) ? c : 'Pieza';
+    return esCodigoValido(c) ? c : null;
   } catch {
-    return 'Pieza';
+    return null; // %-secuencia malformada
   }
 }
 

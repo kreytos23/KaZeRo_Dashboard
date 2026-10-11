@@ -32,5 +32,5 @@ export function proxy(req: NextRequest) {
 export const config = {
   // Se excluyen solo los estáticos exactos: `/favicon.icoX` o `/_next/staticx` (que dan 404) también
   // deben pasar por el proxy para llevar CSP y cabeceras de seguridad. `/icon.svg` pasa y es pública.
-  matcher: ['/((?!_next/static/|_next/image|favicon\\.ico$).*)'],
+  matcher: ['/((?!_next/static/|_next/image(?:/|$)|favicon\\.ico$).*)'],
 };

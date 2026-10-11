@@ -8,6 +8,7 @@ describe('matcher del proxy', () => {
   it('excluye solo los estáticos exactos', () => {
     expect(cubre('/_next/static/chunks/a.js')).toBe(false);
     expect(cubre('/_next/image')).toBe(false);
+    expect(cubre('/_next/image/x')).toBe(false);
     expect(cubre('/favicon.ico')).toBe(false);
   });
   it('lo demás pasa por el proxy (cabeceras de seguridad y CSP), incluidas variantes parecidas', () => {
@@ -18,6 +19,7 @@ describe('matcher del proxy', () => {
       '/favicon.icoX',
       '/favicon.ico/x',
       '/_next/staticx',
+      '/_next/imagex',
       '/icon.svg',
     ])
       expect(cubre(ruta), ruta).toBe(true);

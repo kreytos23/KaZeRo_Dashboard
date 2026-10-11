@@ -50,7 +50,8 @@ export function FormAccion({
       <ErroresCampo.Provider value={estado.campos ?? {}}>{children}</ErroresCampo.Provider>
       {estado.error && (
         <p role="alert" className="text-sm whitespace-pre-line text-red-700">
-          {estado.error}
+          {/* Con errores por campo, el detalle lo anuncia cada campo (aria-describedby): aquí solo un resumen. */}
+          {estado.campos ? 'Revisa los campos marcados.' : estado.error}
         </p>
       )}
       {estado.ok && (

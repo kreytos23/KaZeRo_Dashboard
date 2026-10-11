@@ -28,12 +28,12 @@ export function formatoMXN(c: number): string {
   return FORMATO.format(c / 100);
 }
 
-/** Comisión: 0 a 100 con hasta 2 decimales, devuelta como numeric(5,2). */
 /** "20.00" → "20", "12.50" → "12.5": para mostrar un porcentaje guardado como numeric(5,2) en un campo. */
 export function porcentajeLegible(numeric: string): string {
   return /^\d+\.\d+$/.test(numeric) ? numeric.replace(/0+$/, '').replace(/\.$/, '') : numeric;
 }
 
+/** Comisión: 0 a 100 con hasta 2 decimales, devuelta como numeric(5,2). */
 export function porcentajeANumeric(texto: string): string | null {
   let t = texto.trim().replace(/%$/, '').trim();
   // Coma decimal ("12,5"): una sola coma con 1-2 decimales no es ambigua con separador de miles.

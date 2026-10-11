@@ -87,7 +87,7 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
       </ErroresCampo.Provider>
       {estado.error && (
         <p role="alert" className="text-sm text-red-700">
-          {estado.error}
+          {estado.campos ? 'Revisa los campos marcados.' : estado.error}
         </p>
       )}
       <button

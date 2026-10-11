@@ -7,22 +7,23 @@ const ESTILO = 'min-h-11 rounded-lg border border-stone-300 px-3';
 const ESTILO_ETIQUETA = 'text-sm font-medium';
 
 /** Error de un campo: fuera del `<label>` para que no forme parte del nombre accesible del control. */
-function MensajeError({ name, error }: { name: string; error?: string }) {
+function MensajeError({ idControl, error }: { idControl: string; error?: string }) {
   if (!error) return null;
   return (
-    <span id={`${name}-error`} className="text-sm font-normal text-red-700">
+    <span id={`${idControl}-error`} className="text-sm font-normal text-red-700">
       {error}
     </span>
   );
 }
 
-function useErrorDe(name: string) {
+/** El id del mensaje deriva del id del control (único por useId), no del name: dos formularios pueden repetir name. */
+function useErrorDe(name: string, idControl: string) {
   const error = useContext(ErroresCampo)[name];
   return {
     error,
     aria: {
       'aria-invalid': error ? (true as const) : undefined,
-      'aria-describedby': error ? `${name}-error` : undefined,
+      'aria-describedby': error ? `${idControl}-error` : undefined,
     },
   };
 }
@@ -33,14 +34,15 @@ export function Campo({
   ...props
 }: { etiqueta: string; name: string } & InputHTMLAttributes<HTMLInputElement>) {
   const propio = useId();
-  const { error, aria } = useErrorDe(props.name);
+  const idControl = id ?? propio;
+  const { error, aria } = useErrorDe(props.name, idControl);
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id ?? propio} className={ESTILO_ETIQUETA}>
         {etiqueta}
       </label>
       <input id={id ?? propio} className={ESTILO} {...aria} {...props} />
-      <MensajeError name={props.name} error={error} />
+      <MensajeError idControl={idControl} error={error} />
     </div>
   );
 }
@@ -59,7 +61,7 @@ export function Selector({
   required?: boolean;
 }) {
   const id = useId();
-  const { error, aria } = useErrorDe(name);
+  const { error, aria } = useErrorDe(name, id);
   return (
     <div className="flex flex-col gap-1">
       {/* htmlFor/id y no label envolvente: así el nombre accesible es solo la etiqueta, sin el texto de las opciones. */}
@@ -80,7 +82,7 @@ export function Selector({
           </option>
         ))}
       </select>
-      <MensajeError name={name} error={error} />
+      <MensajeError idControl={id} error={error} />
     </div>
   );
 }
@@ -103,7 +105,7 @@ export function AreaTexto({
   maxLength?: number;
 }) {
   const id = useId();
-  const { error, aria } = useErrorDe(name);
+  const { error, aria } = useErrorDe(name, id);
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className={ESTILO_ETIQUETA}>
@@ -120,7 +122,7 @@ export function AreaTexto({
         className="rounded-lg border border-stone-300 px-3 py-2 font-mono"
         {...aria}
       />
-      <MensajeError name={name} error={error} />
+      <MensajeError idControl={id} error={error} />
     </div>
   );
 }

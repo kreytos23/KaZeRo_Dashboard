@@ -48,7 +48,11 @@ function codigosValidos(codigos: string[]): string[] {
   const repetidos = new Set<string>();
   for (const c of lista) (vistos.has(c) ? repetidos : vistos).add(c);
   if (repetidos.size)
-    throw new ErrorNegocio('codigos_repetidos', `Códigos repetidos: ${[...repetidos].join(', ')}.`);
+    throw new ErrorNegocio(
+      'codigos_repetidos',
+      `Códigos repetidos: ${[...repetidos].join(', ')}.`,
+      'codigos',
+    );
   return lista;
 }
 
