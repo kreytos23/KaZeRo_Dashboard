@@ -5,6 +5,7 @@ import {
   numericACentavos,
   pesosACentavos,
   porcentajeANumeric,
+  porcentajeLegible,
 } from '@/domain/dinero';
 
 describe('dinero en centavos', () => {
@@ -39,5 +40,13 @@ describe('dinero en centavos', () => {
     expect(porcentajeANumeric('1,234')).toBeNull();
     expect(porcentajeANumeric('1,2,3')).toBeNull();
     expect(porcentajeANumeric('100,5')).toBeNull();
+  });
+  it('muestra el porcentaje sin ceros sobrantes', () => {
+    expect(porcentajeLegible('20.00')).toBe('20');
+    expect(porcentajeLegible('12.50')).toBe('12.5');
+    expect(porcentajeLegible('12.55')).toBe('12.55');
+    expect(porcentajeLegible('0.00')).toBe('0');
+    expect(porcentajeLegible('100.00')).toBe('100');
+    expect(porcentajeLegible('texto')).toBe('texto');
   });
 });

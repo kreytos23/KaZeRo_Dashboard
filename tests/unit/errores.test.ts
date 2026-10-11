@@ -4,6 +4,17 @@ import { ErrorNegocio, conErroresDeNegocio, traducirErrorPg } from '@/server/err
 const envuelto = (pg: object) => new Error('Failed query', { cause: pg });
 
 describe('traducción de errores de Postgres', () => {
+  it('asocia la restricción violada con su campo del formulario', () => {
+    expect(traducirErrorPg(envuelto({ code: '23505', constraint: 'vendedor_nombre_uq' }))?.campo).toBe(
+      'nombre',
+    );
+    expect(traducirErrorPg(envuelto({ code: '23514', constraint: 'cliente_telefono_largo' }))?.campo).toBe(
+      'telefono',
+    );
+    expect(
+      traducirErrorPg(envuelto({ code: '23514', constraint: 'pieza_transicion' }))?.campo,
+    ).toBeUndefined();
+  });
   it('traduce la violación de código único', () => {
     const e = traducirErrorPg(envuelto({ code: '23505', constraint: 'pieza_codigo_uq' }));
     expect(e).toBeInstanceOf(ErrorNegocio);

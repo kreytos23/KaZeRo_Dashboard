@@ -64,10 +64,15 @@ function validarPieza(d: DatosPieza) {
     throw new ErrorNegocio(
       'pieza_codigo_formato',
       'El código solo admite letras, números y guiones (máx. 20).',
+      'codigo',
     );
   const descripcion = d.descripcion.trim();
   if (!descripcion || descripcion.length > 300)
-    throw new ErrorNegocio('pieza_invalida', 'La descripción debe tener entre 1 y 300 caracteres.');
+    throw new ErrorNegocio(
+      'pieza_invalida',
+      'La descripción debe tener entre 1 y 300 caracteres.',
+      'descripcion',
+    );
   const fechaAlta = d.fechaAlta ? parsearFechaISO(d.fechaAlta) : hoyMX();
   if (!fechaAlta) throw new ErrorNegocio('pieza_invalida', 'La fecha de alta no es válida.');
   return {

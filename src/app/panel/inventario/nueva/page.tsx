@@ -3,6 +3,8 @@ import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarCatalogo } from '@/server/catalogos/servicio';
 import { FormNuevaPieza } from './FormNuevaPieza';
 
+export const metadata = { title: 'Nueva pieza' };
+
 export default async function NuevaPieza() {
   await requerirSesion();
   const categorias = await conDb((db) => listarCatalogo(db, 'categoria'));

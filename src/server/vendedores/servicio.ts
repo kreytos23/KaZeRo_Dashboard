@@ -26,7 +26,7 @@ const columnas = {
 function nombreValido(nombre: string): string {
   const limpio = nombre.trim().replace(/\s+/g, ' ');
   if (!limpio || limpio.length > 80)
-    throw new ErrorNegocio('vendedor_invalido', 'El nombre debe tener entre 1 y 80 caracteres.');
+    throw new ErrorNegocio('vendedor_invalido', 'El nombre debe tener entre 1 y 80 caracteres.', 'nombre');
   return limpio;
 }
 
@@ -37,6 +37,7 @@ function comisionValida(valor: string): string {
     throw new ErrorNegocio(
       'vendedor_comision_invalida',
       'La comisión debe ser un número entre 0 y 100 con hasta 2 decimales.',
+      'comision',
     );
   return limpio;
 }

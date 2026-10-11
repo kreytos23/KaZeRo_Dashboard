@@ -9,6 +9,8 @@ import { obtenerCliente } from '@/server/clientes/servicio';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { accionEditarCliente } from '../acciones';
 
+export const metadata = { title: 'Cliente' };
+
 export default async function FichaCliente({ params }: { params: Promise<{ id: string }> }) {
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);

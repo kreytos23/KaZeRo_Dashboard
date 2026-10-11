@@ -5,10 +5,36 @@ export class ErrorNegocio extends Error {
   constructor(
     readonly codigo: string,
     mensaje: string,
+    readonly campo?: string,
   ) {
     super(mensaje);
   }
 }
+
+/** Restricción de la BD → nombre del campo en el formulario, para mostrar el error junto a él. */
+const CAMPOS: Record<string, string> = {
+  pieza_codigo_uq: 'codigo',
+  pieza_codigo_formato: 'codigo',
+  pieza_descripcion_largo: 'descripcion',
+  pieza_montos: 'precio',
+  vendedor_nombre_uq: 'nombre',
+  vendedor_nombre_largo: 'nombre',
+  vendedor_comision_rango: 'comision',
+  categoria_nombre_uq: 'nombre',
+  categoria_nombre_largo: 'nombre',
+  material_nombre_uq: 'nombre',
+  material_nombre_largo: 'nombre',
+  proveedor_nombre_uq: 'nombre',
+  proveedor_nombre_largo: 'nombre',
+  cliente_nombre_largo: 'nombre',
+  cliente_referencia_largo: 'referencia',
+  cliente_telefono_largo: 'telefono',
+  cliente_red_social_largo: 'redSocial',
+  cliente_usuario_red_largo: 'usuarioRed',
+  cliente_notas_largo: 'notas',
+  exhibidor_nombre_largo: 'nombre',
+  movimiento_nota_largo: 'nota',
+};
 
 const MENSAJES: Record<string, string> = {
   pieza_codigo_uq: 'Ya existe una pieza con ese código.',
@@ -57,7 +83,8 @@ function mensajesPg(err: unknown): string[] {
 
 export function traducirErrorPg(err: unknown): ErrorNegocio | null {
   const constraint = pgConstraint(err);
-  if (constraint && MENSAJES[constraint]) return new ErrorNegocio(constraint, MENSAJES[constraint]);
+  if (constraint && MENSAJES[constraint])
+    return new ErrorNegocio(constraint, MENSAJES[constraint], CAMPOS[constraint]);
   if (pgCode(err) === '23503') return new ErrorNegocio('referencia', 'El registro relacionado no existe.');
   const code = pgCode(err);
   // Interbloqueo o fallo de serialización: la operación entera se revirtió, basta reintentar.

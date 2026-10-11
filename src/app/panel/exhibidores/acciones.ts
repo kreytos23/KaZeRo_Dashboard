@@ -26,7 +26,11 @@ export async function accionCrearExhibidor(_: EstadoAccion, fd: FormData): Promi
   await requerirSesion();
   return ejecutarAccion(async () => {
     if (texto(fd, 'nombre').length > 200)
-      throw new ErrorNegocio('exhibidor_invalido', 'El nombre debe tener entre 1 y 120 caracteres.');
+      throw new ErrorNegocio(
+        'exhibidor_invalido',
+        'El nombre debe tener entre 1 y 120 caracteres.',
+        'nombre',
+      );
     await conDb((db) =>
       crearExhibidor(db, {
         vendedorId: uuidDe(fd, 'vendedorId'),

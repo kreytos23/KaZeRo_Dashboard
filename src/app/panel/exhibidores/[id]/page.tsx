@@ -11,6 +11,8 @@ import { obtenerExhibidor } from '@/server/exhibidores/servicio';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
 import { accionCerrar, accionEnviar, accionRegresar } from '../acciones';
 
+export const metadata = { title: 'Exhibidor' };
+
 export default async function FichaExhibidor({ params }: { params: Promise<{ id: string }> }) {
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);

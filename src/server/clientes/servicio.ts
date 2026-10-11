@@ -24,11 +24,12 @@ const opcional = (v: string | null | undefined) => {
 function validar(d: DatosCliente) {
   const nombre = d.nombre.trim().replace(/\s+/g, ' ');
   if (!nombre || nombre.length > 120)
-    throw new ErrorNegocio('cliente_invalido', 'El nombre debe tener entre 1 y 120 caracteres.');
+    throw new ErrorNegocio('cliente_invalido', 'El nombre debe tener entre 1 y 120 caracteres.', 'nombre');
   let cumpleanos: string | null = null;
   if (opcional(d.cumpleanos)) {
     cumpleanos = parsearFechaISO(d.cumpleanos!);
-    if (!cumpleanos) throw new ErrorNegocio('cliente_invalido', 'La fecha de cumpleaños no es válida.');
+    if (!cumpleanos)
+      throw new ErrorNegocio('cliente_invalido', 'La fecha de cumpleaños no es válida.', 'cumpleanos');
   }
   return {
     nombre,

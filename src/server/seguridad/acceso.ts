@@ -1,6 +1,6 @@
 // Rutas públicas y sus subrutas por segmento, más archivos públicos que solo valen exactos.
 const PUBLICAS = ['/login', '/api/health'];
-const ARCHIVOS_PUBLICOS = ['/robots.txt'];
+const ARCHIVOS_PUBLICOS = ['/robots.txt', '/icon.svg'];
 
 export type DecisionAcceso = 'pasar' | 'redirigir_login' | 'no_autenticado';
 

@@ -9,6 +9,8 @@ import { listarExhibidores } from '@/server/exhibidores/servicio';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { accionCrearExhibidor } from './acciones';
 
+export const metadata = { title: 'Exhibidores' };
+
 export default async function PaginaExhibidores({
   searchParams,
 }: {

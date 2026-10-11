@@ -11,6 +11,8 @@ const SECCIONES: { tipo: TipoCatalogo; titulo: string; etiqueta: string }[] = [
   { tipo: 'proveedor', titulo: 'Proveedores', etiqueta: 'Nuevo proveedor' },
 ];
 
+export const metadata = { title: 'Catálogos' };
+
 export default async function PaginaCatalogos() {
   await requerirSesion();
   const listas = await conDb((db) => Promise.all(SECCIONES.map((s) => listarCatalogo(db, s.tipo))));

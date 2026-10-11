@@ -2,7 +2,7 @@ import { Fragment } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { conDb } from '@/db/client';
-import { esCodigoValido, normalizarCodigo } from '@/domain/codigos';
+import { esCodigoValido, normalizarCodigo, tituloDeCodigo } from '@/domain/codigos';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
@@ -24,6 +24,11 @@ function codigoDeUrl(crudo: string): string | null {
   } catch {
     return null; // %-secuencia malformada
   }
+}
+
+// El título sale del código de la URL (normalizado y validado): sin consulta extra a la BD.
+export async function generateMetadata({ params }: { params: Promise<{ codigo: string }> }) {
+  return { title: tituloDeCodigo((await params).codigo) };
 }
 
 export default async function FichaPieza({ params }: { params: Promise<{ codigo: string }> }) {

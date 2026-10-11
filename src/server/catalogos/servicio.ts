@@ -14,7 +14,7 @@ const ESPACIOS = /[ \t\n\r\f\v\u00A0]+/g;
 function limpiar(nombre: string): string {
   const limpio = nombre.replace(ESPACIOS, ' ').replace(/^ | $/g, '');
   if (!limpio || limpio.length > 80) {
-    throw new ErrorNegocio('catalogo_invalido', 'El nombre debe tener entre 1 y 80 caracteres.');
+    throw new ErrorNegocio('catalogo_invalido', 'El nombre debe tener entre 1 y 80 caracteres.', 'nombre');
   }
   return limpio;
 }

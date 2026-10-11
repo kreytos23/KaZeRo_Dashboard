@@ -6,6 +6,8 @@ import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarClientes } from '@/server/clientes/servicio';
 import { accionCrearCliente } from './acciones';
 
+export const metadata = { title: 'Clientes' };
+
 export default async function PaginaClientes({
   searchParams,
 }: {

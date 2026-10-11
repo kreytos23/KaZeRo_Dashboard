@@ -5,6 +5,7 @@ import {
   normalizarCodigo,
   separarCodigo,
   siguienteCodigo,
+  tituloDeCodigo,
 } from '@/domain/codigos';
 
 describe('códigos de pieza (R-01)', () => {
@@ -33,5 +34,18 @@ describe('códigos de pieza (R-01)', () => {
     expect(esPrefijoValido('AI')).toBe(true);
     expect(esPrefijoValido('A1')).toBe(false);
     expect(esPrefijoValido('ABCDEFG')).toBe(false);
+  });
+});
+
+describe('tituloDeCodigo', () => {
+  it('normaliza el código de la URL para usarlo de título', () => {
+    expect(tituloDeCodigo('ai29')).toBe('AI29');
+    expect(tituloDeCodigo('%20ai-29%20')).toBe('AI-29');
+  });
+  it('ante algo inválido o malformado usa un título genérico, nunca el texto crudo', () => {
+    expect(tituloDeCodigo('%E0%A4%A')).toBe('Pieza');
+    expect(tituloDeCodigo('<script>alert(1)</script>')).toBe('Pieza');
+    expect(tituloDeCodigo('A'.repeat(50))).toBe('Pieza');
+    expect(tituloDeCodigo('')).toBe('Pieza');
   });
 });

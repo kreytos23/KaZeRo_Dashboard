@@ -1,11 +1,14 @@
 import Link from 'next/link';
 import { conDb } from '@/db/client';
+import { porcentajeLegible } from '@/domain/dinero';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { accionCrearVendedor } from './acciones';
 import { TIPOS } from './tipos';
+
+export const metadata = { title: 'Vendedores' };
 
 export default async function PaginaVendedores() {
   await requerirSesion();
@@ -40,7 +43,7 @@ export default async function PaginaVendedores() {
                   </Link>
                 </td>
                 <td>{TIPOS.find((t) => t.valor === v.tipo)?.texto}</td>
-                <td>{v.comisionPct}%</td>
+                <td>{porcentajeLegible(v.comisionPct)}%</td>
                 <td>{v.activo ? 'Activo' : 'Inactivo'}</td>
               </tr>
             ))}

@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useRef } from 'react';
 import { marcarIndiceSucio } from '@/search/eventos';
+import { ErroresCampo, useEnfocarPrimerInvalido } from './errores-campo';
 import type { EstadoAccion } from './estado';
 
 type Accion = (prev: EstadoAccion, fd: FormData) => Promise<EstadoAccion>;
@@ -32,6 +33,8 @@ export function FormAccion({
     if (limpiarAlGuardar) form.current?.reset();
   }, [estado, limpiarAlGuardar]);
 
+  useEnfocarPrimerInvalido(form, estado);
+
   return (
     <form
       ref={form}
@@ -44,7 +47,7 @@ export function FormAccion({
         startTransition(() => despachar(datos));
       }}
     >
-      {children}
+      <ErroresCampo.Provider value={estado.campos ?? {}}>{children}</ErroresCampo.Provider>
       {estado.error && (
         <p role="alert" className="text-sm whitespace-pre-line text-red-700">
           {estado.error}

@@ -36,13 +36,13 @@ function monto(fd: FormData, campo: string, etiqueta: string, opcional = false):
   if (!t && opcional) return 0;
   const c = pesosACentavos(t);
   if (c === null)
-    throw new ErrorNegocio('monto', `${etiqueta}: escribe un monto válido (ej. 149 o 1,299.50).`);
+    throw new ErrorNegocio('monto', `${etiqueta}: escribe un monto válido (ej. 149 o 1,299.50).`, campo);
   return c;
 }
 
 function largoMax(fd: FormData, campo: string, etiqueta: string, max: number): string {
   const t = texto(fd, campo);
-  if (t.length > max) throw new ErrorNegocio('largo', `${etiqueta}: máximo ${max} caracteres.`);
+  if (t.length > max) throw new ErrorNegocio('largo', `${etiqueta}: máximo ${max} caracteres.`, campo);
   return t;
 }
 

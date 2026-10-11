@@ -14,7 +14,7 @@ const tipo = z.enum(['casa', 'revendedora', 'consignacion']);
 
 function leer(fd: FormData) {
   const t = tipo.safeParse(texto(fd, 'tipo'));
-  if (!t.success) throw new ErrorNegocio('tipo', 'Elige un tipo de vendedor.');
+  if (!t.success) throw new ErrorNegocio('tipo', 'Elige un tipo de vendedor.', 'tipo');
   const bruto = texto(fd, 'comision');
   // El servicio vuelve a validar y da el mensaje de error si no es un porcentaje.
   return { nombre: texto(fd, 'nombre'), tipo: t.data, comisionPct: porcentajeANumeric(bruto) ?? bruto };

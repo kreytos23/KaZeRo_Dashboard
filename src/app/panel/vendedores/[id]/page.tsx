@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
 import { conDb } from '@/db/client';
+import { porcentajeLegible } from '@/domain/dinero';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -10,6 +11,8 @@ import { listarExhibidores } from '@/server/exhibidores/servicio';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
 import { accionEditarVendedor } from '../acciones';
 import { TIPOS } from '../tipos';
+
+export const metadata = { title: 'Vendedor' };
 
 export default async function FichaVendedor({ params }: { params: Promise<{ id: string }> }) {
   await requerirSesion();
@@ -33,7 +36,7 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
             etiqueta="Comisión (%)"
             name="comision"
             inputMode="decimal"
-            defaultValue={v.comisionPct}
+            defaultValue={porcentajeLegible(v.comisionPct)}
             required
           />
           <label className="flex min-h-11 items-center gap-2 text-sm font-medium">

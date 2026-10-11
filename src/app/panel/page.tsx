@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+export const metadata = { title: 'Panel' };
+
 export default function Panel() {
   return (
     <section className="flex flex-col gap-3">

@@ -5,7 +5,7 @@ import './globals.css';
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
-  title: 'Kazero',
+  title: { default: 'Kazero', template: '%s · Kazero' },
   robots: { index: false, follow: false },
 };
 

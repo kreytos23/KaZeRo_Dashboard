@@ -37,7 +37,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await page.getByLabel('Comisión (%)').fill('20');
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(estadoCon(page, 'Cambios guardados.')).toBeVisible();
-  await expect(page.getByLabel('Comisión (%)')).toHaveValue('20.00');
+  await expect(page.getByLabel('Comisión (%)')).toHaveValue('20');
 
   await page.goto('/panel/inventario/nueva');
   await page.getByLabel('Prefijo').fill(prefijo);
@@ -59,7 +59,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await expect(page).toHaveURL(new RegExp(`/panel/inventario/${codigo}$`));
 
   await page.goto('/panel/exhibidores');
-  await page.getByRole('combobox', { name: 'Vendedor', exact: true }).selectOption({ label: `Nelly ${m}` });
+  await page.getByLabel('Vendedor', { exact: true }).selectOption({ label: `Nelly ${m}` });
   await page.getByLabel('Nombre del exhibidor').fill(`Exhibidor ${m}`);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
   await expect(estadoCon(page, 'Exhibidor creado.')).toBeVisible();

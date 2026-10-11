@@ -8,6 +8,8 @@ import { listarPiezas } from '@/server/piezas/servicio';
 import { ETIQUETA_ESTADO } from './etiquetas';
 import { POR_PAGINA, leerFiltros } from './filtros';
 
+export const metadata = { title: 'Inventario' };
+
 export default async function PaginaInventario({
   searchParams,
 }: {

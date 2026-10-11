@@ -2,6 +2,8 @@ import { MAX_FILAS_LOTE } from '@/domain/lote';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { FormLote } from './FormLote';
 
+export const metadata = { title: 'Alta por lote' };
+
 export default async function AltaLote() {
   await requerirSesion();
   return (

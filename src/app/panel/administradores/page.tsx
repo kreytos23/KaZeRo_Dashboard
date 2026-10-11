@@ -8,6 +8,8 @@ const FECHA = new Intl.DateTimeFormat('es-MX', {
   timeZone: 'America/Mexico_City',
 });
 
+export const metadata = { title: 'Administradores' };
+
 export default async function PaginaAdministradores() {
   await requerirSesion();
   const admins = await conDb((db) => listarAdmins(db));

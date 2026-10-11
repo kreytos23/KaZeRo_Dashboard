@@ -5,6 +5,16 @@ export function normalizarCodigo(c: string): string {
   return c.trim().toUpperCase().replace(/\s+/g, '');
 }
 
+/** Título de la ficha de una pieza a partir del segmento de la URL; sin consulta y sin reflejar texto no válido. */
+export function tituloDeCodigo(segmento: string): string {
+  try {
+    const c = normalizarCodigo(decodeURIComponent(segmento));
+    return esCodigoValido(c) ? c : 'Pieza';
+  } catch {
+    return 'Pieza';
+  }
+}
+
 export function esCodigoValido(c: string): boolean {
   return PATRON_CODIGO.test(c);
 }

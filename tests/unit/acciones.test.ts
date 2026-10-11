@@ -17,6 +17,13 @@ describe('ejecutarAccion', () => {
       }),
     ).toEqual({ error: 'Ya existe.' });
   });
+  it('un ErrorNegocio con campo se devuelve también por campo', async () => {
+    expect(
+      await ejecutarAccion(async () => {
+        throw new ErrorNegocio('x', 'Ya existe.', 'nombre');
+      }),
+    ).toEqual({ error: 'Ya existe.', campos: { nombre: 'Ya existe.' } });
+  });
   it('un error inesperado da un mensaje genérico y no loguea su texto (podría traer datos)', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const r = await ejecutarAccion(async () => {

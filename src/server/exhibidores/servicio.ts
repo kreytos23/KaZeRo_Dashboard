@@ -25,9 +25,10 @@ export async function crearExhibidor(
 ): Promise<string> {
   const nombre = d.nombre.trim();
   if (!nombre || nombre.length > 120)
-    throw new ErrorNegocio('exhibidor_invalido', 'El nombre debe tener entre 1 y 120 caracteres.');
+    throw new ErrorNegocio('exhibidor_invalido', 'El nombre debe tener entre 1 y 120 caracteres.', 'nombre');
   const fechaEnvio = parsearFechaISO(d.fechaEnvio);
-  if (!fechaEnvio) throw new ErrorNegocio('exhibidor_invalido', 'La fecha de envío no es válida.');
+  if (!fechaEnvio)
+    throw new ErrorNegocio('exhibidor_invalido', 'La fecha de envío no es válida.', 'fechaEnvio');
   return conErroresDeNegocio(async () => {
     const [e] = await db
       .insert(exhibidor)
@@ -40,9 +41,9 @@ export async function crearExhibidor(
 /** Normaliza y valida la lista antes de tocar la BD: no vacía, sin repetidos, con tope. */
 function codigosValidos(codigos: string[]): string[] {
   const lista = codigos.map(normalizarCodigo).filter(Boolean);
-  if (lista.length === 0) throw new ErrorNegocio('sin_codigos', 'Escribe al menos un código.');
+  if (lista.length === 0) throw new ErrorNegocio('sin_codigos', 'Escribe al menos un código.', 'codigos');
   if (lista.length > MAX_CODIGOS)
-    throw new ErrorNegocio('sin_codigos', `Máximo ${MAX_CODIGOS} piezas por operación.`);
+    throw new ErrorNegocio('sin_codigos', `Máximo ${MAX_CODIGOS} piezas por operación.`, 'codigos');
   const vistos = new Set<string>();
   const repetidos = new Set<string>();
   for (const c of lista) (vistos.has(c) ? repetidos : vistos).add(c);
