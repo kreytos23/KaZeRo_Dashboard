@@ -14,6 +14,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { admin } from './auth';
 
 const ts = (nombre: string) => timestamp(nombre, { withTimezone: true });
 // updated_at lo mantiene el trigger kz_tocar_updated_at (0003); el default cubre el INSERT.
@@ -43,6 +44,7 @@ export const tipoMovimiento = pgEnum('tipo_movimiento', [
   'venta',
   'cancelacion_venta',
   'cambio_estado',
+  'correccion',
 ]);
 export const estadoExhibidor = pgEnum('estado_exhibidor', ['abierto', 'cerrado']);
 
@@ -54,6 +56,9 @@ export const categoria = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     nombre: text('nombre').notNull(),
     createdAt: ts('created_at').notNull().defaultNow(),
+    // Bloqueo optimista del renombrado (Plan 2.1); updated_at por trigger (0009).
+    version: integer('version').notNull().default(1),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
   },
   (t) => [largo('categoria_nombre_largo', t.nombre, 1, 80)],
 );
@@ -63,6 +68,9 @@ export const material = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     nombre: text('nombre').notNull(),
     createdAt: ts('created_at').notNull().defaultNow(),
+    // Bloqueo optimista del renombrado (Plan 2.1); updated_at por trigger (0009).
+    version: integer('version').notNull().default(1),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
   },
   (t) => [largo('material_nombre_largo', t.nombre, 1, 80)],
 );
@@ -72,6 +80,9 @@ export const proveedor = pgTable(
     id: uuid('id').primaryKey().defaultRandom(),
     nombre: text('nombre').notNull(),
     createdAt: ts('created_at').notNull().defaultNow(),
+    // Bloqueo optimista del renombrado (Plan 2.1); updated_at por trigger (0009).
+    version: integer('version').notNull().default(1),
+    updatedAt: ts('updated_at').notNull().defaultNow(),
   },
   (t) => [largo('proveedor_nombre_largo', t.nombre, 1, 80)],
 );
@@ -198,11 +209,19 @@ export const movimientoPieza = pgTable(
     // Sin FK todavía: la tabla pedido nace en el Plan 3 (expand/contract).
     pedidoId: uuid('pedido_id'),
     nota: text('nota'),
+    // Quién hizo el movimiento (Plan 2.1). Nullable: las filas anteriores no lo tienen.
+    adminId: uuid('admin_id').references(() => admin.id),
     fecha: ts('fecha').notNull().defaultNow(),
   },
   (t) => [
     index('movimiento_pieza_pieza_idx').on(t.piezaId, t.orden),
     index('movimiento_pieza_exhibidor_idx').on(t.exhibidorId),
     check('movimiento_nota_largo', sql`${t.nota} IS NULL OR char_length(${t.nota}) <= 200`),
+    index('movimiento_pieza_admin_idx').on(t.adminId),
+    // `tipo::text` y no el literal del enum: 'correccion' se agrega en esta misma tanda de migraciones (55P04).
+    check(
+      'movimiento_correccion_completa',
+      sql`${t.tipo}::text <> 'correccion' OR (${t.adminId} IS NOT NULL AND char_length(btrim(coalesce(${t.nota}, ''))) >= 1)`,
+    ),
   ],
 );

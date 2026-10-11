@@ -48,7 +48,7 @@ export default async function globalSetup() {
   const regen = { email: 'regen@kazero.test', password: randomBytes(18).toString('base64url') };
   const [a, r] = await conDbUrl(process.env.DATABASE_URL_OWNER!, async (db) => {
     await db.execute(
-      sql`TRUNCATE movimiento_pieza, pieza, exhibidor, cliente, vendedor, categoria, material, proveedor,
+      sql`TRUNCATE auditoria_campo, auditoria, movimiento_pieza, pieza, exhibidor, cliente, vendedor, categoria, material, proveedor,
         codigo_recuperacion, sesion, acceso_log, idempotencia, admin RESTART IDENTITY CASCADE`,
     );
     const key = process.env.KAZERO_TOTP_KEY!;

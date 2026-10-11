@@ -100,6 +100,47 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
     ].sort();
     expect(orden(columnas)).toEqual(esperado);
   });
+  it('bitácora, historial y pieza: conjunto EXACTO de privilegios de kazero_app', async () => {
+    const objetivo = sql`('auditoria', 'auditoria_campo', 'movimiento_pieza', 'pieza')`;
+    const [tablas, columnas] = await conDbUrl(urlOwner(), (db) =>
+      Promise.all([
+        db.execute<{ p: string }>(sql`
+          SELECT table_name || ':' || privilege_type AS p FROM information_schema.table_privileges
+          WHERE grantee = 'kazero_app' AND table_schema = 'public' AND table_name IN ${objetivo}`),
+        db.execute<{ p: string }>(sql`
+          SELECT table_name || '.' || column_name || ':' || privilege_type AS p
+          FROM information_schema.column_privileges
+          WHERE grantee = 'kazero_app' AND table_schema = 'public' AND table_name IN ${objetivo}
+            AND privilege_type = 'UPDATE'`),
+      ]),
+    );
+    const orden = (f: { rows: { p: string }[] }) => f.rows.map((x) => x.p).sort();
+    // Bitácora: solo lectura (la escribe kz_auditar, SECURITY DEFINER). Historial: solo inserción (R-06).
+    expect(orden(tablas)).toEqual([
+      'auditoria:SELECT',
+      'auditoria_campo:SELECT',
+      'movimiento_pieza:INSERT',
+      'movimiento_pieza:SELECT',
+      'pieza:INSERT',
+      'pieza:SELECT',
+    ]);
+    // UPDATE de pieza por columna: nunca codigo ni fecha_alta.
+    expect(orden(columnas)).toEqual(
+      [
+        'categoria_id',
+        'costo',
+        'descripcion',
+        'estado',
+        'exhibidor_id',
+        'foto_path',
+        'material_id',
+        'precio',
+        'proveedor_id',
+        'updated_at',
+        'version',
+      ].map((c) => `pieza.${c}:UPDATE`),
+    );
+  });
   it('toda tabla de negocio tiene grants explícitos para kazero_app', async () => {
     const filas = await conDbUrl(urlOwner(), (db) =>
       // Se consulta por oid (no por nombre): el planner puede evaluar el privilegio antes del filtro de
