@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
+import { exhibidor, pieza } from '@/db/schema';
+import { eq } from 'drizzle-orm';
+import { crearVendedor } from '@/server/vendedores/servicio';
 import { parsearLote } from '@/domain/lote';
 import {
   altaLote,
@@ -70,6 +73,42 @@ describe('alta por lote', () => {
     );
     expect(await app((db) => obtenerPiezaPorCodigo(db, 'AB01'))).toBeNull();
   });
+  it('resuelve categoría, material y proveedor aunque varíen mayúsculas y espacios', async () => {
+    const fila = (c: string, cat: string, mat: string, prov: string) =>
+      [c, cat, 'Pieza', mat, prov, '10', '20'].join('\t');
+    const { filas, errores } = parsearLote(
+      [
+        fila('AF01', 'Anillos', 'Oro\u3000laminado', 'Casa\u2009Uno'),
+        fila('AF02', 'ANILLOS', 'ORO\u3000LAMINADO', 'CASA\u2009UNO'),
+        fila('AF03', ' anillos ', 'oro laminado', 'casa uno'),
+      ].join('\n'),
+    );
+    expect(errores).toEqual([]);
+    await app((db) => altaLote(db, filas));
+    const fichas = await Promise.all(
+      ['AF01', 'AF02', 'AF03'].map((c) => app((db) => obtenerPiezaPorCodigo(db, c))),
+    );
+    for (const f of fichas) {
+      expect(f?.categoriaNombre).toBeTruthy();
+      expect(f?.materialNombre).toBeTruthy();
+      expect(f?.proveedorNombre).toBeTruthy();
+    }
+    expect(new Set(fichas.map((f) => f!.categoriaId)).size).toBe(1);
+  });
+  it('rechaza lotes sin filas o con más de 500 filas', async () => {
+    await expect(app((db) => altaLote(db, []))).rejects.toThrow('El lote no tiene piezas.');
+    const filas = Array.from({ length: 501 }, (_, i) => ({
+      linea: i + 1,
+      codigo: `ZZ${i + 1}`,
+      categoria: 'Anillos',
+      descripcion: 'x',
+      material: null,
+      proveedor: null,
+      costoCentavos: 0,
+      precioCentavos: 100,
+    }));
+    await expect(app((db) => altaLote(db, filas))).rejects.toThrow('Máximo 500 piezas por lote.');
+  });
   it('crea todas las piezas del lote', async () => {
     const { filas } = parsearLote(
       ['AC01', 'AC02'].map((c) => [c, 'Collares', 'Collar', '', '', '', '199'].join('\t')).join('\n'),
@@ -104,6 +143,48 @@ describe('cambios de estado manuales (R-03, R-06)', () => {
     await expect(
       app((db) => cambiarEstado(db, { piezaId: f.id, version: f.version, aEstado: 'disponible' })),
     ).rejects.toThrow('Otra pestaña modificó este registro');
+  });
+});
+
+describe('transiciones manuales acotadas', () => {
+  async function enExhibidor(codigo: string) {
+    await app((db) => altaPieza(db, { ...base, codigo }));
+    const f = (await app((db) => obtenerPiezaPorCodigo(db, codigo)))!;
+    await app(async (db) => {
+      const vid = await crearVendedor(db, { nombre: 'Rosa', tipo: 'revendedora', comisionPct: '20' });
+      const [ex] = await db
+        .insert(exhibidor)
+        .values({ vendedorId: vid, nombre: 'Exhibidor Rosa', fechaEnvio: '2026-10-09' })
+        .returning({ id: exhibidor.id });
+      await db.update(pieza).set({ estado: 'en_exhibidor', exhibidorId: ex!.id }).where(eq(pieza.id, f.id));
+    });
+    return (await app((db) => obtenerPiezaPorCodigo(db, codigo)))!;
+  }
+  it('en_exhibidor → disponible no es un cambio manual', async () => {
+    const f = await enExhibidor('AG01');
+    await expect(
+      app((db) => cambiarEstado(db, { piezaId: f.id, version: f.version, aEstado: 'disponible' })),
+    ).rejects.toThrow('Ese cambio de estado no está permitido para la pieza.');
+  });
+  it('disponible → disponible se rechaza', async () => {
+    await app((db) => altaPieza(db, { ...base, codigo: 'AG02' }));
+    const f = (await app((db) => obtenerPiezaPorCodigo(db, 'AG02')))!;
+    await expect(
+      app((db) => cambiarEstado(db, { piezaId: f.id, version: f.version, aEstado: 'disponible' })),
+    ).rejects.toThrow('Ese cambio de estado no está permitido para la pieza.');
+  });
+  it('en_exhibidor → defecto libera el exhibidor y lo deja en el historial', async () => {
+    const f = await enExhibidor('AG03');
+    await app((db) => cambiarEstado(db, { piezaId: f.id, version: f.version, aEstado: 'defecto' }));
+    const despues = (await app((db) => obtenerPiezaPorCodigo(db, 'AG03')))!;
+    expect(despues.estado).toBe('defecto');
+    expect(despues.exhibidorNombre).toBeNull();
+    const h = await app((db) => historial(db, f.id));
+    expect(h[0]).toMatchObject({
+      deEstado: 'en_exhibidor',
+      aEstado: 'defecto',
+      exhibidorNombre: 'Exhibidor Rosa',
+    });
   });
 });
 

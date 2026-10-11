@@ -59,6 +59,12 @@ export function parsearLote(texto: string): { filas: FilaLote[]; errores: ErrorL
           mensaje: `Código ${codigo} repetido en el lote (también en la línea ${previa}).`,
         });
       if (!categoria) return void errores.push({ linea, mensaje: 'Falta la categoría.' });
+      if (categoria.length > 80)
+        return void errores.push({ linea, mensaje: 'La categoría admite hasta 80 caracteres.' });
+      if (material.length > 80)
+        return void errores.push({ linea, mensaje: 'El material admite hasta 80 caracteres.' });
+      if (proveedor.length > 80)
+        return void errores.push({ linea, mensaje: 'El proveedor admite hasta 80 caracteres.' });
       if (!descripcion || descripcion.length > 300)
         return void errores.push({ linea, mensaje: 'La descripción debe tener entre 1 y 300 caracteres.' });
       const costoCentavos = costo ? pesosACentavos(costo) : 0;

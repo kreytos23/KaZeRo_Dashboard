@@ -9,8 +9,10 @@ export type TipoCatalogo = 'categoria' | 'material' | 'proveedor';
 // Las tres tablas tienen la misma forma; se usa el tipo de una para que Drizzle acepte cualquiera.
 const TABLAS = { categoria, material, proveedor } as unknown as Record<TipoCatalogo, typeof categoria>;
 
+// Misma clase de espacios que normalizar(): así normalizar(limpiar(x)) === normalizar(x).
+const ESPACIOS = /[ \t\n\r\f\v\u00A0]+/g;
 function limpiar(nombre: string): string {
-  const limpio = nombre.trim().replace(/\s+/g, ' ');
+  const limpio = nombre.replace(ESPACIOS, ' ').replace(/^ | $/g, '');
   if (!limpio || limpio.length > 80) {
     throw new ErrorNegocio('catalogo_invalido', 'El nombre debe tener entre 1 y 80 caracteres.');
   }

@@ -4,7 +4,7 @@ import { movimientoPieza, pieza, vMovimientoPieza, vPieza } from '@/db/schema';
 import { esCodigoValido, esPrefijoValido, normalizarCodigo, siguienteCodigo } from '@/domain/codigos';
 import { centavosANumeric } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
-import type { FilaLote } from '@/domain/lote';
+import { MAX_FILAS_LOTE, type FilaLote } from '@/domain/lote';
 import { escaparLike, normalizar } from '@/domain/texto';
 import { obtenerOCrearCatalogo, resolverCatalogos } from '@/server/catalogos/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
@@ -79,7 +79,7 @@ function validarPieza(d: DatosPieza) {
   };
 }
 
-export function altaPieza(db: Ejecutor, d: DatosPieza): Promise<{ id: string; codigo: string }> {
+export async function altaPieza(db: Ejecutor, d: DatosPieza): Promise<{ id: string; codigo: string }> {
   const v = validarPieza(d);
   return conErroresDeNegocio(() =>
     db.transaction(async (tx) => {
@@ -102,8 +102,9 @@ export function altaPieza(db: Ejecutor, d: DatosPieza): Promise<{ id: string; co
  * Todo o nada y sin N+1: una consulta para los códigos existentes, dos por cada tipo de catálogo,
  * un INSERT de piezas y un INSERT de movimientos, sin importar cuántas filas traiga el lote.
  */
-export function altaLote(db: Ejecutor, filas: FilaLote[]): Promise<{ creadas: number }> {
+export async function altaLote(db: Ejecutor, filas: FilaLote[]): Promise<{ creadas: number }> {
   if (filas.length === 0) throw new ErrorNegocio('lote_vacio', 'El lote no tiene piezas.');
+  if (filas.length > MAX_FILAS_LOTE) throw new ErrorNegocio('lote', 'Máximo 500 piezas por lote.');
   const validas = filas.map((f) => ({ fila: f, v: validarPieza(f) }));
   return conErroresDeNegocio(() =>
     db.transaction(async (tx) => {
@@ -146,17 +147,18 @@ export function altaLote(db: Ejecutor, filas: FilaLote[]): Promise<{ creadas: nu
       ];
       const idDe = (m: Map<string, string>, nombre: string | null) =>
         nombre ? (m.get(normalizar(nombre)) ?? null) : null;
-      const insertadas = await tx
-        .insert(pieza)
-        .values(
-          validas.map(({ fila, v }) => ({
-            ...v,
-            categoriaId: idDe(categorias, fila.categoria)!,
-            materialId: idDe(materiales, fila.material),
-            proveedorId: idDe(proveedores, fila.proveedor),
-          })),
-        )
-        .returning({ id: pieza.id });
+      const valores = validas.map(({ fila, v }) => {
+        const categoriaId = idDe(categorias, fila.categoria);
+        if (!categoriaId)
+          throw new ErrorNegocio('lote', `Línea ${fila.linea}: no se pudo asignar la categoría.`);
+        return {
+          ...v,
+          categoriaId,
+          materialId: idDe(materiales, fila.material),
+          proveedorId: idDe(proveedores, fila.proveedor),
+        };
+      });
+      const insertadas = await tx.insert(pieza).values(valores).returning({ id: pieza.id });
       await tx
         .insert(movimientoPieza)
         .values(
@@ -167,7 +169,15 @@ export function altaLote(db: Ejecutor, filas: FilaLote[]): Promise<{ creadas: nu
   );
 }
 
-export function cambiarEstado(
+// Pares (estado actual → destino) permitidos de forma manual; el resto pasa por pedidos, ventas o exhibidores.
+const PARES_MANUALES: Record<string, readonly EstadoManual[]> = {
+  disponible: ['regalo', 'defecto', 'guardada'],
+  en_exhibidor: ['regalo', 'defecto', 'guardada'],
+  defecto: ['disponible'],
+  guardada: ['disponible'],
+};
+
+export async function cambiarEstado(
   db: Ejecutor,
   d: { piezaId: string; version: number; aEstado: EstadoManual; nota?: string },
 ): Promise<void> {
@@ -178,12 +188,15 @@ export function cambiarEstado(
   return conErroresDeNegocio(() =>
     db.transaction(async (tx) => {
       const [actual] = await tx
-        .select({ estado: pieza.estado, version: pieza.version })
+        .select({ estado: pieza.estado, version: pieza.version, exhibidorId: pieza.exhibidorId })
         .from(pieza)
         .where(eq(pieza.id, d.piezaId))
         .for('update');
       if (!actual) throw new ErrorNegocio('no_encontrada', 'La pieza no existe.');
       if (actual.version !== d.version) throw conflictoVersion();
+      if (!PARES_MANUALES[actual.estado]?.includes(d.aEstado)) {
+        throw new ErrorNegocio('pieza_transicion', 'Ese cambio de estado no está permitido para la pieza.');
+      }
       await tx
         .update(pieza)
         .set({
@@ -192,12 +205,13 @@ export function cambiarEstado(
           exhibidorId: actual.estado === 'en_exhibidor' ? null : undefined,
           version: sql`${pieza.version} + 1`,
         })
-        .where(eq(pieza.id, d.piezaId));
+        .where(and(eq(pieza.id, d.piezaId), eq(pieza.version, d.version)));
       await tx.insert(movimientoPieza).values({
         piezaId: d.piezaId,
         tipo: 'cambio_estado',
         deEstado: actual.estado,
         aEstado: d.aEstado,
+        exhibidorId: actual.estado === 'en_exhibidor' ? actual.exhibidorId : null,
         nota,
       });
     }),
@@ -251,6 +265,6 @@ export function listarPiezas(
     .from(vPieza)
     .where(and(...filtros))
     .orderBy(asc(vPieza.codigo))
-    .limit(Math.min(o.limite ?? 50, 200))
-    .offset(o.offset ?? 0);
+    .limit(Math.min(Math.max(Math.trunc(o.limite ?? 50), 1), 200))
+    .offset(Math.max(Math.trunc(o.offset ?? 0), 0));
 }

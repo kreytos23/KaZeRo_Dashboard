@@ -66,4 +66,19 @@ describe('alta por lote (pegar desde Excel)', () => {
       mensaje: `Máximo ${MAX_FILAS_LOTE} piezas por lote.`,
     });
   });
+  it('valida la longitud de categoría, material y proveedor con su línea', () => {
+    const larga = 'x'.repeat(81);
+    const r = parsearLote(
+      [
+        ['AA01', larga, 'Anillo', '', '', '', '99'].join('\t'),
+        ['AA02', 'Anillos', 'Anillo', larga, '', '', '99'].join('\t'),
+        ['AA03', 'Anillos', 'Anillo', '', larga, '', '99'].join('\t'),
+      ].join('\n'),
+    );
+    expect(r.errores).toEqual([
+      { linea: 1, mensaje: 'La categoría admite hasta 80 caracteres.' },
+      { linea: 2, mensaje: 'El material admite hasta 80 caracteres.' },
+      { linea: 3, mensaje: 'El proveedor admite hasta 80 caracteres.' },
+    ]);
+  });
 });
