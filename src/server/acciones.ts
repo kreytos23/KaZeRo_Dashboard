@@ -7,6 +7,7 @@ import { ErrorNegocio } from './errores';
 /** Envuelve el cuerpo de una Server Action: éxito → { ok }, ErrorNegocio → { error }, lo demás → mensaje genérico. */
 export async function ejecutarAccion(fn: () => Promise<string | void>): Promise<EstadoAccion> {
   try {
+    // `||` a propósito: una cadena vacía también cae al mensaje por defecto, para que siempre haya un status visible.
     return { ok: (await fn()) || 'Guardado.' };
   } catch (e) {
     // redirect() y notFound() lanzan errores especiales que Next debe recibir.

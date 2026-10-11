@@ -35,5 +35,9 @@ describe('dinero en centavos', () => {
     expect(porcentajeANumeric('15.5%')).toBe('15.50');
     expect(porcentajeANumeric('101')).toBeNull();
     expect(porcentajeANumeric('-1')).toBeNull();
+    expect(porcentajeANumeric('12,5')).toBe('12.50');
+    expect(porcentajeANumeric('1,234')).toBeNull();
+    expect(porcentajeANumeric('1,2,3')).toBeNull();
+    expect(porcentajeANumeric('100,5')).toBeNull();
   });
 });

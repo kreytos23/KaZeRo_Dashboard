@@ -30,7 +30,9 @@ export function formatoMXN(c: number): string {
 
 /** Comisión: 0 a 100 con hasta 2 decimales, devuelta como numeric(5,2). */
 export function porcentajeANumeric(texto: string): string | null {
-  const t = texto.trim().replace(/%$/, '').trim();
+  let t = texto.trim().replace(/%$/, '').trim();
+  // Coma decimal ("12,5"): una sola coma con 1-2 decimales no es ambigua con separador de miles.
+  if (/^\d{1,3},\d{1,2}$/.test(t)) t = t.replace(',', '.');
   if (!/^\d{1,3}(\.\d{1,2})?$/.test(t)) return null;
   const valor = Number(t);
   return valor > 100 ? null : valor.toFixed(2);
