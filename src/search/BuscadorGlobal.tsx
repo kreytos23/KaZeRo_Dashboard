@@ -155,7 +155,7 @@ export function BuscadorGlobal() {
   else if (visible) aviso = resultados.length === 1 ? '1 resultado' : `${resultados.length} resultados`;
 
   return (
-    <div className="relative w-full max-w-md">
+    <div className="w-full max-w-md md:relative">
       <label htmlFor={`${id}-q`} className="sr-only">
         Buscar
       </label>
@@ -213,7 +213,7 @@ export function BuscadorGlobal() {
         role="listbox"
         aria-label="Resultados"
         hidden={!visible}
-        className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-borde bg-white shadow"
+        className="absolute inset-x-4 z-10 mt-1 overflow-hidden md:inset-x-auto md:w-full rounded-lg border border-borde bg-white shadow"
       >
         {visible &&
           resultados.map((r, i) => (

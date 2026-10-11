@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import { codigoTotpNoUsado, datosAdmin } from './utilidades';
+import { abrirMenuSiMovil, codigoTotpNoUsado, datosAdmin } from './utilidades';
 
 test('una ruta privada sin sesión manda a iniciar sesión', async ({ page }) => {
   await page.goto('/panel');
@@ -60,6 +60,7 @@ test('login con contraseña y TOTP llega al panel; cerrar sesión lo protege de 
   expect(trasLogin).toContain('__Host-kz_sesion');
   expect(trasLogin).not.toContain('__Host-kz_pre');
 
+  await abrirMenuSiMovil(page);
   await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   expect(await nombresCookies()).not.toContain('__Host-kz_sesion');

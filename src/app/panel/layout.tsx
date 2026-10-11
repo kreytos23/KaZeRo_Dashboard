@@ -3,23 +3,41 @@ import Link from 'next/link';
 import { BuscadorGlobal } from '@/search/BuscadorGlobal';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { accionCerrarSesion, accionCerrarTodas } from './acciones';
+import { MenuMovil } from './MenuMovil';
 import { NavPanel } from './NavPanel';
 
 const BOTON_SESION =
-  'min-h-11 rounded-full px-2 text-xs text-tinta-suave hover:bg-rubor-suave hover:text-tinta sm:px-3 sm:text-sm';
+  'min-h-11 rounded-full px-3 text-sm text-tinta-suave hover:bg-rubor-suave hover:text-tinta';
+const BOTON_SESION_MOVIL =
+  'min-h-11 w-full rounded-full px-4 text-left text-sm text-tinta-suave hover:bg-rubor-suave hover:text-tinta';
+
+/** Las dos acciones de sesión: el celular las muestra dentro del menú y el escritorio en la cabecera. */
+function AccionesSesion({ clase }: { clase: string }) {
+  return (
+    <>
+      <form action={accionCerrarSesion}>
+        <button className={clase}>Cerrar sesión</button>
+      </form>
+      <form action={accionCerrarTodas}>
+        <button className={clase}>Cerrar sesión en todos los dispositivos</button>
+      </form>
+    </>
+  );
+}
 
 export default async function LayoutPanel({ children }: { children: React.ReactNode }) {
   await requerirSesion();
   return (
     <div className="min-h-dvh">
-      <header className="border-b border-borde bg-white">
+      <header className="relative border-b border-borde bg-white">
         {/* Filete con el degradado del monograma: el toque de marca sin cargar imágenes. */}
         <div
           aria-hidden="true"
           className="h-1 bg-linear-to-r from-marca-terracota via-marca-durazno to-marca-salvia"
         />
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 pt-3 pb-2">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-2 md:pt-3">
+          {/* < md: una sola fila (logo, búsqueda, botón de menú). ≥ md: cabecera completa. */}
+          <div className="flex items-center gap-3 md:flex-wrap md:justify-between md:gap-x-4 md:gap-y-2">
             <Link href="/panel" className="flex shrink-0 items-center rounded-lg">
               {/* Recurso ya optimizado (webp 2x): sin el optimizador de Next, que no aporta aquí. */}
               <Image
@@ -28,22 +46,22 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
                 width={120}
                 height={48}
                 unoptimized
-                className="h-10 w-auto sm:h-12"
+                className="h-10 w-auto md:h-12"
               />
             </Link>
-            <div className="order-last w-full sm:order-none sm:w-auto sm:max-w-md sm:flex-1">
+            <div className="min-w-0 flex-1 md:max-w-md">
               <BuscadorGlobal />
             </div>
-            <div className="flex flex-wrap">
-              <form action={accionCerrarSesion}>
-                <button className={BOTON_SESION}>Cerrar sesión</button>
-              </form>
-              <form action={accionCerrarTodas}>
-                <button className={BOTON_SESION}>Cerrar sesión en todos los dispositivos</button>
-              </form>
+            <div className="hidden flex-wrap md:flex">
+              <AccionesSesion clase={BOTON_SESION} />
             </div>
+            <MenuMovil>
+              <AccionesSesion clase={BOTON_SESION_MOVIL} />
+            </MenuMovil>
           </div>
-          <NavPanel />
+          <div className="hidden md:block">
+            <NavPanel />
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">{children}</main>

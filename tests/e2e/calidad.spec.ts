@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RUTA_ESTADO } from './utilidades';
+import { RUTA_ESTADO, abrirMenuSiMovil } from './utilidades';
 
 test.use({ storageState: RUTA_ESTADO });
 
@@ -17,6 +17,7 @@ test('un registro inexistente muestra la 404 del panel sin revelar nada', async 
   // página llame a notFound(). Next marca esa página con noindex, y el panel ya es privado.
   await page.goto('/panel/inventario/NOEXISTE99');
   await expect(page.getByRole('heading', { name: 'No encontramos ese registro' })).toBeVisible();
+  await abrirMenuSiMovil(page);
   await expect(page.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
 });
 

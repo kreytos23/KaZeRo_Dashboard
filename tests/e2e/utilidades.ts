@@ -1,3 +1,4 @@
+import { expect, type Page } from '@playwright/test';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { generarCodigoTotp } from '../../src/server/auth/totp';
 
@@ -28,4 +29,15 @@ export async function codigoTotpNoUsado(secreto: string): Promise<string> {
 /** Admin aparte para regenerar el TOTP: la acción revoca sus otras sesiones y cambia su secreto. */
 export function datosAdminRegen(): { email: string; password: string } {
   return JSON.parse(readFileSync(RUTA_DATOS_REGEN, 'utf8'));
+}
+
+/** En pantallas < md la navegación y el cierre de sesión viven en el menú: se abre (no-op en escritorio). */
+export async function abrirMenuSiMovil(page: Page) {
+  const boton = page.getByRole('button', { name: 'Menú' });
+  if (!(await boton.isVisible())) return;
+  // Hasta hidratar, el clic no hace nada: se reintenta hasta ver el menú abierto.
+  await expect(async () => {
+    if ((await boton.getAttribute('aria-expanded')) !== 'true') await boton.click();
+    await expect(boton).toHaveAttribute('aria-expanded', 'true', { timeout: 500 });
+  }).toPass();
 }
