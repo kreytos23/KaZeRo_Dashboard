@@ -2,7 +2,7 @@ import { eq, sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
 import { pgCode } from '@/db/errors';
-import { categoria, movimientoPieza, pieza } from '@/db/schema';
+import { categoria, cliente, exhibidor, movimientoPieza, pieza, vendedor } from '@/db/schema';
 import { normalizar } from '@/domain/texto';
 import { traducirErrorPg } from '@/server/errores';
 import { truncarTodo, urlApp, urlOwner } from './utilidades';
@@ -18,14 +18,36 @@ async function capturar(fn: () => Promise<unknown>) {
   }
 }
 
+async function vendedorBase(nombre = 'Danya') {
+  const [v] = await app((db) =>
+    db.insert(vendedor).values({ nombre, tipo: 'casa' }).returning({ id: vendedor.id }),
+  );
+  return v!.id;
+}
+
+async function exhibidorBase(vendedorId: string, nombre: string) {
+  const [e] = await app((db) =>
+    db
+      .insert(exhibidor)
+      .values({ vendedorId, nombre, fechaEnvio: '2026-10-09' })
+      .returning({ id: exhibidor.id }),
+  );
+  return e!.id;
+}
+
 async function piezaBase(codigo = 'AA01') {
   return app(async (db) => {
-    const [c] = await db.insert(categoria).values({ nombre: 'Anillos' }).returning({ id: categoria.id });
+    const [c] = await db
+      .insert(categoria)
+      .values({ nombre: 'Anillos' })
+      .onConflictDoNothing()
+      .returning({ id: categoria.id });
+    const catId = c?.id ?? (await db.select({ id: categoria.id }).from(categoria).limit(1))[0]!.id;
     const [p] = await db
       .insert(pieza)
       .values({
         codigo,
-        categoriaId: c!.id,
+        categoriaId: catId,
         descripcion: 'Anillo',
         precio: '149.00',
         fechaAlta: '2026-10-09',
@@ -46,6 +68,8 @@ describe('reglas de inventario en la BD', () => {
       'a\u00A0\u00A0b',
       'ÁÉÍÓÚ Üñ',
       'Oro  LAMINADO',
+      'a\u3000b',
+      '\u2003x\u2003',
     ];
     const r = await app((db) =>
       db.execute<{ e: string; n: string }>(
@@ -121,6 +145,88 @@ describe('reglas de inventario en la BD', () => {
     const despues = await app((db) =>
       db.execute<{ u: string }>(sql`SELECT updated_at::text AS u FROM pieza WHERE id = ${id}`),
     );
+    expect(despues.rows[0]!.u > antes.rows[0]!.u).toBe(true);
+  });
+
+  it('un exhibidor cerrado exige cerrado_at y uno abierto no lo tiene', async () => {
+    const v = await vendedorBase();
+    const e = await capturar(() =>
+      app((db) =>
+        db
+          .insert(exhibidor)
+          .values({ vendedorId: v, nombre: 'Ex', fechaEnvio: '2026-10-09', estado: 'cerrado' }),
+      ),
+    );
+    expect(traducirErrorPg(e)?.codigo).toBe('exhibidor_cierre_coherente');
+  });
+
+  it('solo una pieza en exhibidor o apartada puede tener exhibidor', async () => {
+    const id = await piezaBase();
+    const v = await vendedorBase();
+    const ex = await exhibidorBase(v, 'A');
+    const e = await capturar(() =>
+      app((db) => db.update(pieza).set({ exhibidorId: ex }).where(eq(pieza.id, id))),
+    );
+    expect(traducirErrorPg(e)?.codigo).toBe('pieza_exhibidor_solo_si_aplica');
+  });
+
+  it('una pieza en exhibidor no cambia de exhibidor sin regresar', async () => {
+    const id = await piezaBase();
+    const v = await vendedorBase();
+    const a = await exhibidorBase(v, 'A');
+    const b = await exhibidorBase(v, 'B');
+    await app((db) =>
+      db.update(pieza).set({ estado: 'en_exhibidor', exhibidorId: a }).where(eq(pieza.id, id)),
+    );
+    const e = await capturar(() =>
+      app((db) => db.update(pieza).set({ exhibidorId: b }).where(eq(pieza.id, id))),
+    );
+    expect(traducirErrorPg(e)?.codigo).toBe('pieza_cambio_exhibidor');
+  });
+
+  it('el teléfono del cliente admite hasta 30 caracteres', async () => {
+    const e = await capturar(() =>
+      app((db) => db.insert(cliente).values({ nombre: 'Ana', telefono: '1'.repeat(31) })),
+    );
+    expect(traducirErrorPg(e)?.codigo).toBe('cliente_telefono_largo');
+  });
+
+  it('un precio negativo se traduce a un mensaje de negocio', async () => {
+    const e = await capturar(async () => {
+      const id = await piezaBase();
+      await app((db) => db.update(pieza).set({ precio: '-1' }).where(eq(pieza.id, id)));
+    });
+    expect(traducirErrorPg(e)?.message).toBe('El costo y el precio no pueden ser negativos.');
+  });
+
+  it('v_exhibidor cuenta solo las piezas en exhibidor de cada exhibidor', async () => {
+    const v = await vendedorBase();
+    const a = await exhibidorBase(v, 'A');
+    const b = await exhibidorBase(v, 'B');
+    const p1 = await piezaBase('AA01');
+    const p2 = await piezaBase('AA02');
+    await piezaBase('AA03');
+    for (const id of [p1, p2])
+      await app((db) =>
+        db.update(pieza).set({ estado: 'en_exhibidor', exhibidorId: a }).where(eq(pieza.id, id)),
+      );
+    const r = await app((db) =>
+      db.execute<{ id: string; n: number }>(sql`SELECT id, piezas_actuales AS n FROM v_exhibidor`),
+    );
+    const n = Object.fromEntries(r.rows.map((f) => [f.id, f.n]));
+    expect(n[a]).toBe(2);
+    expect(n[b]).toBe(0);
+  });
+
+  it('updated_at de cliente lo mantiene un trigger', async () => {
+    const [c] = await app((db) => db.insert(cliente).values({ nombre: 'Ana' }).returning({ id: cliente.id }));
+    const leer = () =>
+      app((db) =>
+        db.execute<{ u: string }>(sql`SELECT updated_at::text AS u FROM cliente WHERE id = ${c!.id}`),
+      );
+    const antes = await leer();
+    await app((db) => db.update(cliente).set({ notas: 'x' }).where(eq(cliente.id, c!.id)));
+    const despues = await leer();
     expect(despues.rows[0]!.u > antes.rows[0]!.u).toBe(true);
   });
 });

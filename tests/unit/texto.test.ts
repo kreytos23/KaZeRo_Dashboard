@@ -11,6 +11,8 @@ describe('normalizar', () => {
     ['straße Ø Łódź', 'strasse o lodz'],
     ['a  b', 'a b'],
     ['ÁÉÍÓÚ Üñ', 'aeiou un'],
+    ['a\u3000b', 'a\u3000b'],
+    ['\u2003x\u2003', '\u2003x\u2003'],
   ])('%j → %j', (entrada, salida) => expect(normalizar(entrada)).toBe(salida));
 });
 

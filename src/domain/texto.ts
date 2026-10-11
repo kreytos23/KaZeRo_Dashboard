@@ -20,8 +20,8 @@ export function normalizar(texto: string): string {
     .replace(/\p{M}/gu, '')
     .replace(/[ßæÆœŒøØłŁđĐ]/g, (c) => ESPECIALES[c]!)
     .toLowerCase()
-    .replace(/[\s\u00A0]+/g, ' ')
-    .trim();
+    .replace(/[ \t\n\r\f\v\u00A0]+/g, ' ')
+    .replace(/^ | $/g, '');
 }
 
 /** Para `LIKE … ESCAPE '\'`: sin esto, un % o _ escrito por el usuario actúa como comodín. */

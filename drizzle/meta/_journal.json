@@ -29,6 +29,20 @@
       "when": 1791696376823,
       "tag": "0003_inventario_reglas",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791697114945,
+      "tag": "0004_chunky_namorita",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791697115738,
+      "tag": "0005_inventario_reglas_2",
+      "breakpoints": true
     }
   ]
 }

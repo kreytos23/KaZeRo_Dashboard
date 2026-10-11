@@ -21,6 +21,8 @@ const tiempos = {
   createdAt: ts('created_at').notNull().defaultNow(),
   updatedAt: ts('updated_at').notNull().defaultNow(),
 };
+const maxLargo = (nombre: string, col: unknown, max: number) =>
+  check(nombre, sql`${col} IS NULL OR char_length(${col}) <= ${sql.raw(String(max))}`);
 const largo = (nombre: string, col: unknown, min: number, max: number) =>
   check(nombre, sql`char_length(btrim(${col})) BETWEEN ${sql.raw(String(min))} AND ${sql.raw(String(max))}`);
 
@@ -109,6 +111,11 @@ export const cliente = pgTable(
   (t) => [
     largo('cliente_nombre_largo', t.nombre, 1, 120),
     index('cliente_vendedor_habitual_idx').on(t.vendedorHabitualId),
+    maxLargo('cliente_referencia_largo', t.referencia, 120),
+    maxLargo('cliente_telefono_largo', t.telefono, 30),
+    maxLargo('cliente_red_social_largo', t.redSocial, 40),
+    maxLargo('cliente_usuario_red_largo', t.usuarioRed, 80),
+    check('cliente_notas_largo', sql`char_length(${t.notas}) <= 2000`),
   ],
 );
 
@@ -129,6 +136,8 @@ export const exhibidor = pgTable(
   (t) => [
     largo('exhibidor_nombre_largo', t.nombre, 1, 120),
     index('exhibidor_vendedor_idx').on(t.vendedorId),
+    // Desnormalización documentada: estado y cerrado_at deben decir lo mismo.
+    check('exhibidor_cierre_coherente', sql`(${t.estado} = 'cerrado') = (${t.cerradoAt} IS NOT NULL)`),
   ],
 );
 
@@ -164,6 +173,12 @@ export const pieza = pgTable(
     largo('pieza_descripcion_largo', t.descripcion, 1, 300),
     check('pieza_montos', sql`${t.costo} >= 0 AND ${t.precio} >= 0`),
     check('pieza_exhibidor_coherente', sql`${t.estado} <> 'en_exhibidor' OR ${t.exhibidorId} IS NOT NULL`),
+    // "apartada" conserva el exhibidor para que una venta cancelada devuelva la pieza a él.
+    check(
+      'pieza_exhibidor_solo_si_aplica',
+      sql`${t.estado} IN ('en_exhibidor', 'apartada') OR ${t.exhibidorId} IS NULL`,
+    ),
+    maxLargo('pieza_foto_path_largo', t.fotoPath, 500),
   ],
 );
 
