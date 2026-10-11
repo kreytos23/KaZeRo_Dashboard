@@ -16,10 +16,14 @@ export default async function PaginaExhibidores({
 }) {
   await requerirSesion();
   const filtro = z.uuid().safeParse((await searchParams).vendedor);
-  const todos = await conDb((db) => listarVendedores(db));
-  // Un id válido pero inexistente se ignora (listado completo) en vez de mostrar una lista vacía engañosa.
+  // Una sola ronda: el id del filtro ya viene validado como uuid; uno inexistente da una lista vacía.
+  const [todos, exhibidores] = await conDb((db) =>
+    Promise.all([
+      listarVendedores(db),
+      listarExhibidores(db, { vendedorId: filtro.success ? filtro.data : undefined }),
+    ]),
+  );
   const vendedorId = filtro.success && todos.some((v) => v.id === filtro.data) ? filtro.data : undefined;
-  const exhibidores = await conDb((db) => listarExhibidores(db, { vendedorId }));
   const activos = todos.filter((v) => v.activo);
   return (
     <section className="flex max-w-3xl flex-col gap-6">

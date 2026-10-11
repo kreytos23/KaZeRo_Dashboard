@@ -4,20 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { conDb } from '@/db/client';
 import type { EstadoAccion } from '@/features/ui/estado';
 import { ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
+import { partirCodigos } from '@/features/exhibidores/codigos';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { ErrorNegocio } from '@/server/errores';
 import { cerrarExhibidor, crearExhibidor, enviarPiezas, regresarPiezas } from '@/server/exhibidores/servicio';
 
-/** 500 códigos de hasta 20 caracteres con separadores caben de sobra; más es abuso. */
-const MAX_CARACTERES_CODIGOS = 20_000;
-
-/** Corta el tamaño ANTES de partir el texto; separadores: saltos de línea, comas, espacios y tabuladores. */
-function codigosDe(fd: FormData): string[] {
-  const crudo = texto(fd, 'codigos');
-  if (crudo.length > MAX_CARACTERES_CODIGOS)
-    throw new ErrorNegocio('sin_codigos', 'El texto de códigos es demasiado grande. Máximo 500 piezas.');
-  return crudo.split(/[\s,]+/).filter(Boolean);
-}
+const codigosDe = (fd: FormData) => partirCodigos(texto(fd, 'codigos'));
 
 const piezas = (n: number, participio: 'enviada' | 'regresada') =>
   n === 1 ? `1 pieza ${participio}.` : `${n} piezas ${participio}s.`;

@@ -8,13 +8,17 @@ import { AreaTexto } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { obtenerExhibidor } from '@/server/exhibidores/servicio';
+import { obtenerVendedor } from '@/server/vendedores/servicio';
 import { accionCerrar, accionEnviar, accionRegresar } from '../acciones';
 
 export default async function FichaExhibidor({ params }: { params: Promise<{ id: string }> }) {
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const e = await conDb((db) => obtenerExhibidor(db, id.data));
+  const [e, vendedor] = await conDb(async (db) => {
+    const ex = await obtenerExhibidor(db, id.data);
+    return [ex, ex ? await obtenerVendedor(db, ex.vendedorId) : null] as const;
+  });
   if (!e) notFound();
   const abierto = e.estado === 'abierto';
   return (
@@ -28,6 +32,16 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
           · {e.fechaEnvio} · {abierto ? 'Abierto' : 'Cerrado'}
         </p>
       </div>
+      {!abierto && (
+        <p role="status" className="text-sm text-green-700">
+          Exhibidor cerrado.
+        </p>
+      )}
+      {abierto && vendedor && !vendedor.activo && (
+        <p className="text-sm text-amber-800">
+          El vendedor de este exhibidor está inactivo: no se podrán enviar piezas hasta reactivarlo.
+        </p>
+      )}
       {abierto && (
         <div className="grid gap-6 md:grid-cols-2">
           <FormAccion accion={accionEnviar} textoBoton="Enviar piezas" limpiarAlGuardar>
@@ -70,6 +84,9 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
               Confirmo que quiero cerrar este exhibidor; no se puede reabrir.
             </label>
           </Fragment>
+          <p className="text-sm text-stone-600">
+            Si hay piezas apartadas ligadas a este exhibidor, no se podrá cerrar hasta resolver sus pedidos.
+          </p>
         </FormAccion>
       )}
     </section>
