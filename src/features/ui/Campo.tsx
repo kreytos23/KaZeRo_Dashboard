@@ -3,14 +3,15 @@
 import { useContext, useId, type InputHTMLAttributes } from 'react';
 import { ErroresCampo } from './errores-campo';
 
-const ESTILO = 'min-h-11 rounded-lg border border-stone-300 px-3';
+const ESTILO =
+  'min-h-11 rounded-lg border border-borde-campo bg-white px-3 aria-invalid:border-2 aria-invalid:border-error';
 const ESTILO_ETIQUETA = 'text-sm font-medium';
 
 /** Error de un campo: fuera del `<label>` para que no forme parte del nombre accesible del control. */
 function MensajeError({ idControl, error }: { idControl: string; error?: string }) {
   if (!error) return null;
   return (
-    <span id={`${idControl}-error`} className="text-sm font-normal text-red-700">
+    <span id={`${idControl}-error`} className="text-sm font-normal text-error">
       {error}
     </span>
   );
@@ -119,7 +120,7 @@ export function AreaTexto({
         required={required}
         placeholder={placeholder}
         maxLength={maxLength}
-        className="rounded-lg border border-stone-300 px-3 py-2 font-mono"
+        className="rounded-lg border border-borde-campo bg-white px-3 py-2 font-mono aria-invalid:border-2 aria-invalid:border-error"
         {...aria}
       />
       <MensajeError idControl={id} error={error} />

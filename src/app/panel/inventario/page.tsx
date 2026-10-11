@@ -44,13 +44,13 @@ export default async function PaginaInventario({
         <div className="flex flex-wrap gap-2">
           <Link
             href="/panel/inventario/nueva"
-            className="flex min-h-11 items-center rounded-lg bg-stone-900 px-4 text-white"
+            className="flex min-h-11 items-center rounded-lg bg-primario px-4 font-medium text-white hover:bg-primario-fuerte"
           >
             Nueva pieza
           </Link>
           <Link
             href="/panel/inventario/lote"
-            className="flex min-h-11 items-center rounded-lg border border-stone-300 px-4"
+            className="flex min-h-11 items-center rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
           >
             Alta por lote
           </Link>
@@ -76,9 +76,11 @@ export default async function PaginaInventario({
             ...categorias.map((c) => ({ valor: c.id, texto: c.nombre })),
           ]}
         />
-        <button className="min-h-11 rounded-lg border border-stone-300 px-4">Filtrar</button>
+        <button className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave">
+          Filtrar
+        </button>
       </form>
-      <div className="overflow-x-auto">
+      <div className="tarjeta overflow-x-auto px-4">
         <table className="w-full min-w-[36rem] text-left text-sm">
           <caption className="sr-only">Piezas del inventario</caption>
           <thead>
@@ -94,9 +96,9 @@ export default async function PaginaInventario({
           </thead>
           <tbody>
             {piezas.map((p) => (
-              <tr key={p.id} className="border-t border-stone-200">
+              <tr key={p.id} className="border-t border-borde">
                 <td className="py-2 font-mono">
-                  <Link href={`/panel/inventario/${encodeURIComponent(p.codigo)}`} className="underline">
+                  <Link href={`/panel/inventario/${encodeURIComponent(p.codigo)}`} className="enlace">
                     {p.codigo}
                   </Link>
                 </td>
@@ -109,17 +111,17 @@ export default async function PaginaInventario({
           </tbody>
         </table>
         {piezas.length === 0 && (
-          <p className="py-4 text-sm text-stone-600">No hay piezas con esos filtros.</p>
+          <p className="py-4 text-sm text-tinta-suave">No hay piezas con esos filtros.</p>
         )}
       </div>
       <nav aria-label="Páginas" className="flex gap-2">
         {f.pagina > 1 && (
-          <Link href={conPagina(f.pagina - 1)} className="flex min-h-11 items-center px-3 underline">
+          <Link href={conPagina(f.pagina - 1)} className="flex min-h-11 items-center px-3 enlace">
             Anterior
           </Link>
         )}
         {piezas.length === POR_PAGINA && (
-          <Link href={conPagina(f.pagina + 1)} className="flex min-h-11 items-center px-3 underline">
+          <Link href={conPagina(f.pagina + 1)} className="flex min-h-11 items-center px-3 enlace">
             Siguiente
           </Link>
         )}

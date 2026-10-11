@@ -7,12 +7,12 @@ export default function RegistroNoEncontrado() {
     <section className="flex max-w-md flex-col gap-4">
       <h1 className="text-2xl font-semibold">No encontramos ese registro</h1>
       {/* Mensaje genérico a propósito: no confirma si el registro existió. */}
-      <p className="text-stone-600">
+      <p className="text-tinta-suave">
         Puede que el enlace esté mal escrito. Usa el buscador (tecla /) para encontrarlo.
       </p>
       <Link
         href="/panel"
-        className="flex min-h-11 items-center self-start rounded-lg border border-stone-300 px-4"
+        className="flex min-h-11 items-center self-start rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
       >
         Volver al panel
       </Link>

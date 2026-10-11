@@ -199,12 +199,12 @@ export function BuscadorGlobal() {
           }
         }}
         onBlur={() => setAbierto(false)}
-        className="min-h-11 w-full rounded-lg border border-stone-300 px-3"
+        className="min-h-11 w-full rounded-lg border border-borde-campo bg-white px-3"
       />
       <div
         role="status"
         aria-live="polite"
-        className={aviso && !visible ? 'mt-1 text-xs text-stone-700' : 'sr-only'}
+        className={aviso && !visible ? 'mt-1 text-xs text-tinta-suave' : 'sr-only'}
       >
         {aviso}
       </div>
@@ -213,7 +213,7 @@ export function BuscadorGlobal() {
         role="listbox"
         aria-label="Resultados"
         hidden={!visible}
-        className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-stone-200 bg-white shadow"
+        className="absolute z-10 mt-1 w-full overflow-hidden rounded-lg border border-borde bg-white shadow"
       >
         {visible &&
           resultados.map((r, i) => (
@@ -227,13 +227,13 @@ export function BuscadorGlobal() {
                 e.preventDefault();
                 abrir(r);
               }}
-              className={`min-h-11 cursor-pointer px-3 py-2 ${i === sel ? 'bg-stone-100' : ''}`}
+              className={`min-h-11 cursor-pointer px-3 py-2 ${i === sel ? 'bg-rubor-suave' : ''}`}
             >
-              <span className="block text-xs font-semibold uppercase tracking-wide text-stone-600">
+              <span className="block text-xs font-semibold uppercase tracking-wide text-tinta-suave">
                 {ETIQUETA_TIPO[r.tipo]}
               </span>
               <span className="block text-sm font-medium">{r.titulo}</span>
-              <span className="block text-xs text-stone-600">{r.subtitulo}</span>
+              <span className="block text-xs text-tinta-suave">{r.subtitulo}</span>
             </li>
           ))}
       </ul>

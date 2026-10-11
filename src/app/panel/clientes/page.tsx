@@ -26,15 +26,17 @@ export default async function PaginaClientes({
       </FormAccion>
       <form className="flex gap-2" role="search">
         <Campo etiqueta="Filtrar clientes" name="q" type="search" defaultValue={q} maxLength={120} />
-        <button className="min-h-11 self-end rounded-lg border border-stone-300 px-4">Filtrar</button>
+        <button className="min-h-11 self-end rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave">
+          Filtrar
+        </button>
       </form>
-      <ul className="flex flex-col divide-y divide-stone-200">
+      <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4">
         {clientes.map((c) => (
           <li key={c.id} className="py-2">
-            <Link href={`/panel/clientes/${c.id}`} className="underline">
+            <Link href={`/panel/clientes/${c.id}`} className="enlace">
               {c.nombre}
             </Link>
-            {c.referencia && <span className="text-stone-600"> · {c.referencia}</span>}
+            {c.referencia && <span className="text-tinta-suave"> · {c.referencia}</span>}
           </li>
         ))}
       </ul>

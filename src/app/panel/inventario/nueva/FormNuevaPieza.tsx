@@ -55,13 +55,13 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
           <button
             type="button"
             onClick={sugerir}
-            className="min-h-11 rounded-lg border border-stone-300 px-4"
+            className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
           >
             Sugerir código
           </button>
         </div>
         {aviso && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="aviso-error">
             {aviso}
           </p>
         )}
@@ -86,14 +86,14 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
         <Campo etiqueta="Precio" name="precio" inputMode="decimal" required placeholder="149" />
       </ErroresCampo.Provider>
       {estado.error && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="aviso-error">
           {estado.campos ? 'Revisa los campos marcados.' : estado.error}
         </p>
       )}
       <button
         type="submit"
         disabled={pendiente}
-        className="min-h-11 self-start rounded-lg bg-stone-900 px-4 font-medium text-white disabled:opacity-60"
+        className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
       >
         Guardar pieza
       </button>

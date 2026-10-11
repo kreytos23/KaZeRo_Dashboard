@@ -12,7 +12,7 @@ export default function ErrorGlobal({
 }) {
   return (
     <html lang="es-MX">
-      <body className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 bg-stone-50 px-4 text-stone-900">
+      <body className="mx-auto flex min-h-dvh max-w-md flex-col justify-center gap-4 bg-crema px-4 text-tinta">
         <title>Error · Kazero</title>
         <h1 className="text-2xl font-semibold">Algo salió mal</h1>
         {/* Nunca error.message: podría traer detalles internos. */}
@@ -20,7 +20,7 @@ export default function ErrorGlobal({
         <button
           type="button"
           onClick={reset}
-          className="min-h-11 self-start rounded-lg bg-stone-900 px-4 text-white"
+          className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white hover:bg-primario-fuerte"
         >
           Reintentar
         </button>

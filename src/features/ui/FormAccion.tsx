@@ -49,20 +49,20 @@ export function FormAccion({
     >
       <ErroresCampo.Provider value={estado.campos ?? {}}>{children}</ErroresCampo.Provider>
       {estado.error && (
-        <p role="alert" className="text-sm whitespace-pre-line text-red-700">
+        <p role="alert" className="aviso-error whitespace-pre-line">
           {/* Con errores por campo, el detalle lo anuncia cada campo (aria-describedby): aquí solo un resumen. */}
           {estado.campos ? 'Revisa los campos marcados.' : estado.error}
         </p>
       )}
       {estado.ok && (
-        <p role="status" className="text-sm text-green-700">
+        <p role="status" className="aviso-exito">
           {estado.ok}
         </p>
       )}
       <button
         type="submit"
         disabled={pendiente}
-        className="min-h-11 self-start rounded-lg bg-stone-900 px-4 font-medium text-white disabled:opacity-60"
+        className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
       >
         {textoBoton}
       </button>

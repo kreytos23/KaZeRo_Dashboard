@@ -27,20 +27,20 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
     <section className="flex max-w-3xl flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">{e.nombre}</h1>
-        <p className="text-stone-600">
-          <Link href={`/panel/vendedores/${e.vendedorId}`} className="underline">
+        <p className="text-tinta-suave">
+          <Link href={`/panel/vendedores/${e.vendedorId}`} className="enlace">
             {e.vendedorNombre}
           </Link>{' '}
           · {e.fechaEnvio} · {abierto ? 'Abierto' : 'Cerrado'}
         </p>
       </div>
       {!abierto && (
-        <p role="status" className="text-sm text-green-700">
+        <p role="status" className="aviso-exito">
           Exhibidor cerrado.
         </p>
       )}
       {abierto && vendedor && !vendedor.activo && (
-        <p className="text-sm text-amber-800">
+        <p className="aviso-atencion">
           El vendedor de este exhibidor está inactivo: no se podrán enviar piezas hasta reactivarlo.
         </p>
       )}
@@ -64,17 +64,17 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
         </div>
       )}
       <h2 className="text-lg font-semibold">Piezas en el exhibidor ({e.piezasActuales})</h2>
-      <ul className="flex flex-col divide-y divide-stone-200 text-sm">
+      <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4 text-sm">
         {e.piezas.map((p) => (
           <li key={p.id} className="py-2">
-            <Link href={`/panel/inventario/${encodeURIComponent(p.codigo)}`} className="font-mono underline">
+            <Link href={`/panel/inventario/${encodeURIComponent(p.codigo)}`} className="font-mono enlace">
               {p.codigo}
             </Link>{' '}
             · {p.descripcion} · {formatoMXN(numericACentavos(p.precio))}
           </li>
         ))}
       </ul>
-      {e.piezas.length === 0 && <p className="text-sm text-stone-600">No hay piezas en este exhibidor.</p>}
+      {e.piezas.length === 0 && <p className="text-sm text-tinta-suave">No hay piezas en este exhibidor.</p>}
       {abierto && e.piezasActuales === 0 && (
         <FormAccion accion={accionCerrar} textoBoton="Cerrar exhibidor">
           {/* key por versión en los campos (no en el formulario): refresca sin perder el estado de la acción. */}
@@ -86,7 +86,7 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
               Confirmo que quiero cerrar este exhibidor; no se puede reabrir.
             </label>
           </Fragment>
-          <p className="text-sm text-stone-600">
+          <p className="text-sm text-tinta-suave">
             Si hay piezas apartadas ligadas a este exhibidor, no se podrá cerrar hasta resolver sus pedidos.
           </p>
         </FormAccion>

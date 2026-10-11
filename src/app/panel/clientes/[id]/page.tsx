@@ -65,7 +65,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
           <AreaTexto etiqueta="Notas" name="notas" defaultValue={c.notas} rows={3} maxLength={2000} />
         </Fragment>
       </FormAccion>
-      <p className="text-sm text-stone-600">
+      <p className="text-sm text-tinta-suave">
         Los pedidos, el saldo y la tarjeta de lealtad aparecerán aquí con el módulo de pedidos.
       </p>
     </section>

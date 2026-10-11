@@ -48,7 +48,7 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
       <ul className="flex flex-col gap-1">
         {exhibidores.map((e) => (
           <li key={e.id}>
-            <Link href={`/panel/exhibidores/${e.id}`} className="underline">
+            <Link href={`/panel/exhibidores/${e.id}`} className="enlace">
               {e.nombre}
             </Link>{' '}
             · {e.estado} · {e.piezasActuales} piezas

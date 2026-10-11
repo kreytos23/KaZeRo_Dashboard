@@ -37,7 +37,7 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
     <section className="flex max-w-3xl flex-col gap-6">
       <div>
         <h1 className="font-mono text-2xl font-semibold">{p.codigo}</h1>
-        <p className="text-stone-700">{p.descripcion}</p>
+        <p className="text-tinta-suave">{p.descripcion}</p>
       </div>
       <dl className="grid grid-cols-2 gap-2 text-sm">
         <dt className="font-medium">Estado</dt>
@@ -45,7 +45,7 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
         <dt className="font-medium">Exhibidor</dt>
         <dd>
           {p.exhibidorId ? (
-            <Link href={`/panel/exhibidores/${p.exhibidorId}`} className="underline">
+            <Link href={`/panel/exhibidores/${p.exhibidorId}`} className="enlace">
               {p.exhibidorNombre}
             </Link>
           ) : (
@@ -88,14 +88,14 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
       <h2 className="text-lg font-semibold">Historial</h2>
       <ol className="flex flex-col gap-2 text-sm">
         {movimientos.map((m) => (
-          <li key={m.id} className="border-l-2 border-stone-300 pl-3">
+          <li key={m.id} className="border-l-2 border-marca-rubor pl-3">
             <span className="font-medium">{ETIQUETA_MOVIMIENTO[m.tipo] ?? m.tipo}</span>
             {' · '}
             {m.deEstado ? `${ETIQUETA_ESTADO[m.deEstado]} → ` : ''}
             {ETIQUETA_ESTADO[m.aEstado]}
             {m.exhibidorNombre && ` · ${m.exhibidorNombre}`}
             {m.nota && ` · ${m.nota}`}
-            <span className="block text-stone-500">{FECHA.format(m.fecha)}</span>
+            <span className="block text-tinta-suave">{FECHA.format(m.fecha)}</span>
           </li>
         ))}
       </ol>

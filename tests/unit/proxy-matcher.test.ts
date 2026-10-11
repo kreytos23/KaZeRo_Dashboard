@@ -20,7 +20,9 @@ describe('matcher del proxy', () => {
       '/favicon.ico/x',
       '/_next/staticx',
       '/_next/imagex',
-      '/icon.svg',
+      '/icon.png',
+      '/apple-icon.png',
+      '/marca/logo-k.webp',
     ])
       expect(cubre(ruta), ruta).toBe(true);
   });

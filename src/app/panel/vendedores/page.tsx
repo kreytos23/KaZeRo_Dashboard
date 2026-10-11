@@ -21,7 +21,7 @@ export default async function PaginaVendedores() {
         <Selector etiqueta="Tipo" name="tipo" opciones={TIPOS} />
         <Campo etiqueta="Comisión (%)" name="comision" inputMode="decimal" defaultValue="0" required />
       </FormAccion>
-      <div className="overflow-x-auto">
+      <div className="tarjeta overflow-x-auto px-4">
         <table className="w-full text-left text-sm">
           <caption className="sr-only">Lista de vendedores</caption>
           <thead>
@@ -36,9 +36,9 @@ export default async function PaginaVendedores() {
           </thead>
           <tbody>
             {vendedores.map((v) => (
-              <tr key={v.id} className="border-t border-stone-200">
+              <tr key={v.id} className="border-t border-borde">
                 <td className="py-2">
-                  <Link href={`/panel/vendedores/${v.id}`} className="underline">
+                  <Link href={`/panel/vendedores/${v.id}`} className="enlace">
                     {v.nombre}
                   </Link>
                 </td>

@@ -104,16 +104,36 @@ test('el nombre accesible de un selector es solo su etiqueta', async ({ page }) 
 });
 
 test('el favicon existe y es público', async ({ request }) => {
-  expect((await request.get('/icon.svg')).status()).toBe(200);
+  expect((await request.get('/icon.png')).status()).toBe(200);
 });
 
 test.describe('sin sesión', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('el favicon se sirve sin sesión', async ({ request }) => {
-    const r = await request.get('/icon.svg', { maxRedirects: 0 });
-    expect(r.status()).toBe(200);
-    expect(r.headers()['content-type']).toContain('image/svg+xml');
+  test('los iconos y las imágenes de marca se sirven sin sesión', async ({ request }) => {
+    for (const [ruta, tipo] of [
+      ['/icon.png', 'image/png'],
+      ['/apple-icon.png', 'image/png'],
+      ['/favicon.ico', 'image/'],
+      ['/marca/logo-completo.webp', 'image/webp'],
+      ['/marca/logo-horizontal.webp', 'image/webp'],
+    ] as const) {
+      const r = await request.get(ruta, { maxRedirects: 0 });
+      expect(r.status(), ruta).toBe(200);
+      expect(r.headers()['content-type'], ruta).toContain(tipo);
+      // favicon.ico no pasa por el proxy, pero las cabeceras estáticas de next.config lo cubren.
+      expect(r.headers()['x-content-type-options'], ruta).toBe('nosniff');
+    }
+    // Fuera de la lista exacta, /marca exige sesión como cualquier otra ruta.
+    const r = await request.get('/marca/sub/logo.webp', { maxRedirects: 0 });
+    expect(r.status()).toBe(307);
+  });
+
+  test('el login muestra el logo de la marca cargado', async ({ page }) => {
+    await page.goto('/login');
+    const logo = page.getByRole('img', { name: 'KaZeRo. Vida, moda y estilo' });
+    await expect(logo).toBeVisible();
+    await expect.poll(() => logo.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   });
 
   test('el login avisa del bloqueo solo con el motivo exacto', async ({ page }) => {

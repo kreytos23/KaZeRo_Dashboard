@@ -1,6 +1,10 @@
 // Rutas públicas y sus subrutas por segmento, más archivos públicos que solo valen exactos.
 const PUBLICAS = ['/login', '/api/health'];
-const ARCHIVOS_PUBLICOS = ['/robots.txt', '/icon.svg'];
+// Iconos que Next genera desde src/app (el login sin sesión también los pide). `/favicon.ico` no
+// pasa por el proxy (ver matcher en src/proxy.ts), así que no hace falta listarlo.
+const ARCHIVOS_PUBLICOS = ['/robots.txt', '/icon.png', '/apple-icon.png'];
+// Imágenes de marca de public/marca: un único segmento con nombre simple, sin subcarpetas.
+const IMAGEN_MARCA = /^\/marca\/[a-z0-9-]+\.(?:webp|png)$/;
 
 export type DecisionAcceso = 'pasar' | 'redirigir_login' | 'no_autenticado';
 
@@ -16,6 +20,8 @@ function esPublica(ruta: string) {
   if (segmentos.some((s) => s === '' || s === '.' || s === '..' || s.includes('%') || s.includes('\\')))
     return false;
   if (ARCHIVOS_PUBLICOS.includes(sinBarraFinal)) return true;
+  // Contra la ruta original, no la recortada: `/marca/logo.webp/` no es un archivo.
+  if (IMAGEN_MARCA.test(ruta)) return true;
   return PUBLICAS.some((p) => sinBarraFinal === p || sinBarraFinal.startsWith(`${p}/`));
 }
 

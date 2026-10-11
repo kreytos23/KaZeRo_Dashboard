@@ -1,1 +1,141 @@
 @import 'tailwindcss';
+
+/*
+ * Identidad de KaZeRo. Los tonos claros de la marca (terracota, durazno, salvia, menta, rubor) NO
+ * alcanzan 4.5:1 como texto sobre blanco o crema: se usan solo en fondos, bordes y acentos. Para
+ * texto, botones y foco hay variantes oscuras derivadas que sí cumplen WCAG AA (razones medidas
+ * contra blanco y crema en el informe de marca; mínimo 4.5:1 texto, 3:1 bordes de control y foco).
+ */
+@theme {
+  /* Paleta de marca (muestreada del logo). */
+  --color-marca-terracota: #de8354;
+  --color-marca-durazno: #ebb369;
+  --color-marca-salvia: #b5c97f;
+  --color-marca-menta: #c3d9b4;
+  --color-marca-crema: #fcf6f0;
+  --color-marca-rubor: #f2cfc8;
+
+  /* Variantes accesibles. */
+  --color-marca-terracota-700: #a54e29; /* 5.6:1 con texto blanco; 5.3:1 sobre crema */
+  --color-marca-terracota-800: #86401f; /* hover/activo: 7.6:1 con texto blanco */
+  --color-marca-salvia-700: #4d6a37; /* 5.7:1 sobre crema */
+  --color-marca-salvia-800: #3d552b; /* 7.3:1 sobre salvia suave */
+  --color-marca-rubor-suave: #f8e7e2;
+  --color-marca-salvia-suave: #eef3e4;
+
+  /* Neutros cálidos. */
+  --color-tinta: #2b211c; /* 14.6:1 sobre crema */
+  --color-tinta-suave: #6a5850; /* 6.3:1 sobre crema; 5.6:1 sobre rubor suave */
+  --color-borde: #efdcd5; /* decorativo: separadores de tablas y tarjetas */
+  --color-borde-campo: #998075; /* contorno de campos: ≥3:1 contra blanco y crema */
+
+  /* Estados: verde azulado y carmesí, distintos entre sí y del terracota de los botones. */
+  --color-exito: #22663f;
+  --color-exito-fondo: #e9f4ec;
+  --color-error: #b3263a;
+  --color-error-fondo: #fcecee;
+  --color-aviso: #86480b;
+  --color-aviso-fondo: #fdf3e1;
+  --color-aviso-borde: #e9c37a;
+
+  /* Alias semánticos para componentes. */
+  --color-crema: var(--color-marca-crema);
+  --color-rubor-suave: var(--color-marca-rubor-suave);
+  --color-primario: var(--color-marca-terracota-700);
+  --color-primario-fuerte: var(--color-marca-terracota-800);
+  --color-secundario: var(--color-marca-salvia-700);
+  --color-secundario-fuerte: var(--color-marca-salvia-800);
+  --color-secundario-suave: var(--color-marca-salvia-suave);
+}
+
+/* La fuente la autoaloja next/font (layout.tsx) y expone esta variable; inline para resolverla en uso. */
+@theme inline {
+  --font-sans: var(--font-marca), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-crema);
+    color: var(--color-tinta);
+  }
+
+  h1,
+  h2 {
+    color: var(--color-tinta);
+    letter-spacing: -0.01em;
+  }
+
+  /* Foco siempre visible con teclado: terracota oscuro, ≥3:1 contra crema, blanco y rubor suave. */
+  :focus-visible {
+    outline: 2px solid var(--color-primario);
+    outline-offset: 2px;
+  }
+
+  /* El gris por defecto de Tailwind (tinta al 50 %) queda en ~3:1; este cálido llega a 4.9:1 sobre blanco. */
+  ::placeholder {
+    color: #7e6c64;
+  }
+
+  ::selection {
+    background: var(--color-marca-rubor);
+    color: var(--color-tinta);
+  }
+}
+
+/* Enlaces de texto en salvia oscuro; el subrayado no depende solo del color para distinguirlos. */
+@utility enlace {
+  color: var(--color-secundario);
+  text-decoration-line: underline;
+  text-underline-offset: 3px;
+  &:hover {
+    color: var(--color-secundario-fuerte);
+  }
+}
+
+/* Superficie de tablas y listas: blanco con borde rubor apenas visible (decorativo, no delimita controles). */
+@utility tarjeta {
+  border: 1px solid var(--color-borde);
+  border-radius: var(--radius-xl);
+  background-color: #fff;
+  box-shadow: 0 1px 2px rgb(165 78 41 / 0.06);
+}
+
+/* Manchas de acuarela solo con degradados CSS (sin imágenes): rubor arriba, salvia abajo. */
+@utility fondo-acuarela {
+  background-color: var(--color-crema);
+  background-image:
+    radial-gradient(40rem 28rem at 0% 0%, rgb(242 207 200 / 0.55), transparent 70%),
+    radial-gradient(36rem 26rem at 100% 100%, rgb(195 217 180 / 0.45), transparent 70%),
+    radial-gradient(24rem 18rem at 100% 0%, rgb(235 179 105 / 0.18), transparent 70%);
+}
+
+/* Mensajes de estado: color + fondo + filete, así no dependen solo del tono. */
+@utility aviso-error {
+  border-left: 4px solid var(--color-error);
+  border-radius: var(--radius-lg);
+  background: var(--color-error-fondo);
+  padding: --spacing(2) --spacing(3);
+  color: var(--color-error);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+
+@utility aviso-exito {
+  border-left: 4px solid var(--color-exito);
+  border-radius: var(--radius-lg);
+  background: var(--color-exito-fondo);
+  padding: --spacing(2) --spacing(3);
+  color: var(--color-exito);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}
+
+@utility aviso-atencion {
+  border-left: 4px solid var(--color-aviso-borde);
+  border-radius: var(--radius-lg);
+  background: var(--color-aviso-fondo);
+  padding: --spacing(2) --spacing(3);
+  color: var(--color-aviso);
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
+}

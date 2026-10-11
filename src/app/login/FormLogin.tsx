@@ -14,7 +14,7 @@ export function FormLogin() {
           type="email"
           autoComplete="username"
           required
-          className="min-h-11 rounded-lg border border-stone-300 px-3"
+          className="min-h-11 rounded-lg border border-borde-campo bg-white px-3"
         />
       </label>
       <label className="flex flex-col gap-1 text-sm font-medium">
@@ -24,18 +24,18 @@ export function FormLogin() {
           type="password"
           autoComplete="current-password"
           required
-          className="min-h-11 rounded-lg border border-stone-300 px-3"
+          className="min-h-11 rounded-lg border border-borde-campo bg-white px-3"
         />
       </label>
       {estado.error && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="aviso-error">
           {estado.error}
         </p>
       )}
       <button
         type="submit"
         disabled={pendiente}
-        className="min-h-11 rounded-lg bg-stone-900 font-medium text-white disabled:opacity-60"
+        className="min-h-11 rounded-lg bg-primario font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
       >
         Continuar
       </button>

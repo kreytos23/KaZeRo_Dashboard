@@ -17,7 +17,7 @@ function Enrolamiento({
   onOcultar: () => void;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4">
+    <div className="flex flex-col gap-3 rounded-lg border border-aviso-borde bg-aviso-fondo p-4">
       <h3 className="text-lg font-semibold">Escanea este código</h3>
       <p className="text-sm">Cuenta: {e.email}. Agrégala en la app autenticadora.</p>
       {/* eslint-disable-next-line @next/next/no-img-element -- data URL generada en el servidor, no hay nada que optimizar */}
@@ -40,7 +40,7 @@ function Enrolamiento({
       <button
         type="button"
         onClick={onOcultar}
-        className="min-h-11 self-start rounded-lg border border-stone-900 px-4 font-medium"
+        className="min-h-11 self-start rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
       >
         Ya los guardé, ocultar
       </button>
@@ -106,14 +106,14 @@ function Alta({ onOcultar }: { onOcultar: () => void }) {
         required
       />
       {estado.error && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="aviso-error">
           {estado.error}
         </p>
       )}
       <button
         type="submit"
         disabled={pendiente}
-        className="min-h-11 self-start rounded-lg bg-stone-900 px-4 font-medium text-white disabled:opacity-60"
+        className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
       >
         Agregar administrador
       </button>
@@ -133,7 +133,7 @@ function Regenerar({ onOcultar }: { onOcultar: () => void }) {
     );
   return (
     <form onSubmit={onSubmit} aria-busy={pendiente} className="flex max-w-md flex-col gap-3">
-      <p className="text-sm text-stone-600">
+      <p className="text-sm text-tinta-suave">
         Úsalo si perdiste el teléfono. Tu TOTP y códigos actuales dejan de servir y se cierran tus demás
         sesiones.
       </p>
@@ -145,14 +145,14 @@ function Regenerar({ onOcultar }: { onOcultar: () => void }) {
         required
       />
       {estado.error && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="aviso-error">
           {estado.error}
         </p>
       )}
       <button
         type="submit"
         disabled={pendiente}
-        className="min-h-11 self-start rounded-lg border border-stone-900 px-4 font-medium disabled:opacity-60"
+        className="min-h-11 self-start rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave disabled:opacity-60"
       >
         Regenerar mi TOTP
       </button>

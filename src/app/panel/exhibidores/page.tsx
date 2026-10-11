@@ -31,9 +31,9 @@ export default async function PaginaExhibidores({
     <section className="flex max-w-3xl flex-col gap-6">
       <h1 className="text-2xl font-semibold">Exhibidores</h1>
       {activos.length === 0 ? (
-        <p className="text-sm text-stone-600">
+        <p className="text-sm text-tinta-suave">
           Primero agrega un vendedor activo en{' '}
-          <Link href="/panel/vendedores" className="underline">
+          <Link href="/panel/vendedores" className="enlace">
             Vendedores
           </Link>
           .
@@ -63,15 +63,17 @@ export default async function PaginaExhibidores({
           defaultValue={vendedorId ?? ''}
           opciones={[{ valor: '', texto: 'Todos' }, ...todos.map((v) => ({ valor: v.id, texto: v.nombre }))]}
         />
-        <button className="min-h-11 rounded-lg border border-stone-300 px-4">Filtrar</button>
+        <button className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave">
+          Filtrar
+        </button>
       </form>
-      <ul className="flex flex-col divide-y divide-stone-200">
+      <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4">
         {exhibidores.map((e) => (
           <li key={e.id} className="py-2">
-            <Link href={`/panel/exhibidores/${e.id}`} className="underline">
+            <Link href={`/panel/exhibidores/${e.id}`} className="enlace">
               {e.nombre}
             </Link>
-            <span className="text-stone-600">
+            <span className="text-tinta-suave">
               {' '}
               · {e.vendedorNombre} · {e.fechaEnvio} · {e.estado === 'abierto' ? 'Abierto' : 'Cerrado'} ·{' '}
               {e.piezasActuales} {e.piezasActuales === 1 ? 'pieza' : 'piezas'}
@@ -79,7 +81,7 @@ export default async function PaginaExhibidores({
           </li>
         ))}
       </ul>
-      {exhibidores.length === 0 && <p className="text-sm text-stone-600">No hay exhibidores.</p>}
+      {exhibidores.length === 0 && <p className="text-sm text-tinta-suave">No hay exhibidores.</p>}
     </section>
   );
 }

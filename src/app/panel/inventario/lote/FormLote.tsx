@@ -30,7 +30,7 @@ export function FormLote() {
     >
       <AreaTexto etiqueta="Filas pegadas desde Excel" name="filas" rows={14} required maxLength={200000} />
       {estado.error && (
-        <div role="alert" className="text-sm text-red-700">
+        <div role="alert" className="aviso-error">
           <p>{estado.error}</p>
           {estado.lineas && (
             <ul className="mt-1 list-disc pl-5">
@@ -42,14 +42,14 @@ export function FormLote() {
         </div>
       )}
       {estado.ok && (
-        <p role="status" className="text-sm text-green-700">
+        <p role="status" className="aviso-exito">
           {estado.ok}
         </p>
       )}
       <button
         type="submit"
         disabled={pendiente}
-        className="min-h-11 self-start rounded-lg bg-stone-900 px-4 font-medium text-white disabled:opacity-60"
+        className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
       >
         Dar de alta el lote
       </button>
