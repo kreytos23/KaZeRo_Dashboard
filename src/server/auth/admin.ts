@@ -1,12 +1,16 @@
-import type { Db } from '@/db/pool';
+import type { Ejecutor } from '@/db/pool';
 import { admin, codigoRecuperacion } from '@/db/schema';
 import { cifrar } from './cifrado';
 import { hashPassword, validarFortaleza } from './password';
 import { hashCodigoRecuperacion, nuevosCodigosRecuperacion } from './tokens';
 import { nuevoSecretoTotp, uriTotp } from './totp';
 
-/** Requiere el rol dueño: kazero_app no puede insertar admins (mínimo privilegio). */
-export async function crearAdmin(db: Db, datos: { email: string; password: string }, llaveTotp: string) {
+/** Acepta la conexión o una transacción. Quien llame con kazero_app debe haber re-autenticado al admin que da el alta. */
+export async function crearAdmin(
+  db: Ejecutor,
+  datos: { email: string; password: string },
+  llaveTotp: string,
+) {
   const error = validarFortaleza(datos.password);
   if (error) throw new Error(error);
   const email = datos.email.trim().toLowerCase();

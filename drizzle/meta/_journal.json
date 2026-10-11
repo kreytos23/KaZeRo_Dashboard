@@ -43,6 +43,20 @@
       "when": 1791697115738,
       "tag": "0005_inventario_reglas_2",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791700917551,
+      "tag": "0006_sleepy_king_bedlam",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1791700919727,
+      "tag": "0007_admins_grants",
+      "breakpoints": true
     }
   ]
 }

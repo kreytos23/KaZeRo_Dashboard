@@ -1,5 +1,5 @@
 import { and, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
-import type { Db } from '@/db/pool';
+import type { Db, Ejecutor } from '@/db/pool';
 import { accesoLog, admin, codigoRecuperacion, sesion } from '@/db/schema';
 import { descifrar } from './cifrado';
 import { hashPassword, verificarPassword } from './password';
@@ -21,8 +21,6 @@ export const POLITICA = {
 
 type Red = { ip: string | null; userAgent: string | null };
 type Evento = (typeof accesoLog.$inferInsert)['evento'];
-/** La conexión directa o una transacción en curso. */
-type Ejecutor = Db | Parameters<Parameters<Db['transaction']>[0]>[0];
 
 const MIN = 60_000;
 const masMinutos = (t: Date, m: number) => new Date(t.getTime() + m * MIN);
@@ -46,7 +44,7 @@ async function bloquearCorreo(tx: Ejecutor, email: string) {
   await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${'kazero:login:' + email}))`);
 }
 
-function registrar(db: Ejecutor, email: string, evento: Evento, red: Red, ahora: Date) {
+export function registrarAcceso(db: Ejecutor, email: string, evento: Evento, red: Red, ahora: Date) {
   return db
     .insert(accesoLog)
     .values({ email, evento, ip: red.ip, userAgent: red.userAgent, createdAt: ahora });
@@ -92,7 +90,7 @@ export async function iniciarLogin(
     await bloquearCorreo(tx, email);
     const bloqueo = await minutosBloqueo(tx, email, ahora);
     if (bloqueo > 0) {
-      await registrar(tx, email, 'bloqueado', e, ahora);
+      await registrarAcceso(tx, email, 'bloqueado', e, ahora);
       return { ok: false, motivo: 'bloqueado', minutosRestantes: bloqueo };
     }
     const [fila] = await tx
@@ -102,7 +100,7 @@ export async function iniciarLogin(
       .limit(1);
     const valido = await verificarPassword(fila?.passwordHash ?? (await senuelo()), e.password);
     if (!fila || !valido) {
-      await registrar(tx, email, 'password_fallido', e, ahora);
+      await registrarAcceso(tx, email, 'password_fallido', e, ahora);
       return { ok: false, motivo: 'credenciales' };
     }
     const { token, hash } = nuevoToken();
@@ -163,7 +161,7 @@ export async function verificarSegundoFactor(
       const bloqueo = await minutosBloqueo(tx, email, ahora);
       if (bloqueo > 0) {
         await tx.update(sesion).set({ revocadaAt: ahora }).where(eq(sesion.id, pre.sesionId));
-        await registrar(tx, email, 'bloqueado', e, ahora);
+        await registrarAcceso(tx, email, 'bloqueado', e, ahora);
         return { ok: false, motivo: 'bloqueado', minutosRestantes: bloqueo };
       }
 
@@ -202,7 +200,7 @@ export async function verificarSegundoFactor(
       }
 
       if (!valido) {
-        await registrar(tx, email, 'totp_fallido', e, ahora);
+        await registrarAcceso(tx, email, 'totp_fallido', e, ahora);
         return { ok: false, motivo: 'codigo' };
       }
 
@@ -228,14 +226,48 @@ export async function verificarSegundoFactor(
         userAgent: e.userAgent,
         createdAt: ahora,
       });
-      await registrar(tx, email, 'login_ok', e, ahora);
-      if (usoRecuperacion) await registrar(tx, email, 'codigo_recuperacion_usado', e, ahora);
+      await registrarAcceso(tx, email, 'login_ok', e, ahora);
+      if (usoRecuperacion) await registrarAcceso(tx, email, 'codigo_recuperacion_usado', e, ahora);
       return { ok: true, token };
     });
   } catch (err) {
     if (err instanceof Revertir) return err.resultado as ResultadoSegundoFactor;
     throw err;
   }
+}
+
+/**
+ * Re-autenticación para operaciones sensibles (alta de admin, regenerar TOTP). Aplica el mismo bloqueo
+ * por correo que el login. Llamar SIEMPRE dentro de una transacción (usa pg_advisory_xact_lock) y devolver,
+ * no lanzar, en caso de fallo: así el registro del fallo se confirma.
+ */
+export async function reautenticarAdmin(
+  tx: Ejecutor,
+  adminId: string,
+  password: string,
+  red: Red,
+  ahora = new Date(),
+): Promise<
+  { ok: true; email: string } | { ok: false; motivo: 'credenciales' | 'bloqueado'; minutosRestantes?: number }
+> {
+  const [fila] = await tx
+    .select({ email: admin.email, passwordHash: admin.passwordHash })
+    .from(admin)
+    .where(eq(admin.id, adminId))
+    .limit(1);
+  if (!fila) return { ok: false, motivo: 'credenciales' };
+  const email = fila.email.toLowerCase();
+  await bloquearCorreo(tx, email);
+  const bloqueo = await minutosBloqueo(tx, email, ahora);
+  if (bloqueo > 0) {
+    await registrarAcceso(tx, email, 'bloqueado', red, ahora);
+    return { ok: false, motivo: 'bloqueado', minutosRestantes: bloqueo };
+  }
+  if (!(await verificarPassword(fila.passwordHash, password))) {
+    await registrarAcceso(tx, email, 'password_fallido', red, ahora);
+    return { ok: false, motivo: 'credenciales' };
+  }
+  return { ok: true, email };
 }
 
 export async function validarSesion(db: Db, token: string, ahora = new Date()) {
@@ -258,16 +290,33 @@ export async function validarSesion(db: Db, token: string, ahora = new Date()) {
   return { adminId: f.adminId, sesionId: f.sesionId };
 }
 
-export async function cerrarSesion(db: Db, token: string, ahora = new Date()) {
-  await db
-    .update(sesion)
-    .set({ revocadaAt: ahora })
-    .where(and(eq(sesion.tokenHash, hashToken(token)), isNull(sesion.revocadaAt)));
+const SIN_RED: Red = { ip: null, userAgent: null };
+
+async function emailDe(db: Ejecutor, adminId: string) {
+  const [a] = await db.select({ email: admin.email }).from(admin).where(eq(admin.id, adminId)).limit(1);
+  return a?.email.toLowerCase() ?? null;
 }
 
-export async function cerrarTodas(db: Db, adminId: string, ahora = new Date()) {
-  await db
-    .update(sesion)
-    .set({ revocadaAt: ahora })
-    .where(and(eq(sesion.adminId, adminId), isNull(sesion.revocadaAt)));
+export async function cerrarSesion(db: Db, token: string, ahora = new Date(), red: Red = SIN_RED) {
+  // Revocar y registrar van juntos: no queda una sesión cerrada sin su evento.
+  await db.transaction(async (tx) => {
+    const [s] = await tx
+      .update(sesion)
+      .set({ revocadaAt: ahora })
+      .where(and(eq(sesion.tokenHash, hashToken(token)), isNull(sesion.revocadaAt)))
+      .returning({ adminId: sesion.adminId });
+    const email = s ? await emailDe(tx, s.adminId) : null;
+    if (email) await registrarAcceso(tx, email, 'logout', red, ahora);
+  });
+}
+
+export async function cerrarTodas(db: Db, adminId: string, ahora = new Date(), red: Red = SIN_RED) {
+  await db.transaction(async (tx) => {
+    await tx
+      .update(sesion)
+      .set({ revocadaAt: ahora })
+      .where(and(eq(sesion.adminId, adminId), isNull(sesion.revocadaAt)));
+    const email = await emailDe(tx, adminId);
+    if (email) await registrarAcceso(tx, email, 'logout_todos', red, ahora);
+  });
 }

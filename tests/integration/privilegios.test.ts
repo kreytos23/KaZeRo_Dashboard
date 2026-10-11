@@ -20,14 +20,14 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
   it('no puede TRUNCATE', async () => {
     expect(await codigoAl(urlApp(), sql`TRUNCATE acceso_log`)).toBe('42501');
   });
-  it('no puede borrar ni insertar admins', async () => {
+  it('no puede borrar admins ni cambiar su contraseña, correo o rol', async () => {
     expect(await codigoAl(urlApp(), sql`DELETE FROM admin`)).toBe('42501');
-    expect(
-      await codigoAl(
-        urlApp(),
-        sql`INSERT INTO admin (email, password_hash, totp_secret_cifrado) VALUES ('a','b','c')`,
-      ),
-    ).toBe('42501');
+    expect(await codigoAl(urlApp(), sql`UPDATE admin SET password_hash = 'x'`)).toBe('42501');
+    expect(await codigoAl(urlApp(), sql`UPDATE admin SET email = 'x@x.mx'`)).toBe('42501');
+    expect(await codigoAl(urlApp(), sql`UPDATE admin SET rol = 'admin'`)).toBe('42501');
+  });
+  it('sí puede actualizar el paso TOTP (lo usa el login)', async () => {
+    expect(await codigoAl(urlApp(), sql`UPDATE admin SET totp_ultimo_paso = totp_ultimo_paso`)).toBe('ok');
   });
   it('sí puede leer y escribir sesiones', async () => {
     expect(await codigoAl(urlApp(), sql`SELECT count(*) FROM sesion`)).toBe('ok');
