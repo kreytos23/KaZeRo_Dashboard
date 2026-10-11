@@ -82,3 +82,10 @@ describe('consulta vacía con recientes', () => {
     expect(claves('', ['cliente:c3', 'pieza:zzz', 'pieza:p1'])).toEqual(['cliente:c3', 'pieza:p1']);
   });
 });
+
+describe('código escrito con guion o espacios', () => {
+  it('"af-12" y "af 12" encuentran AF12 primero', () => {
+    expect(claves('af-12')[0]).toBe('pieza:p1');
+    expect(claves('af 12')[0]).toBe('pieza:p1');
+  });
+});

@@ -25,6 +25,11 @@ const ESTADOS: Record<string, string> = {
   guardada: 'Guardada',
 };
 
+/** "af-12" debe encontrar AF12: se compara también sin guiones. */
+function compactar(c: string): string {
+  return normalizarCodigo(c).replace(/-/g, '');
+}
+
 function acotarLimite(limite: number): number {
   if (!Number.isFinite(limite)) return LIMITE_DEFECTO;
   return Math.min(Math.max(Math.floor(limite), 1), LIMITE_MAXIMO);
@@ -33,6 +38,7 @@ function acotarLimite(limite: number): number {
 export function crearMotor(indice: IndiceBusqueda) {
   const docs: Doc[] = [];
   const porCodigo = new Map<string, Resultado>();
+  const porCodigoCompacto = new Map<string, Resultado>();
   const porClave = new Map<string, Resultado>();
 
   for (const [id, codigo, descripcion, estado] of indice.piezas) {
@@ -44,6 +50,7 @@ export function crearMotor(indice: IndiceBusqueda) {
       href: `/panel/inventario/${encodeURIComponent(codigo)}`,
     };
     porCodigo.set(normalizarCodigo(codigo), r);
+    porCodigoCompacto.set(compactar(codigo), r);
     porClave.set(r.clave, r);
     docs.push({ ...r, texto: `${codigo} ${descripcion}` });
   }
@@ -97,7 +104,7 @@ export function crearMotor(indice: IndiceBusqueda) {
         }
         return lista.slice(0, max);
       }
-      const exacto = porCodigo.get(normalizarCodigo(consulta));
+      const exacto = porCodigo.get(normalizarCodigo(consulta)) ?? porCodigoCompacto.get(compactar(consulta));
       const impulso = new Map(
         recientes.map((c, i) => [c, 1 + (recientes.length - i) / recientes.length] as const),
       );
