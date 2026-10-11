@@ -54,6 +54,52 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
   it('sí puede leer y escribir sesiones', async () => {
     expect(await codigoAl(urlApp(), sql`SELECT count(*) FROM sesion`)).toBe('ok');
   });
+  it('admin y codigo_recuperacion: el conjunto EXACTO de privilegios de kazero_app (tabla y columna)', async () => {
+    const [tablas, columnas] = await conDbUrl(urlOwner(), (db) =>
+      Promise.all([
+        db.execute<{ p: string }>(sql`
+          SELECT table_name || ':' || privilege_type AS p FROM information_schema.table_privileges
+          WHERE grantee = 'kazero_app' AND table_schema = 'public'
+            AND table_name IN ('admin', 'codigo_recuperacion')`),
+        db.execute<{ p: string }>(sql`
+          SELECT table_name || '.' || column_name || ':' || privilege_type AS p
+          FROM information_schema.column_privileges
+          WHERE grantee = 'kazero_app' AND table_schema = 'public'
+            AND table_name IN ('admin', 'codigo_recuperacion')`),
+      ]),
+    );
+    const orden = (f: { rows: { p: string }[] }) => f.rows.map((x) => x.p).sort();
+    expect(orden(tablas)).toEqual([
+      'admin:SELECT',
+      'codigo_recuperacion:INSERT',
+      'codigo_recuperacion:SELECT',
+    ]);
+    const columnasAdmin = [
+      'created_at',
+      'email',
+      'id',
+      'password_hash',
+      'rol',
+      'totp_secret_cifrado',
+      'totp_ultimo_paso',
+      'updated_at',
+      'version',
+    ];
+    const columnasCodigo = ['admin_id', 'created_at', 'hash', 'id', 'usado_at'];
+    const esperado = [
+      // SELECT de tabla: el login lee password_hash y el TOTP.
+      ...columnasAdmin.map((c) => `admin.${c}:SELECT`),
+      // Alta: solo estas tres columnas (no puede elegir `rol`).
+      ...['email', 'password_hash', 'totp_secret_cifrado'].map((c) => `admin.${c}:INSERT`),
+      // Regenerar TOTP y el paso del login; nunca contraseña, correo ni rol.
+      ...['totp_secret_cifrado', 'totp_ultimo_paso', 'updated_at', 'version'].map((c) => `admin.${c}:UPDATE`),
+      ...columnasCodigo.map((c) => `codigo_recuperacion.${c}:SELECT`),
+      ...columnasCodigo.map((c) => `codigo_recuperacion.${c}:INSERT`),
+      // Solo marcar como usado.
+      'codigo_recuperacion.usado_at:UPDATE',
+    ].sort();
+    expect(orden(columnas)).toEqual(esperado);
+  });
   it('toda tabla de negocio tiene grants explícitos para kazero_app', async () => {
     const filas = await conDbUrl(urlOwner(), (db) =>
       // Se consulta por oid (no por nombre): el planner puede evaluar el privilegio antes del filtro de
