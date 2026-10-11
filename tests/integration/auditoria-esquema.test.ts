@@ -301,7 +301,7 @@ describe('corrección de estado en el trigger (R-07)', () => {
       db.insert(movimientoPieza).values({
         piezaId,
         tipo: 'correccion',
-        deEstado: 'disponible',
+        deEstado: 'regalo',
         aEstado: 'regalo',
         nota: 'x',
         adminId,
@@ -310,18 +310,64 @@ describe('corrección de estado en el trigger (R-07)', () => {
     expect(traducirErrorPg(await a(piezaId, 'disponible'))?.codigo).toBe('pieza_transicion');
   });
 
+  it('regalo desde disponible no puede ir a un exhibidor', async () => {
+    const { piezaId } = await piezaBase();
+    const ex = await exhibidorAbierto();
+    await mover(piezaId, 'disponible', 'regalo', null);
+    expect(traducirErrorPg(await a(piezaId, 'en_exhibidor', ex))?.codigo).toBe('pieza_transicion');
+  });
+
+  it('regalo desde un exhibidor abierto vuelve a ese exhibidor, no a disponible (igual que destinoCorreccion)', async () => {
+    const { piezaId } = await piezaBase();
+    const ex = await exhibidorAbierto();
+    await mover(piezaId, 'disponible', 'en_exhibidor', ex);
+    await mover(piezaId, 'en_exhibidor', 'regalo', ex);
+    expect(traducirErrorPg(await a(piezaId, 'disponible'))?.codigo).toBe('pieza_transicion');
+    expect(await a(piezaId, 'en_exhibidor', ex)).toBeNull();
+  });
+
+  it('regalo desde un exhibidor ya cerrado solo vuelve a disponible', async () => {
+    const { piezaId } = await piezaBase();
+    const ex = await exhibidorAbierto();
+    await mover(piezaId, 'disponible', 'en_exhibidor', ex);
+    await mover(piezaId, 'en_exhibidor', 'regalo', ex);
+    await owner((db) =>
+      db.update(exhibidor).set({ estado: 'cerrado', cerradoAt: new Date() }).where(eq(exhibidor.id, ex)),
+    );
+    expect(traducirErrorPg(await a(piezaId, 'en_exhibidor', ex))?.codigo).toBe('pieza_transicion');
+    expect(await a(piezaId, 'disponible')).toBeNull();
+  });
+
+  it('guardada desde un exhibidor cerrado no vuelve a él', async () => {
+    const { piezaId } = await piezaBase();
+    const ex = await exhibidorAbierto();
+    await mover(piezaId, 'disponible', 'en_exhibidor', ex);
+    await mover(piezaId, 'en_exhibidor', 'guardada', ex);
+    await owner((db) =>
+      db.update(exhibidor).set({ estado: 'cerrado', cerradoAt: new Date() }).where(eq(exhibidor.id, ex)),
+    );
+    expect(traducirErrorPg(await a(piezaId, 'en_exhibidor', ex))?.codigo).toBe('pieza_transicion');
+  });
+
   it('una corrección exige admin y motivo (CHECK)', async () => {
     const { piezaId } = await piezaBase();
     const sinAdmin = await capturar(() =>
       app((db) =>
-        db.insert(movimientoPieza).values({ piezaId, tipo: 'correccion', aEstado: 'disponible', nota: 'x' }),
+        db
+          .insert(movimientoPieza)
+          .values({ piezaId, tipo: 'correccion', deEstado: 'disponible', aEstado: 'disponible', nota: 'x' }),
       ),
     );
     const sinMotivo = await capturar(() =>
       app((db) =>
-        db
-          .insert(movimientoPieza)
-          .values({ piezaId, tipo: 'correccion', aEstado: 'disponible', nota: '  ', adminId }),
+        db.insert(movimientoPieza).values({
+          piezaId,
+          tipo: 'correccion',
+          deEstado: 'disponible',
+          aEstado: 'disponible',
+          nota: '  ',
+          adminId,
+        }),
       ),
     );
     expect(traducirErrorPg(sinAdmin)?.codigo).toBe('movimiento_correccion_completa');
@@ -381,8 +427,18 @@ describe('endurecimiento de las funciones de la bitácora', () => {
     const { piezaId } = await piezaBase();
     await app(async (db) => {
       await db.update(pieza).set({ estado: 'regalo' }).where(eq(pieza.id, piezaId));
-      // El último movimiento no es el cambio manual a regalo: no hay nada que deshacer.
-      await db.insert(movimientoPieza).values({ piezaId, tipo: 'alta', aEstado: 'regalo' });
+      await db
+        .insert(movimientoPieza)
+        .values({ piezaId, tipo: 'cambio_estado', deEstado: 'disponible', aEstado: 'regalo' });
+      // El último movimiento ya no es el cambio manual a regalo: no hay nada que deshacer.
+      await db.insert(movimientoPieza).values({
+        piezaId,
+        tipo: 'correccion',
+        deEstado: 'regalo',
+        aEstado: 'regalo',
+        nota: 'x',
+        adminId,
+      });
     });
     const e = await capturar(() =>
       app((db) =>
@@ -395,5 +451,119 @@ describe('endurecimiento de las funciones de la bitácora', () => {
       ),
     );
     expect(traducirErrorPg(e)?.codigo).toBe('pieza_transicion');
+  });
+});
+
+describe('movimientos coherentes con la pieza (trigger de movimiento_pieza)', () => {
+  const insertar = (v: typeof movimientoPieza.$inferInsert) =>
+    capturar(() => app((db) => db.insert(movimientoPieza).values(v)));
+  const codigo = async (v: typeof movimientoPieza.$inferInsert) => traducirErrorPg(await insertar(v))?.codigo;
+  async function exhibidorNuevo(nombre: string) {
+    return app(async (db) => {
+      const [v] = await db
+        .insert(vendedor)
+        .values({ nombre: `V ${nombre}`, tipo: 'revendedora' })
+        .returning({ id: vendedor.id });
+      const [e] = await db
+        .insert(exhibidor)
+        .values({ vendedorId: v!.id, nombre, fechaEnvio: '2026-10-11' })
+        .returning({ id: exhibidor.id });
+      return e!.id;
+    });
+  }
+
+  it('a_estado debe ser el estado actual de la pieza', async () => {
+    const { piezaId } = await piezaBase();
+    expect(await codigo({ piezaId, tipo: 'cambio_estado', deEstado: 'disponible', aEstado: 'regalo' })).toBe(
+      'movimiento_coherente',
+    );
+  });
+
+  it('de_estado debe ser el a_estado del movimiento anterior', async () => {
+    const { piezaId } = await piezaBase();
+    await app((db) => db.update(pieza).set({ estado: 'regalo' }).where(eq(pieza.id, piezaId)));
+    expect(await codigo({ piezaId, tipo: 'cambio_estado', deEstado: 'guardada', aEstado: 'regalo' })).toBe(
+      'movimiento_coherente',
+    );
+    expect(await codigo({ piezaId, tipo: 'cambio_estado', aEstado: 'regalo' })).toBe('movimiento_coherente');
+    expect(
+      await insertar({ piezaId, tipo: 'cambio_estado', deEstado: 'disponible', aEstado: 'regalo' }),
+    ).toBeNull();
+  });
+
+  it('el alta solo puede ser el primer movimiento y sin estado previo', async () => {
+    const { piezaId } = await piezaBase();
+    expect(await codigo({ piezaId, tipo: 'alta', aEstado: 'disponible' })).toBe('movimiento_coherente');
+  });
+
+  it('el exhibidor del movimiento coincide con el de la pieza y con el del envío anterior', async () => {
+    const { piezaId } = await piezaBase();
+    const ex = await exhibidorNuevo('Exh A');
+    const otro = await exhibidorNuevo('Exh B');
+    await app((db) =>
+      db.update(pieza).set({ estado: 'en_exhibidor', exhibidorId: ex }).where(eq(pieza.id, piezaId)),
+    );
+    expect(
+      await codigo({
+        piezaId,
+        tipo: 'envio_exhibidor',
+        deEstado: 'disponible',
+        aEstado: 'en_exhibidor',
+        exhibidorId: otro,
+      }),
+    ).toBe('movimiento_coherente');
+    expect(
+      await insertar({
+        piezaId,
+        tipo: 'envio_exhibidor',
+        deEstado: 'disponible',
+        aEstado: 'en_exhibidor',
+        exhibidorId: ex,
+      }),
+    ).toBeNull();
+    await app((db) =>
+      db.update(pieza).set({ estado: 'regalo', exhibidorId: null }).where(eq(pieza.id, piezaId)),
+    );
+    expect(
+      await codigo({
+        piezaId,
+        tipo: 'cambio_estado',
+        deEstado: 'en_exhibidor',
+        aEstado: 'regalo',
+        exhibidorId: otro,
+      }),
+    ).toBe('movimiento_coherente');
+  });
+
+  it('no se puede fabricar un cambio manual falso para luego "deshacerlo" hacia un exhibidor', async () => {
+    const { piezaId } = await piezaBase();
+    const ex = await exhibidorNuevo('Exh A');
+    // La pieza nunca estuvo en el exhibidor: la app la pasa a regalo e inventa que venía de él.
+    await app((db) => db.update(pieza).set({ estado: 'regalo' }).where(eq(pieza.id, piezaId)));
+    expect(
+      await codigo({
+        piezaId,
+        tipo: 'cambio_estado',
+        deEstado: 'en_exhibidor',
+        aEstado: 'regalo',
+        exhibidorId: ex,
+      }),
+    ).toBe('movimiento_coherente');
+    const e = await capturar(() =>
+      app((db) =>
+        db.update(pieza).set({ estado: 'en_exhibidor', exhibidorId: ex }).where(eq(pieza.id, piezaId)),
+      ),
+    );
+    expect(traducirErrorPg(e)?.codigo).toBe('pieza_transicion');
+  });
+});
+
+describe('contexto de auditoría inválido', () => {
+  it('un kazero.admin_id que no es uuid falla como "sin admin"', async () => {
+    const { piezaId } = await piezaBase();
+    const e = await capturar(() =>
+      editar({ adminId: 'no-es-uuid' }, sql`UPDATE pieza SET descripcion = 'X' WHERE id = ${piezaId}`),
+    );
+    expect(traducirErrorPg(e)?.codigo).toBe('auditoria_sin_admin');
   });
 });

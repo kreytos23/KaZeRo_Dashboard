@@ -141,6 +141,15 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       ].map((c) => `pieza.${c}:UPDATE`),
     );
   });
+  it('kazero_app no tiene ningún privilegio sobre la secuencia de la bitácora', async () => {
+    const r = await conDbUrl(urlOwner(), (db) =>
+      db.execute<{ p: boolean }>(sql`
+        SELECT has_sequence_privilege('kazero_app', 'public.auditoria_orden_seq', 'USAGE')
+            OR has_sequence_privilege('kazero_app', 'public.auditoria_orden_seq', 'SELECT')
+            OR has_sequence_privilege('kazero_app', 'public.auditoria_orden_seq', 'UPDATE') AS p`),
+    );
+    expect(r.rows[0]!.p).toBe(false);
+  });
   it('toda tabla de negocio tiene grants explícitos para kazero_app', async () => {
     const filas = await conDbUrl(urlOwner(), (db) =>
       // Se consulta por oid (no por nombre): el planner puede evaluar el privilegio antes del filtro de

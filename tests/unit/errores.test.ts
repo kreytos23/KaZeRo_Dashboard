@@ -34,6 +34,14 @@ describe('traducción de errores de Postgres', () => {
       traducirErrorPg(envuelto({ code: '23514', constraint: 'movimiento_correccion_completa' }))?.campo,
     ).toBe('motivo');
   });
+  it('traduce el movimiento incoherente con la pieza', () => {
+    const e = traducirErrorPg(envuelto({ code: 'P0001', constraint: 'movimiento_coherente' }));
+    expect(e).toMatchObject({
+      codigo: 'movimiento_coherente',
+      message: 'El movimiento no coincide con el historial de la pieza.',
+    });
+    expect(e?.campo).toBeUndefined();
+  });
   it('traduce la transición de pieza rechazada por el trigger', () => {
     expect(traducirErrorPg(envuelto({ code: 'P0001', constraint: 'pieza_transicion' }))?.codigo).toBe(
       'pieza_transicion',

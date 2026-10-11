@@ -6,6 +6,9 @@
 -- 1. Bitácora. La escribe solo este trigger: SECURITY DEFINER porque kazero_app no tiene INSERT en
 --    auditoria/auditoria_campo (no puede fabricar ni omitir entradas). search_path fijo por seguridad.
 --    Argumentos: columnas auditadas; 'col>tabla' = llave foránea, se guarda el nombre de esa tabla.
+--    Contexto: los servicios lo fijan con set_config('kazero.admin_id' | 'kazero.motivo', …, true) DENTRO de
+--    db.transaction. El tercer argumento (true) lo hace local a la transacción: se borra en COMMIT/ROLLBACK y
+--    no se filtra a otra petición que reutilice la conexión del pool. Nunca uses is_local = false ni SET.
 CREATE OR REPLACE FUNCTION public.kz_auditar() RETURNS trigger
   LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp
   AS $$
@@ -13,7 +16,8 @@ DECLARE
   viejo jsonb := to_jsonb(OLD);
   nuevo jsonb := to_jsonb(NEW);
   -- Contexto de la transacción (fijarContextoAuditoria, set_config(…, true)): se borra al terminar.
-  quien uuid := nullif(current_setting('kazero.admin_id', true), '')::uuid;
+  quien_tx text := current_setting('kazero.admin_id', true);
+  quien uuid;
   motivo_tx text := nullif(btrim(coalesce(current_setting('kazero.motivo', true), '')), '');
   cabecera uuid;
   columna text;
@@ -22,6 +26,10 @@ DECLARE
   antes text;
   despues text;
 BEGIN
+  -- Un valor que no es uuid cuenta como contexto ausente (auditoria_sin_admin), no como 22P02.
+  IF quien_tx ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN
+    quien := quien_tx::uuid;
+  END IF;
   FOR i IN 0 .. TG_NARGS - 1 LOOP
     columna := split_part(TG_ARGV[i], '>', 1);
     tabla := nullif(split_part(TG_ARGV[i], '>', 2), '');
@@ -88,29 +96,47 @@ CREATE TRIGGER material_updated_at BEFORE UPDATE ON material FOR EACH ROW EXECUT
 CREATE TRIGGER proveedor_updated_at BEFORE UPDATE ON proveedor FOR EACH ROW EXECUTE FUNCTION kz_tocar_updated_at();
 --> statement-breakpoint
 -- 2. Máquina de estados, versión 3 (parte de 0005): agrega la rama de corrección (R-07).
+--    DEBE coincidir con destinoCorreccion de src/domain/correccion.ts: el destino de una corrección es
+--    exactamente el que calcula el dominio, nada más.
 CREATE OR REPLACE FUNCTION public.kz_validar_transicion_pieza() RETURNS trigger
   LANGUAGE plpgsql
   AS $$
 DECLARE
   ultimo record;
+  ex_abierto boolean;
 BEGIN
   IF NOT kz_transicion_pieza_permitida(OLD.estado, NEW.estado) THEN
     -- Única excepción: deshacer el último cambio manual a regalo/defecto/guardada. Lo decide el historial
-    -- (solo inserción), no una bandera de sesión que la app pudiera fijar a voluntad.
-    IF (OLD.estado::text || '>' || NEW.estado::text) = ANY (ARRAY[
-         'regalo>disponible', 'regalo>en_exhibidor', 'defecto>en_exhibidor', 'guardada>en_exhibidor']) THEN
+    -- (solo inserción y coherente con la pieza, ver kz_validar_movimiento_pieza), no una bandera de sesión.
+    -- Solo llegan aquí regalo→disponible y {regalo,defecto,guardada}→en_exhibidor: defecto→disponible y
+    -- guardada→disponible ya son cambios manuales normales.
+    IF OLD.estado::text IN ('regalo', 'defecto', 'guardada') AND NEW.estado::text IN ('disponible', 'en_exhibidor') THEN
       SELECT mp.tipo::text AS tipo, mp.de_estado::text AS de, mp.a_estado::text AS a, mp.exhibidor_id
         INTO ultimo
-        FROM movimiento_pieza mp
+        FROM public.movimiento_pieza mp
         WHERE mp.pieza_id = OLD.id
         ORDER BY mp.orden DESC
         LIMIT 1;
-      IF FOUND THEN
-        IF ultimo.tipo = 'cambio_estado' AND ultimo.a = OLD.estado::text
-           AND (NEW.estado::text = 'disponible'
-                OR (ultimo.de = 'en_exhibidor' AND NEW.exhibidor_id = ultimo.exhibidor_id
-                    AND EXISTS (SELECT 1 FROM exhibidor e WHERE e.id = NEW.exhibidor_id AND e.estado = 'abierto'))) THEN
-          RETURN NEW;
+      IF FOUND AND ultimo.tipo = 'cambio_estado' AND ultimo.a = OLD.estado::text THEN
+        IF ultimo.de = 'disponible' THEN
+          -- Venía de disponible: solo vuelve a disponible.
+          IF NEW.estado::text = 'disponible' THEN
+            RETURN NEW;
+          END IF;
+        ELSIF ultimo.de = 'en_exhibidor' AND ultimo.exhibidor_id IS NOT NULL THEN
+          -- FOR SHARE: el exhibidor no se cierra mientras esta corrección decide. El servicio ya lo bloqueó
+          -- antes que a la pieza (orden exhibidor → pieza), así que aquí no se espera.
+          SELECT e.estado::text = 'abierto' INTO ex_abierto
+            FROM public.exhibidor e
+            WHERE e.id = ultimo.exhibidor_id
+            FOR SHARE;
+          -- Abierto: vuelve a ESE exhibidor. Cerrado: queda disponible (la app avisa).
+          IF ex_abierto AND NEW.estado::text = 'en_exhibidor' AND NEW.exhibidor_id = ultimo.exhibidor_id THEN
+            RETURN NEW;
+          END IF;
+          IF NOT ex_abierto AND NEW.estado::text = 'disponible' THEN
+            RETURN NEW;
+          END IF;
         END IF;
       END IF;
     END IF;
@@ -125,6 +151,52 @@ BEGIN
   RETURN NEW;
 END
 $$;
+--> statement-breakpoint
+-- 2b. Historial coherente con la pieza. Sin esto la app podría insertar un `cambio_estado` inventado
+--     (p. ej. "venía del exhibidor X") y luego "deshacerlo" con la rama de corrección de arriba.
+--     Reglas (los servicios ya cambian la pieza ANTES de insertar su movimiento, en la misma transacción):
+--     - a_estado = estado actual de la pieza;
+--     - alta: solo como primer movimiento y sin de_estado;
+--     - resto: de_estado = a_estado del movimiento anterior de esa pieza;
+--     - a_estado en_exhibidor: exhibidor_id = el de la pieza; de_estado en_exhibidor: el del movimiento anterior.
+--     Los INSERT de varias filas (altaLote, enviar, regresar) traen una fila por pieza distinta; aun si se
+--     repitiera una pieza, un trigger BEFORE ROW ve las filas que la misma sentencia ya insertó.
+CREATE OR REPLACE FUNCTION public.kz_validar_movimiento_pieza() RETURNS trigger
+  LANGUAGE plpgsql
+  AS $$
+DECLARE
+  estado_actual text;
+  exhibidor_actual uuid;
+  hay_previo boolean;
+  previo_a text;
+  previo_exhibidor uuid;
+BEGIN
+  -- FOR UPDATE: serializa los movimientos de una pieza (los servicios ya la tienen bloqueada; aquí no espera).
+  SELECT p.estado::text, p.exhibidor_id INTO estado_actual, exhibidor_actual
+    FROM public.pieza p WHERE p.id = NEW.pieza_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RETURN NEW; -- La FK rechaza la fila.
+  END IF;
+  SELECT mp.a_estado::text, mp.exhibidor_id INTO previo_a, previo_exhibidor
+    FROM public.movimiento_pieza mp
+    WHERE mp.pieza_id = NEW.pieza_id
+    ORDER BY mp.orden DESC
+    LIMIT 1;
+  hay_previo := FOUND;
+  IF NEW.a_estado::text <> estado_actual
+     OR (NEW.tipo::text = 'alta' AND (hay_previo OR NEW.de_estado IS NOT NULL))
+     OR (NEW.tipo::text <> 'alta' AND NEW.de_estado::text IS DISTINCT FROM previo_a)
+     OR (NEW.a_estado::text = 'en_exhibidor' AND NEW.exhibidor_id IS DISTINCT FROM exhibidor_actual)
+     OR (NEW.de_estado::text = 'en_exhibidor' AND NEW.exhibidor_id IS DISTINCT FROM previo_exhibidor) THEN
+    RAISE EXCEPTION 'Movimiento incoherente con la pieza o su historial'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'movimiento_coherente';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER movimiento_pieza_coherente BEFORE INSERT ON movimiento_pieza
+  FOR EACH ROW EXECUTE FUNCTION kz_validar_movimiento_pieza();
 --> statement-breakpoint
 -- 3. Vistas. CREATE OR REPLACE solo puede agregar columnas al final (no cambia las existentes).
 CREATE VIEW v_auditoria WITH (security_invoker = true) AS

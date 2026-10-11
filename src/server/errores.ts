@@ -73,6 +73,7 @@ const MENSAJES: Record<string, string> = {
   auditoria_motivo_largo: 'El motivo admite hasta 200 caracteres.',
   auditoria_sin_admin: 'No se pudo registrar quién hizo el cambio. Recarga la página.',
   movimiento_correccion_completa: 'La corrección necesita un motivo.',
+  movimiento_coherente: 'El movimiento no coincide con el historial de la pieza.',
 };
 
 function mensajesPg(err: unknown): string[] {
