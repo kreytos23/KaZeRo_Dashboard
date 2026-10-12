@@ -1,6 +1,7 @@
 import 'server-only';
 import { unstable_rethrow } from 'next/navigation';
 import { pgCode } from '@/db/errors';
+import { MAX_BYTES_SUBIDA } from '@/domain/imagenes';
 import type { EstadoAccion } from '@/features/ui/estado';
 import { ErrorNegocio } from './errores';
 
@@ -45,4 +46,28 @@ export function versionDe(fd: FormData): number {
   const v = texto(fd, 'version');
   if (!/^\d{1,9}$/.test(v)) throw new ErrorNegocio('conflicto', 'Recarga la página e intenta de nuevo.');
   return Number(v);
+}
+
+/**
+ * Archivo de un FormData. El tamaño se revisa ANTES de leerlo (también si es opcional); el contenido
+ * (magic bytes, dimensiones, animadas) lo valida `procesarImagen`. Nunca se confía en el nombre ni el MIME.
+ */
+export async function bytesDeArchivo(fd: FormData, campo: string): Promise<Uint8Array>;
+export async function bytesDeArchivo(
+  fd: FormData,
+  campo: string,
+  o: { opcional?: boolean },
+): Promise<Uint8Array | null>;
+export async function bytesDeArchivo(
+  fd: FormData,
+  campo: string,
+  o: { opcional?: boolean } = {},
+): Promise<Uint8Array | null> {
+  const v = fd.get(campo);
+  if (!(v instanceof File) || v.size === 0) {
+    if (o.opcional) return null;
+    throw new ErrorNegocio('imagen', 'Elige una foto.', campo);
+  }
+  if (v.size > MAX_BYTES_SUBIDA) throw new ErrorNegocio('imagen', 'La foto pesa más de 3 MB.', campo);
+  return new Uint8Array(await v.arrayBuffer());
 }

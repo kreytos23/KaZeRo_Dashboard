@@ -3,6 +3,9 @@ const PUBLICAS = ['/login', '/api/health'];
 // Iconos que Next genera desde src/app (el login sin sesión también los pide).
 const ICONOS = ['/icon.png', '/apple-icon.png', '/favicon.ico'];
 const ARCHIVOS_PUBLICOS = ['/robots.txt', ...ICONOS];
+// Tareas programadas: sin cookie (las llama Vercel Cron) pero protegidas en el handler con CRON_SECRET.
+// Solo la ruta exacta (sin barra final ni subrutas); la guarda estática de Route Handlers exige autorizarCron().
+const TAREAS_PROGRAMADAS = ['/api/tareas/limpiar-imagenes'];
 // Imágenes de marca de public/marca: un único segmento con nombre simple, sin subcarpetas.
 const IMAGEN_MARCA = /^\/marca\/[a-z0-9-]+\.(?:webp|png)$/;
 
@@ -20,6 +23,7 @@ function esPublica(ruta: string) {
   if (segmentos.some((s) => s === '' || s === '.' || s === '..' || s.includes('%') || s.includes('\\')))
     return false;
   if (ARCHIVOS_PUBLICOS.includes(sinBarraFinal)) return true;
+  if (TAREAS_PROGRAMADAS.includes(ruta)) return true;
   // Contra la ruta original, no la recortada: `/marca/logo.webp/` no es un archivo.
   if (IMAGEN_MARCA.test(ruta)) return true;
   return PUBLICAS.some((p) => sinBarraFinal === p || sinBarraFinal.startsWith(`${p}/`));
@@ -31,11 +35,17 @@ export function decidirAcceso(ruta: string, tieneCookie: boolean): DecisionAcces
   return ruta === '/api' || ruta.startsWith('/api/') ? 'no_autenticado' : 'redirigir_login';
 }
 
+// Foto de pieza (Plan 2.2): su Cache-Control lo decide el handler (privada, un día, solo con la clave vigente).
+const RUTA_IMAGEN_PIEZA =
+  /^\/api\/piezas\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/imagen$/;
+
 /**
  * Solo los iconos y las imágenes de marca (binarios públicos, sin datos) se cachean, por un día y sin
  * `immutable`: sus nombres no llevan hash y un cambio de logo debe verse al día siguiente. HTML y APIs
  * nunca se cachean (lecciones §5). Se compara contra la ruta exacta, igual que en `esPublica`.
+ * `null`: la ruta de la foto de una pieza pone su propia cabecera (el proxy no la pisa).
  */
-export function cacheControlPara(ruta: string): string {
+export function cacheControlPara(ruta: string): string | null {
+  if (RUTA_IMAGEN_PIEZA.test(ruta)) return null;
   return ICONOS.includes(ruta) || IMAGEN_MARCA.test(ruta) ? 'public, max-age=86400' : 'private, no-store';
 }

@@ -6,9 +6,12 @@ import { mensajeCorreccion } from '@/domain/correccion';
 import { pesosACentavos } from '@/domain/dinero';
 import { parsearLote } from '@/domain/lote';
 import type { EstadoAccion } from '@/features/ui/estado';
-import { ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
+import { bytesDeArchivo, ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { ErrorNegocio } from '@/server/errores';
+import { almacenImagenes } from '@/server/imagenes/almacen';
+import { procesarImagen } from '@/server/imagenes/procesar';
+import { altaPiezaConFoto, cambiarImagenPieza, quitarImagenPieza } from '@/server/piezas/imagen';
 import {
   ESTADOS_MANUALES,
   altaLote,
@@ -49,20 +52,28 @@ function largoMax(fd: FormData, campo: string, etiqueta: string, max: number): s
   return t;
 }
 
-/** Devuelve el código creado en `ok`; el cliente navega a la ficha y avisa al buscador (ver FormNuevaPieza). */
+/**
+ * Devuelve el código creado en `ok`; el cliente navega a la ficha y avisa al buscador (ver FormNuevaPieza).
+ * La foto es opcional y viaja en el mismo envío (D9).
+ */
 export async function accionAltaPieza(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   await requerirSesion();
   return ejecutarAccion(async () => {
+    const datos = {
+      codigo: largoMax(fd, 'codigo', 'Código', 40),
+      categoria: largoMax(fd, 'categoria', 'Categoría', 80),
+      material: largoMax(fd, 'material', 'Material', 80),
+      proveedor: largoMax(fd, 'proveedor', 'Proveedor', 80),
+      descripcion: largoMax(fd, 'descripcion', 'Descripción', 300),
+      costoCentavos: monto(fd, 'costo', 'Costo', true),
+      precioCentavos: monto(fd, 'precio', 'Precio'),
+    };
+    // La foto se procesa ANTES de abrir la BD (CPU fuera de la conexión) y antes de subir nada.
+    const bytes = await bytesDeArchivo(fd, 'imagen', { opcional: true });
+    const imagen = bytes ? await procesarImagen(bytes) : null;
+    // Sin foto no se toca el almacén (ni su configuración): el alta se comporta como antes.
     const p = await conDb((db) =>
-      altaPieza(db, {
-        codigo: largoMax(fd, 'codigo', 'Código', 40),
-        categoria: largoMax(fd, 'categoria', 'Categoría', 80),
-        material: largoMax(fd, 'material', 'Material', 80),
-        proveedor: largoMax(fd, 'proveedor', 'Proveedor', 80),
-        descripcion: largoMax(fd, 'descripcion', 'Descripción', 300),
-        costoCentavos: monto(fd, 'costo', 'Costo', true),
-        precioCentavos: monto(fd, 'precio', 'Precio'),
-      }),
+      imagen ? altaPiezaConFoto(db, almacenImagenes(), datos, imagen) : altaPieza(db, datos),
     );
     revalidatePath('/panel/inventario');
     return p.codigo;
@@ -99,6 +110,35 @@ function revalidarPieza(codigo: string) {
   revalidatePath(`/panel/inventario/${encodeURIComponent(codigo)}`);
   revalidatePath('/panel/inventario/[codigo]', 'page');
   revalidatePath('/panel/inventario');
+}
+
+/** Sube o cambia la foto (también en piezas vendidas). El buscador lo marca sucio la UI (Task 6). */
+export async function accionCambiarImagen(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const piezaId = uuidDe(fd, 'piezaId');
+    const version = versionDe(fd);
+    const imagen = await procesarImagen(await bytesDeArchivo(fd, 'imagen'));
+    const { codigo } = await conDb((db) =>
+      cambiarImagenPieza(db, almacenImagenes(), { piezaId, version, adminId, imagen }),
+    );
+    revalidarPieza(codigo);
+    return 'Foto guardada.';
+  });
+}
+
+export async function accionQuitarImagen(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    if (texto(fd, 'confirmo') !== 'si')
+      throw new ErrorNegocio('sin_confirmacion', 'Confirma que quieres quitar la foto.', 'confirmo');
+    const piezaId = uuidDe(fd, 'piezaId');
+    const version = versionDe(fd);
+    const r = await conDb((db) => quitarImagenPieza(db, almacenImagenes(), { piezaId, version, adminId }));
+    if (r.cambios === 0) return 'Sin cambios.';
+    revalidarPieza(r.codigo);
+    return 'Foto quitada.';
+  });
 }
 
 export async function accionCambiarEstado(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {

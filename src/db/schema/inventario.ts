@@ -167,6 +167,9 @@ export const pieza = pgTable(
     precio: numeric('precio', { precision: 12, scale: 2 }).notNull(),
     fechaAlta: date('fecha_alta').notNull(),
     fotoPath: text('foto_path'),
+    // Plan 2.2 (R-38): clave de la foto vigente; una nueva por subida (rutas inmutables en Blob).
+    // foto_path (Plan 1) queda obsoleta: nunca se usó; se borra en una migración contract futura.
+    imagenClave: uuid('imagen_clave'),
     // Desnormalización documentada: estado actual (derivable del historial), protegido por trigger y CHECK.
     estado: estadoPieza('estado').notNull().default('disponible'),
     exhibidorId: uuid('exhibidor_id').references(() => exhibidor.id),
@@ -175,6 +178,8 @@ export const pieza = pgTable(
   },
   (t) => [
     uniqueIndex('pieza_codigo_uq').on(t.codigo),
+    // Plan 2.2: una clave de foto pertenece a una sola pieza (NULL se repite sin problema).
+    uniqueIndex('pieza_imagen_clave_uq').on(t.imagenClave),
     index('pieza_estado_idx').on(t.estado),
     index('pieza_categoria_idx').on(t.categoriaId),
     index('pieza_material_idx').on(t.materialId),

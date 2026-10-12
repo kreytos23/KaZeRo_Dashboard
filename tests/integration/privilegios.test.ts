@@ -133,6 +133,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
         'estado',
         'exhibidor_id',
         'foto_path',
+        'imagen_clave',
         'material_id',
         'precio',
         'proveedor_id',

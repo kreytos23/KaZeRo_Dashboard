@@ -64,6 +64,7 @@ export const vPieza = pgView('v_pieza', {
   proveedorNombre: text('proveedor_nombre'),
   exhibidorId: uuid('exhibidor_id'),
   exhibidorNombre: text('exhibidor_nombre'),
+  imagenClave: uuid('imagen_clave'),
 }).existing();
 
 export const vMovimientoPieza = pgView('v_movimiento_pieza', {

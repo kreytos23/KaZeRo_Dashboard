@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
+import { FotoPieza } from '@/features/imagenes/FotoPieza';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarCatalogo } from '@/server/catalogos/servicio';
@@ -81,13 +82,14 @@ export default async function PaginaInventario({
         </button>
       </form>
       <div className="tarjeta overflow-x-auto px-4">
-        <table className="w-full min-w-[36rem] text-left text-sm">
+        <table className="w-full min-w-[40rem] text-left text-sm">
           <caption className="sr-only">Piezas del inventario</caption>
           <thead>
             <tr>
               <th scope="col" className="py-2">
-                Código
+                Foto
               </th>
+              <th scope="col">Código</th>
               <th scope="col">Descripción</th>
               <th scope="col">Categoría</th>
               <th scope="col">Precio</th>
@@ -97,6 +99,9 @@ export default async function PaginaInventario({
           <tbody>
             {piezas.map((p) => (
               <tr key={p.id} className="border-t border-borde">
+                <td className="py-2">
+                  <FotoPieza piezaId={p.id} clave={p.imagenClave} alt="" variante="mini" />
+                </td>
                 <td className="py-2 font-mono">
                   <Link href={`/panel/inventario/${encodeURIComponent(p.codigo)}`} className="enlace">
                     {p.codigo}

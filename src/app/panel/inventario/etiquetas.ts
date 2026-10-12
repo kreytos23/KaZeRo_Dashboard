@@ -28,3 +28,5 @@ export function destinosManuales(estado: EstadoPieza): Manual[] {
   if (estado === 'defecto' || estado === 'guardada') return ['disponible'];
   return [];
 }
+
+export const textoBotonFoto = (tiene: boolean) => (tiene ? 'Cambiar foto' : 'Subir foto');

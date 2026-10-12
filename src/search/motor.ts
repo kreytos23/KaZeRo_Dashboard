@@ -1,5 +1,6 @@
 import MiniSearch from 'minisearch';
 import { normalizarCodigo } from '@/domain/codigos';
+import { urlImagenPieza } from '@/domain/imagenes';
 import { normalizar } from '@/domain/texto';
 import type { IndiceBusqueda } from './tipos';
 
@@ -9,6 +10,8 @@ export interface Resultado {
   titulo: string;
   subtitulo: string;
   href: string;
+  /** URL de la miniatura (solo piezas con foto). */
+  miniatura: string | null;
 }
 type Doc = Resultado & { texto: string };
 
@@ -41,13 +44,14 @@ export function crearMotor(indice: IndiceBusqueda) {
   const porCodigoCompacto = new Map<string, Resultado>();
   const porClave = new Map<string, Resultado>();
 
-  for (const [id, codigo, descripcion, estado] of indice.piezas) {
+  for (const [id, codigo, descripcion, estado, imagen] of indice.piezas) {
     const r: Resultado = {
       clave: `pieza:${id}`,
       tipo: 'pieza',
       titulo: `${codigo} · ${descripcion}`,
       subtitulo: ESTADOS[estado] ?? estado,
       href: `/panel/inventario/${encodeURIComponent(codigo)}`,
+      miniatura: imagen ? urlImagenPieza(id, imagen, 'mini') : null,
     };
     porCodigo.set(normalizarCodigo(codigo), r);
     porCodigoCompacto.set(compactar(codigo), r);
@@ -61,6 +65,7 @@ export function crearMotor(indice: IndiceBusqueda) {
       titulo: nombre,
       subtitulo: referencia ?? 'Cliente',
       href: `/panel/clientes/${encodeURIComponent(id)}`,
+      miniatura: null,
     };
     porClave.set(r.clave, r);
     docs.push({ ...r, texto: `${nombre} ${referencia ?? ''}` });
@@ -72,6 +77,7 @@ export function crearMotor(indice: IndiceBusqueda) {
       titulo: nombre,
       subtitulo: 'Vendedor',
       href: `/panel/vendedores/${encodeURIComponent(id)}`,
+      miniatura: null,
     };
     porClave.set(r.clave, r);
     docs.push({ ...r, texto: nombre });
@@ -80,7 +86,7 @@ export function crearMotor(indice: IndiceBusqueda) {
   const ms = new MiniSearch<Doc>({
     idField: 'clave',
     fields: ['texto'],
-    storeFields: ['clave', 'tipo', 'titulo', 'subtitulo', 'href'],
+    storeFields: ['clave', 'tipo', 'titulo', 'subtitulo', 'href', 'miniatura'],
     // Mismo normalizador que el resto del sistema: sin acentos ni mayúsculas, en índice y consulta.
     processTerm: (t) => normalizar(t) || null,
     searchOptions: {
@@ -115,6 +121,7 @@ export function crearMotor(indice: IndiceBusqueda) {
         titulo: h.titulo,
         subtitulo: h.subtitulo,
         href: h.href,
+        miniatura: h.miniatura,
       }));
       const ordenada = exacto ? [exacto, ...lista.filter((r) => r.clave !== exacto.clave)] : lista;
       return ordenada.slice(0, max);

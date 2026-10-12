@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { startTransition, useActionState, useEffect, useRef, useState } from 'react';
+import { SelectorFoto } from '@/features/imagenes/SelectorFoto';
 import { Campo } from '@/features/ui/Campo';
 import { ErroresCampo, useEnfocarPrimerInvalido } from '@/features/ui/errores-campo';
 import type { EstadoAccion } from '@/features/ui/estado';
@@ -14,6 +15,8 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
   const [estado, despachar, pendiente] = useActionState<EstadoAccion, FormData>(accionAltaPieza, {});
   const [prefijo, setPrefijo] = useState('');
   const [codigo, setCodigo] = useState('');
+  // Plan 3 Task 12: al agregar "Guardar y agregar otra", este estado `foto` también debe reiniciarse.
+  const [foto, setFoto] = useState<File | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [sugiriendo, setSugiriendo] = useState(false);
   const form = useRef<HTMLFormElement>(null);
@@ -56,6 +59,7 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
         e.preventDefault();
         if (enviando) return;
         const datos = new FormData(e.currentTarget);
+        if (foto) datos.set('imagen', foto);
         startTransition(() => despachar(datos));
       }}
     >
@@ -103,12 +107,16 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
         <Campo etiqueta="Proveedor" name="proveedor" maxLength={80} />
         <Campo etiqueta="Costo" name="costo" inputMode="decimal" placeholder="65" />
         <Campo etiqueta="Precio" name="precio" inputMode="decimal" required placeholder="149" />
+        <SelectorFoto etiqueta="Foto (opcional)" onCambio={setFoto} />
       </ErroresCampo.Provider>
       {estado.error && (
         <p role="alert" className="aviso-error">
           {estado.campos ? 'Revisa los campos marcados.' : estado.error}
         </p>
       )}
+      <p role="status" className="text-sm text-tinta-suave">
+        {enviando && foto ? 'Subiendo…' : ''}
+      </p>
       <button
         type="submit"
         disabled={enviando || !hidratado}

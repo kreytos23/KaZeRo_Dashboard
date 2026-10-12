@@ -71,6 +71,20 @@
       "when": 1791756021807,
       "tag": "0009_auditoria_reglas",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791789890643,
+      "tag": "0010_wise_doctor_doom",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1791789892235,
+      "tag": "0011_imagen_pieza",
+      "breakpoints": true
     }
   ]
 }
