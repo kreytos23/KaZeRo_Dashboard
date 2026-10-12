@@ -36,6 +36,7 @@ const filaPieza = {
   estado: vPieza.estado,
   categoriaNombre: vPieza.categoriaNombre,
   exhibidorId: vPieza.exhibidorId,
+  imagenClave: vPieza.imagenClave,
 };
 export type PiezaFila = {
   id: string;
@@ -45,6 +46,7 @@ export type PiezaFila = {
   estado: EstadoPieza;
   categoriaNombre: string;
   exhibidorId: string | null;
+  imagenClave: string | null;
 };
 
 export async function sugerirCodigo(db: Ejecutor, prefijo: string): Promise<string> {
@@ -199,7 +201,12 @@ export async function editarPieza(
   );
 }
 
-export async function altaPieza(db: Ejecutor, d: DatosPieza): Promise<{ id: string; codigo: string }> {
+/** `extra` lo usa el alta con foto: el id y la clave se generan antes para subir los blobs primero (D6). */
+export async function altaPieza(
+  db: Ejecutor,
+  d: DatosPieza,
+  extra: { id?: string; imagenClave?: string } = {},
+): Promise<{ id: string; codigo: string }> {
   const v = validarPieza(d);
   return conErroresDeNegocio(() =>
     db.transaction(async (tx) => {
@@ -210,7 +217,14 @@ export async function altaPieza(db: Ejecutor, d: DatosPieza): Promise<{ id: stri
         : null;
       const [p] = await tx
         .insert(pieza)
-        .values({ ...v, categoriaId, materialId, proveedorId })
+        .values({
+          ...v,
+          categoriaId,
+          materialId,
+          proveedorId,
+          ...(extra.id ? { id: extra.id } : {}),
+          imagenClave: extra.imagenClave ?? null,
+        })
         .returning({ id: pieza.id, codigo: pieza.codigo });
       await tx.insert(movimientoPieza).values({ piezaId: p!.id, tipo: 'alta', aEstado: 'disponible' });
       return p!;

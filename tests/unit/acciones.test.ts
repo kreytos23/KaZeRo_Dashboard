@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ejecutarAccion, texto, uuidDe, uuidOpcionalDe, versionDe } from '@/server/acciones';
+import { MAX_BYTES_SUBIDA } from '@/domain/imagenes';
+import { bytesDeArchivo, ejecutarAccion, texto, uuidDe, uuidOpcionalDe, versionDe } from '@/server/acciones';
 import { ErrorNegocio } from '@/server/errores';
 
 describe('ejecutarAccion', () => {
@@ -77,5 +78,43 @@ describe('lectores de campos ocultos', () => {
     for (const malo of ['', '-1', '1.5', 'abc', '99999999999']) {
       expect(() => versionDe(fd({ version: malo }))).toThrow(ErrorNegocio);
     }
+  });
+});
+
+describe('bytesDeArchivo', () => {
+  const fd = (v?: File | string) => {
+    const f = new FormData();
+    if (v !== undefined) f.set('imagen', v);
+    return f;
+  };
+  it('archivo → bytes', async () => {
+    expect(await bytesDeArchivo(fd(new File([Uint8Array.of(1, 2)], 'x.jpg')), 'imagen')).toEqual(
+      Uint8Array.of(1, 2),
+    );
+  });
+  it('ausente, vacío o texto: error en el campo; opcional → null', async () => {
+    for (const v of [undefined, new File([], 'x.jpg'), 'texto']) {
+      await expect(bytesDeArchivo(fd(v), 'imagen')).rejects.toMatchObject({
+        campo: 'imagen',
+        message: 'Elige una foto.',
+      });
+      expect(await bytesDeArchivo(fd(v), 'imagen', { opcional: true })).toBeNull();
+    }
+  });
+  it('más de 3 MB: se rechaza sin leer el contenido (también si es opcional)', async () => {
+    const enorme = new File([new Uint8Array(MAX_BYTES_SUBIDA + 1)], 'x.jpg');
+    const leer = vi.spyOn(enorme, 'arrayBuffer');
+    await expect(bytesDeArchivo(fd(enorme), 'imagen')).rejects.toMatchObject({
+      campo: 'imagen',
+      message: 'La foto pesa más de 3 MB.',
+    });
+    await expect(bytesDeArchivo(fd(enorme), 'imagen', { opcional: true })).rejects.toMatchObject({
+      campo: 'imagen',
+    });
+    expect(leer).not.toHaveBeenCalled();
+  });
+  it('justo 3 MB se acepta', async () => {
+    const tope = new File([new Uint8Array(MAX_BYTES_SUBIDA)], 'x.jpg');
+    expect((await bytesDeArchivo(fd(tope), 'imagen'))!.length).toBe(MAX_BYTES_SUBIDA);
   });
 });
