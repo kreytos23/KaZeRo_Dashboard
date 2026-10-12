@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useRef } from 'react';
 import { AreaTexto } from '@/features/ui/Campo';
+import { useHidratado } from '@/features/ui/hidratado';
 import { marcarIndiceSucio } from '@/search/eventos';
 import { accionAltaLote } from '../acciones';
 import type { EstadoLote } from '../tipos';
@@ -9,6 +10,7 @@ import type { EstadoLote } from '../tipos';
 export function FormLote() {
   const [estado, despachar, pendiente] = useActionState<EstadoLote, FormData>(accionAltaLote, {});
   const form = useRef<HTMLFormElement>(null);
+  const hidratado = useHidratado();
 
   useEffect(() => {
     if (!estado.ok) return;
@@ -19,6 +21,8 @@ export function FormLote() {
   return (
     <form
       ref={form}
+      method="post"
+      data-hidratado={hidratado ? 'si' : 'no'}
       className="flex flex-col gap-3"
       aria-busy={pendiente}
       onSubmit={(e) => {
@@ -41,14 +45,13 @@ export function FormLote() {
           )}
         </div>
       )}
-      {estado.ok && (
-        <p role="status" className="aviso-exito">
-          {estado.ok}
-        </p>
-      )}
+      {/* Siempre montado: una región que nace con texto no se anuncia. */}
+      <p role="status" className={estado.ok ? 'aviso-exito' : undefined}>
+        {estado.ok}
+      </p>
       <button
         type="submit"
-        disabled={pendiente}
+        disabled={pendiente || !hidratado}
         className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
       >
         Dar de alta el lote

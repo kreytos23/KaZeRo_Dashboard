@@ -32,7 +32,11 @@ export function CampoMotivo({ montos = [] }: { montos?: readonly MontoVigilado[]
       );
     revisar();
     form.addEventListener('input', revisar);
-    return () => form.removeEventListener('input', revisar);
+    form.addEventListener('change', revisar);
+    return () => {
+      form.removeEventListener('input', revisar);
+      form.removeEventListener('change', revisar);
+    };
   }, [clave]);
 
   return (

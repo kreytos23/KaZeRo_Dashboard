@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { RUTA_ESTADO, abrirMenuSiMovil, codigoTotpNoUsado, datosAdmin } from './utilidades';
+import { RUTA_ESTADO, abrirMenuSiMovil, codigoTotpNoUsado, datosAdmin, irA } from './utilidades';
 
 /**
  * Formularios completados SOLO con el teclado: nada de clics ni `fill`. Lo único que no es teclado es
@@ -36,7 +36,7 @@ test.describe('formularios solo con teclado', () => {
 
   test('alta de vendedor: orden de Tab, selector con flechas y Enter envía', async ({ page }, info) => {
     const m = marca(info.project.name);
-    await page.goto('/panel/vendedores');
+    await irA(page, '/panel/vendedores');
     const nombre = page.getByLabel('Nombre');
     await escribirEn(page, nombre, `Teclado ${m}`);
     await tabHacia(page, page.getByLabel('Tipo'));
@@ -54,7 +54,7 @@ test.describe('formularios solo con teclado', () => {
 
   test('alta de cliente con Enter y edición de su ficha sin ratón', async ({ page }, info) => {
     const m = marca(info.project.name);
-    await page.goto('/panel/clientes');
+    await irA(page, '/panel/clientes');
     await escribirEn(page, page.getByLabel('Nombre', { exact: true }), `Cliente Teclado ${m}`);
     await tabHacia(page, page.getByLabel('Referencia'));
     await page.keyboard.type('Voca 9');
@@ -74,7 +74,7 @@ test.describe('formularios solo con teclado', () => {
   test('nueva pieza: Sugerir código con teclado y envío con Enter', async ({ page }, info) => {
     const m = marca(info.project.name);
     const codigo = `K${m}01`;
-    await page.goto('/panel/inventario/nueva');
+    await irA(page, '/panel/inventario/nueva');
     await escribirEn(page, page.getByLabel('Prefijo'), `K${m}`);
     await tabHacia(page, page.getByRole('button', { name: 'Sugerir código' }));
     await page.keyboard.press('Enter');
@@ -104,7 +104,7 @@ test.describe('formularios solo con teclado', () => {
     const m = marca(info.project.name);
     const codigo = `K${m}01`;
     // La prueba anterior dejó la pieza en Defecto: se vuelve a Disponible para poder enviarla.
-    await page.goto(`/panel/inventario/${codigo}`);
+    await irA(page, `/panel/inventario/${codigo}`);
     const nuevo = page.getByLabel('Nuevo estado');
     await enfocar(page, nuevo);
     await page.keyboard.type('Disponible');
@@ -112,7 +112,7 @@ test.describe('formularios solo con teclado', () => {
     await page.keyboard.press('Enter');
     await expect(estadoCon(page, 'Estado actualizado.')).toBeVisible();
 
-    await page.goto('/panel/exhibidores');
+    await irA(page, '/panel/exhibidores');
     const vendedor = page.getByLabel('Vendedor', { exact: true });
     await enfocar(page, vendedor);
     await page.keyboard.type(`Teclado ${m}`);
@@ -148,7 +148,7 @@ test.describe('formularios solo con teclado', () => {
 
   test('el error de un campo mueve el foco al primer campo inválido', async ({ page }, info) => {
     const m = marca(info.project.name);
-    await page.goto('/panel/vendedores');
+    await irA(page, '/panel/vendedores');
     // Nombre repetido (creado en la primera prueba): el servidor marca el campo y el foco va allí.
     await escribirEn(page, page.getByLabel('Nombre'), `Teclado ${m}`);
     await page.keyboard.press('Enter');
@@ -161,7 +161,7 @@ test.describe('formularios solo con teclado', () => {
 test.describe('menú del celular con teclado', () => {
   test('abre, atrapa el foco, cierra con Escape y navega con Enter', async ({ page }, info) => {
     test.skip(info.project.name !== 'movil', 'El menú solo existe en pantallas < md');
-    await page.goto('/panel');
+    await irA(page, '/panel');
     const boton = page.getByRole('button', { name: 'Menú' });
     await enfocar(page, boton);
     await expect(boton).toHaveAttribute('aria-expanded', 'false');
@@ -207,7 +207,7 @@ test.describe('menú del celular con teclado', () => {
 
   test('en escritorio no hay botón de menú y la navegación está a la vista', async ({ page }, info) => {
     test.skip(info.project.name === 'movil');
-    await page.goto('/panel');
+    await irA(page, '/panel');
     await expect(page.getByRole('button', { name: 'Menú' })).toBeHidden();
     await expect(page.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
   });
@@ -217,7 +217,7 @@ test.describe('login y verificación con teclado', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
   test('Correo, Contraseña, Enter; código TOTP (con foco inicial) y Enter', async ({ page }) => {
     const d = datosAdmin();
-    await page.goto('/login');
+    await irA(page, '/login');
     await escribirEn(page, page.getByLabel('Correo'), d.email);
     await tabHacia(page, page.getByLabel('Contraseña'));
     await page.keyboard.type(d.password);
@@ -247,7 +247,7 @@ test.describe('foco visible', () => {
 
   for (const ruta of PAGINAS) {
     test(`todo control alcanzable con Tab muestra un indicador de foco en ${ruta}`, async ({ page }) => {
-      await page.goto(ruta);
+      await irA(page, ruta);
       // Sin esperar, el recorrido pasaría por el esqueleto de loading.tsx y no por la página real.
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       const sinIndicador: string[] = [];

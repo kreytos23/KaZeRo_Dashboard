@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { RUTA_ESTADO, RUTA_ESTADO_REGEN, datosAdmin, datosAdminRegen } from './utilidades';
+import { RUTA_ESTADO, RUTA_ESTADO_REGEN, datosAdmin, datosAdminRegen, irA } from './utilidades';
 
 test.use({ storageState: RUTA_ESTADO });
 
@@ -23,7 +23,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   const prefijo = `Z${m}`;
   const codigo = `${prefijo}01`;
 
-  await page.goto('/panel/vendedores');
+  await irA(page, '/panel/vendedores');
   await page.getByLabel('Nombre').fill(`Nelly ${m}`);
   await page.getByLabel('Tipo').selectOption('revendedora');
   await page.getByLabel('Comisión (%)').fill('18');
@@ -39,7 +39,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await expect(estadoCon(page, 'Cambios guardados.')).toBeVisible();
   await expect(page.getByLabel('Comisión (%)')).toHaveValue('20');
 
-  await page.goto('/panel/inventario/nueva');
+  await irA(page, '/panel/inventario/nueva');
   await page.getByLabel('Prefijo').fill(prefijo);
   await page.getByRole('button', { name: 'Sugerir código' }).click();
   await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
@@ -51,14 +51,14 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await expect(page.getByRole('heading', { name: codigo })).toBeVisible();
 
   // Búsqueda global: atajo /, código en minúsculas resuelto por el mapa de códigos, Enter navega.
-  await page.goto('/panel');
+  await irA(page, '/panel');
   const buscador = await abrirBuscadorConAtajo(page);
   await buscador.fill(codigo.toLowerCase());
   await expect(page.getByRole('option', { name: new RegExp(codigo) })).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(new RegExp(`/panel/inventario/${codigo}$`));
 
-  await page.goto('/panel/exhibidores');
+  await irA(page, '/panel/exhibidores');
   await page.getByLabel('Vendedor', { exact: true }).selectOption({ label: `Nelly ${m}` });
   await page.getByLabel('Nombre del exhibidor').fill(`Exhibidor ${m}`);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
@@ -85,7 +85,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
 test('alta individual, ficha de pieza con destinos válidos y estados', async ({ page }, info) => {
   const m = marca(info.project.name);
   const codigo = `Y${m}01`;
-  await page.goto('/panel/inventario/nueva');
+  await irA(page, '/panel/inventario/nueva');
   await page.getByLabel('Prefijo').fill(`Y${m}`);
   await page.getByRole('button', { name: 'Sugerir código' }).click();
   await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
@@ -107,7 +107,7 @@ test('alta individual, ficha de pieza con destinos válidos y estados', async ({
 test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async ({ page }, info) => {
   const m = marca(info.project.name);
   const codigo = `W${m}01`;
-  await page.goto('/panel/inventario/nueva');
+  await irA(page, '/panel/inventario/nueva');
   await page.getByLabel('Prefijo').fill(`W${m}`);
   await page.getByRole('button', { name: 'Sugerir código' }).click();
   await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
@@ -160,14 +160,18 @@ test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async
   await expect(page.getByLabel('Nuevo estado')).toHaveCount(0);
   await expect(movimientos.getByText('Cambio de estado').first()).toBeVisible();
 
-  // Deshacer: pide motivo y confirmación.
-  await movimientos.getByLabel('Motivo de la corrección').fill('Se marcó por error');
-  await movimientos.getByRole('button', { name: 'Deshacer último cambio' }).click();
+  // Deshacer: va junto al último movimiento, con motivo y confirmación.
+  await expect(movimientos.getByText('Deshacer: Disponible → Regalo')).toBeVisible();
+  await expect(movimientos.getByText('La pieza volverá a Disponible.')).toBeVisible();
+  await movimientos.getByLabel('Motivo de la corrección (obligatorio)').fill('Se marcó por error');
+  await movimientos.getByRole('button', { name: 'Deshacer este cambio' }).click();
   await expect(movimientos.getByLabel('Confirmo que quiero deshacer este cambio.')).toBeFocused();
   await movimientos.getByLabel('Confirmo que quiero deshacer este cambio.').check();
-  await movimientos.getByRole('button', { name: 'Deshacer último cambio' }).click();
+  await movimientos.getByRole('button', { name: 'Deshacer este cambio' }).click();
   await expect(estadoCon(page, 'Cambio deshecho: la pieza volvió a Disponible.')).toBeVisible();
-  await expect(movimientos.getByRole('button', { name: 'Deshacer último cambio' })).toHaveCount(0);
+  // El formulario desaparece: el foco pasa al aviso en vez de perderse en <body>.
+  await expect(estadoCon(page, 'Cambio deshecho')).toBeFocused();
+  await expect(movimientos.getByRole('button', { name: 'Deshacer este cambio' })).toHaveCount(0);
   await expect(page.getByLabel('Nuevo estado')).toBeVisible();
   await expect(movimientos.getByText('Corrección')).toBeVisible();
   await expect(movimientos.getByText('Se marcó por error')).toBeVisible();
@@ -175,7 +179,7 @@ test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async
 
 test('cliente con alta rápida se encuentra sin acentos', async ({ page }, info) => {
   const m = marca(info.project.name);
-  await page.goto('/panel/clientes');
+  await irA(page, '/panel/clientes');
   await page.getByLabel('Nombre', { exact: true }).fill(`Rocío Santibañez ${m}`);
   await page.getByLabel('Referencia').fill('5to norte');
   await page.getByRole('button', { name: 'Agregar cliente' }).click();
@@ -195,7 +199,7 @@ test('cliente con alta rápida se encuentra sin acentos', async ({ page }, info)
 test('agregar administrador muestra el QR y los códigos hasta ocultarlos', async ({ page }, info) => {
   const m = marca(info.project.name);
   const correo = `nuevo-${m.toLowerCase()}@kazero.test`;
-  await page.goto('/panel/administradores');
+  await irA(page, '/panel/administradores');
   const form = page
     .locator('form')
     .filter({ has: page.getByRole('button', { name: 'Agregar administrador' }) });
@@ -222,7 +226,7 @@ test.describe('regenerar TOTP (admin y sesión aparte)', () => {
   // Cambia el secreto y revoca las demás sesiones: no puede tocar al admin que usan el resto de pruebas.
   test.use({ storageState: RUTA_ESTADO_REGEN });
   test('muestra QR y 8 códigos nuevos y la sesión actual sigue viva', async ({ page }) => {
-    await page.goto('/panel/administradores');
+    await irA(page, '/panel/administradores');
     const form = page
       .locator('form')
       .filter({ has: page.getByRole('button', { name: 'Regenerar mi TOTP' }) });
@@ -246,4 +250,21 @@ test.describe('sin sesión', () => {
     expect(r.status()).toBe(401);
     expect(await r.json()).toEqual({ error: 'no_autenticado' });
   });
+});
+
+test('un envío antes de hidratar no pone ningún campo en la URL', async ({ page }) => {
+  // Sin JavaScript el formulario nunca se hidrata: el botón sigue deshabilitado y Enter no envía.
+  await page.route('**/_next/static/**', (r) => r.abort());
+  await page.goto('/panel/administradores');
+  const form = page
+    .locator('form')
+    .filter({ has: page.getByRole('button', { name: 'Agregar administrador' }) });
+  await expect(form).toHaveAttribute('data-hidratado', 'no');
+  await expect(form.getByRole('button', { name: 'Agregar administrador' })).toBeDisabled();
+  await expect(form).toHaveAttribute('method', /post/i);
+  await form.getByLabel('Tu contraseña actual').fill('secreto-que-no-debe-salir');
+  await form.getByLabel('Tu contraseña actual').press('Enter');
+  await form.evaluate((f) => (f as HTMLFormElement).requestSubmit());
+  await page.waitForTimeout(800);
+  expect(page.url()).not.toMatch(/passwordActual|secreto-que-no-debe-salir|\?/);
 });

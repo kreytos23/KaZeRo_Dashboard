@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useState } from 'react';
 import { Campo } from '@/features/ui/Campo';
+import { useHidratado } from '@/features/ui/hidratado';
 import { accionAgregarAdmin, accionRegenerarTotp } from './acciones';
 import type { EstadoEnrolamiento } from './tipos';
 
@@ -78,11 +79,12 @@ function useAccion(accion: Accion) {
     startTransition(() => despachar(datos));
     for (const i of form.querySelectorAll<HTMLInputElement>('input[type="password"]')) i.value = '';
   };
-  return { estado, pendiente, onSubmit };
+  const hidratado = useHidratado();
+  return { estado, pendiente: pendiente || !hidratado, hidratado, onSubmit };
 }
 
 function Alta({ onOcultar, emailActual }: { onOcultar: () => void; emailActual: string }) {
-  const { estado, pendiente, onSubmit } = useAccion(accionAgregarAdmin);
+  const { estado, pendiente, hidratado, onSubmit } = useAccion(accionAgregarAdmin);
   if (estado.enrolamiento)
     return (
       <Enrolamiento
@@ -92,7 +94,13 @@ function Alta({ onOcultar, emailActual }: { onOcultar: () => void; emailActual: 
       />
     );
   return (
-    <form onSubmit={onSubmit} aria-busy={pendiente} className="flex max-w-md flex-col gap-3">
+    <form
+      method="post"
+      data-hidratado={hidratado ? 'si' : 'no'}
+      onSubmit={onSubmit}
+      aria-busy={pendiente}
+      className="flex max-w-md flex-col gap-3"
+    >
       {/* Primero la credencial de esta cuenta (con su usuario oculto); después, la del administrador nuevo. */}
       <UsuarioActual email={emailActual} />
       <Campo
@@ -147,7 +155,7 @@ function Alta({ onOcultar, emailActual }: { onOcultar: () => void; emailActual: 
 }
 
 function Regenerar({ onOcultar, emailActual }: { onOcultar: () => void; emailActual: string }) {
-  const { estado, pendiente, onSubmit } = useAccion(accionRegenerarTotp);
+  const { estado, pendiente, hidratado, onSubmit } = useAccion(accionRegenerarTotp);
   if (estado.enrolamiento)
     return (
       <Enrolamiento
@@ -157,7 +165,13 @@ function Regenerar({ onOcultar, emailActual }: { onOcultar: () => void; emailAct
       />
     );
   return (
-    <form onSubmit={onSubmit} aria-busy={pendiente} className="flex max-w-md flex-col gap-3">
+    <form
+      method="post"
+      data-hidratado={hidratado ? 'si' : 'no'}
+      onSubmit={onSubmit}
+      aria-busy={pendiente}
+      className="flex max-w-md flex-col gap-3"
+    >
       <p className="text-sm text-tinta-suave">
         Úsalo si perdiste el teléfono. Tu TOTP y códigos actuales dejan de servir y se cierran tus demás
         sesiones.

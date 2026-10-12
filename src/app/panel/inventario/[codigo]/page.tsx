@@ -9,7 +9,7 @@ import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { FormAccion } from '@/features/ui/FormAccion';
-import { FECHA_HORA } from '@/features/ui/formato';
+import { Fecha } from '@/features/ui/Fecha';
 import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarCatalogo } from '@/server/catalogos/servicio';
@@ -166,14 +166,10 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
         <h2 id="historial-movimientos" className="text-lg font-semibold">
           Historial de movimientos
         </h2>
-        <FormDeshacerCambio
-          piezaId={p.id}
-          version={p.version}
-          destino={destino && ultimo ? describirDestino(destino, ultimo.exhibidorNombre) : null}
-        />
-        <ol className="flex flex-col gap-2 text-sm">
-          {movimientos.map((m) => (
-            <li key={m.id} className="border-l-2 border-marca-rubor pl-3">
+        <ol className="mt-1 flex flex-col gap-3 text-sm">
+          {movimientos.map((m, i) => (
+            // El más reciente conserva su clave: su formulario de deshacer sigue montado tras corregir.
+            <li key={i === 0 ? 'ultimo' : m.id} className="border-l-2 border-marca-rubor pl-3">
               <span className="font-medium">{ETIQUETA_MOVIMIENTO[m.tipo] ?? m.tipo}</span>
               {' · '}
               {m.deEstado ? `${ETIQUETA_ESTADO[m.deEstado]} → ` : ''}
@@ -181,9 +177,21 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
               {m.exhibidorNombre && ` · ${m.exhibidorNombre}`}
               {m.nota && ` · ${m.nota}`}
               <span className="block text-tinta-suave">
-                {FECHA_HORA.format(m.fecha)}
+                <Fecha fecha={m.fecha} />
                 {m.adminEmail && ` · ${m.adminEmail}`}
               </span>
+              {i === 0 && (
+                <FormDeshacerCambio
+                  piezaId={p.id}
+                  version={p.version}
+                  titulo={
+                    ultimo?.deEstado
+                      ? `Deshacer: ${ETIQUETA_ESTADO[ultimo.deEstado]} → ${ETIQUETA_ESTADO[ultimo.aEstado]}`
+                      : 'Deshacer'
+                  }
+                  destino={destino && ultimo ? describirDestino(destino, ultimo.exhibidorNombre) : null}
+                />
+              )}
             </li>
           ))}
         </ol>

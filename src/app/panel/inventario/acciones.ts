@@ -149,7 +149,7 @@ export async function accionDeshacerCambio(_: EstadoAccion, fd: FormData): Promi
   const { adminId } = await requerirSesion();
   return ejecutarAccion(async () => {
     if (texto(fd, 'confirmo') !== 'si')
-      throw new ErrorNegocio('sin_confirmacion', 'Confirma que quieres deshacer el cambio.');
+      throw new ErrorNegocio('sin_confirmacion', 'Confirma que quieres deshacer el cambio.', 'confirmo');
     const r = await conDb((db) =>
       deshacerUltimoCambio(db, {
         piezaId: uuidDe(fd, 'piezaId'),

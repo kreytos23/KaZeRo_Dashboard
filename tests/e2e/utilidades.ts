@@ -41,3 +41,17 @@ export async function abrirMenuSiMovil(page: Page) {
     await expect(boton).toHaveAttribute('aria-expanded', 'true', { timeout: 500 });
   }).toPass();
 }
+
+/**
+ * Los formularios con `onSubmit` nacen con el botón deshabilitado y `data-hidratado="no"`; React los marca "si"
+ * al hidratar. Hay que esperar antes de interactuar: un envío previo sería nativo (campos en la URL).
+ */
+export async function esperarHidratado(page: Page) {
+  await page.waitForFunction(() => !document.querySelector('form[data-hidratado="no"]'));
+}
+
+/** `goto` seguido de la espera a la hidratación de los formularios de la página. */
+export async function irA(page: Page, ruta: string) {
+  await page.goto(ruta);
+  await esperarHidratado(page);
+}

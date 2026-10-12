@@ -1,28 +1,28 @@
 import { expect, test } from '@playwright/test';
-import { RUTA_ESTADO, abrirMenuSiMovil } from './utilidades';
+import { RUTA_ESTADO, abrirMenuSiMovil, irA } from './utilidades';
 
 test.use({ storageState: RUTA_ESTADO });
 
 test('cada sección tiene su título', async ({ page }) => {
-  await page.goto('/panel/inventario');
+  await irA(page, '/panel/inventario');
   await expect(page).toHaveTitle('Inventario · Kazero');
-  await page.goto('/panel/vendedores');
+  await irA(page, '/panel/vendedores');
   await expect(page).toHaveTitle('Vendedores · Kazero');
-  await page.goto('/panel');
+  await irA(page, '/panel');
   await expect(page).toHaveTitle('Panel · Kazero');
 });
 
 test('un registro inexistente muestra la 404 del panel sin revelar nada', async ({ page }) => {
   // El estado HTTP es 200 y no 404: loading.tsx hace que la respuesta empiece a enviarse antes de que la
   // página llame a notFound(). Next marca esa página con noindex, y el panel ya es privado.
-  await page.goto('/panel/inventario/NOEXISTE99');
+  await irA(page, '/panel/inventario/NOEXISTE99');
   await expect(page.getByRole('heading', { name: 'No encontramos ese registro' })).toBeVisible();
   await abrirMenuSiMovil(page);
   await expect(page.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
 });
 
 test('una ruta pública inexistente muestra la 404 general', async ({ page }) => {
-  await page.goto('/no-existe-esta-ruta');
+  await irA(page, '/no-existe-esta-ruta');
   await expect(page.getByRole('heading', { name: 'No encontramos esa página' })).toBeVisible();
 });
 
@@ -37,7 +37,7 @@ test('las 404 también llevan CSP y cabeceras de seguridad (el proxy las cubre)'
 
 test('el error de negocio aparece junto a su campo y conserva lo escrito', async ({ page }, info) => {
   const nombre = `Duplicada ${info.project.name}`;
-  await page.goto('/panel/vendedores');
+  await irA(page, '/panel/vendedores');
   for (let i = 0; i < 2; i++) {
     await page.getByLabel('Nombre').fill(nombre);
     await page.getByLabel('Comisión (%)').fill('18');
@@ -53,7 +53,7 @@ test('el error de negocio aparece junto a su campo y conserva lo escrito', async
 });
 
 test('un monto inválido se marca en su campo y mueve el foco allí', async ({ page }) => {
-  await page.goto('/panel/inventario/nueva');
+  await irA(page, '/panel/inventario/nueva');
   await page.getByLabel('Código', { exact: true }).fill('ERR1');
   await page.getByLabel('Categoría').fill('Anillos');
   await page.getByLabel('Descripción').fill('Prueba de monto');
@@ -69,12 +69,12 @@ test('un monto inválido se marca en su campo y mueve el foco allí', async ({ p
 
 test('dos formularios con el mismo campo describen cada uno su propio error', async ({ page }, info) => {
   const m = info.project.name;
-  await page.goto('/panel/vendedores');
+  await irA(page, '/panel/vendedores');
   await page.getByLabel('Nombre').fill(`Vend ids ${m}`);
   await page.getByLabel('Comisión (%)').fill('10');
   await page.getByRole('button', { name: 'Agregar vendedor' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Vendedor agregado.' })).toBeVisible();
-  await page.goto('/panel/exhibidores');
+  await irA(page, '/panel/exhibidores');
   await page.getByLabel('Vendedor', { exact: true }).selectOption({ label: `Vend ids ${m}` });
   await page.getByLabel('Nombre del exhibidor').fill(`Exh ids ${m}`);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
@@ -100,7 +100,7 @@ test('dos formularios con el mismo campo describen cada uno su propio error', as
 });
 
 test('el nombre accesible de un selector es solo su etiqueta', async ({ page }) => {
-  await page.goto('/panel/vendedores');
+  await irA(page, '/panel/vendedores');
   await expect(page.getByRole('combobox', { name: 'Tipo', exact: true })).toBeVisible();
 });
 
@@ -137,19 +137,19 @@ test.describe('sin sesión', () => {
   });
 
   test('el login muestra el logo de la marca cargado', async ({ page }) => {
-    await page.goto('/login');
+    await irA(page, '/login');
     const logo = page.getByRole('img', { name: 'KaZeRo. Vida, moda y estilo' });
     await expect(logo).toBeVisible();
     await expect.poll(() => logo.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   });
 
   test('el login avisa del bloqueo solo con el motivo exacto', async ({ page }) => {
-    await page.goto('/login?motivo=bloqueado');
+    await irA(page, '/login?motivo=bloqueado');
     await expect(page.locator('p[role="alert"]')).toHaveText('Demasiados intentos. Intenta más tarde.');
-    await page.goto('/login?motivo=<b>hola</b>');
+    await irA(page, '/login?motivo=<b>hola</b>');
     await expect(page.locator('p[role="alert"]')).toHaveCount(0);
     await expect(page.getByText('hola')).toHaveCount(0);
-    await page.goto('/login');
+    await irA(page, '/login');
     await expect(page.locator('p[role="alert"]')).toHaveCount(0);
     await expect(page).toHaveTitle('Iniciar sesión · Kazero');
   });

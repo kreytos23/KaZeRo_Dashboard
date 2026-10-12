@@ -1,5 +1,5 @@
 import type { EntradaHistorial } from '@/domain/auditoria';
-import { FECHA_HORA } from '@/features/ui/formato';
+import { Fecha } from '@/features/ui/Fecha';
 import { ETIQUETA_CAMPO, formatearValor } from './formato';
 
 /** Historial de una ficha (R-08). Las entradas ya vienen agrupadas de una sola consulta (sin N+1). */
@@ -27,7 +27,7 @@ export function HistorialCambios({
           {entradas.map((e) => (
             <li key={e.id} className="border-l-2 border-marca-rubor pl-3">
               <p className="text-tinta-suave">
-                {FECHA_HORA.format(e.fecha)} · {e.adminEmail}
+                <Fecha fecha={e.fecha} /> · {e.adminEmail}
               </p>
               <ul>
                 {e.campos.map((c) => (
