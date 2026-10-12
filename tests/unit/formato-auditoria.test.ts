@@ -14,6 +14,11 @@ describe('formato del historial de cambios', () => {
     expect(formatearValor('notas', '')).toBe('—');
     expect(formatearValor('nombre', 'Oro laminado')).toBe('Oro laminado');
   });
+  it('un monto histórico ilegible o enorme se muestra tal cual, sin lanzar', () => {
+    expect(formatearValor('precio', 'abc')).toBe('abc');
+    expect(formatearValor('costo', '-5.00')).toBe('-5.00');
+    expect(formatearValor('precio', '99999999999999999999')).toBe('99999999999999999999');
+  });
   it('todo campo de dinero tiene etiqueta', () => {
     for (const campos of Object.values(CAMPOS_DINERO))
       for (const c of campos) expect(ETIQUETA_CAMPO[c]).toBeTruthy();

@@ -1,4 +1,4 @@
-﻿import { pesosACentavos, porcentajeANumeric } from './dinero';
+import { pesosACentavos, porcentajeANumeric } from './dinero';
 
 export type EntidadAuditada =
   'pieza' | 'vendedor' | 'cliente' | 'exhibidor' | 'categoria' | 'material' | 'proveedor';
@@ -25,7 +25,7 @@ export const CAMPOS_DINERO: Readonly<Record<EntidadAuditada, readonly string[]>>
   proveedor: [],
 };
 
-/** Campos que cambian, en el orden de `despues`. Los valores llegan ya canÃ³nicos ('149.00', uuid, 'true'). */
+/** Campos que cambian, en el orden de `despues`. Los valores llegan ya canónicos ('149.00', uuid, 'true'). */
 export function calcularCambios(
   antes: Readonly<Record<string, Valor>>,
   despues: Readonly<Record<string, Valor>>,
@@ -54,7 +54,7 @@ export function validarMotivo(
   return { ok: true, motivo };
 }
 
-/** Â¿El usuario cambiÃ³ este monto? '149' y '149.00' son el mismo; un texto ilegible cuenta como cambio. */
+/** ¿El usuario cambió este monto? '149' y '149.00' son el mismo; un texto ilegible cuenta como cambio. */
 export function montoCambio(tipo: 'pesos' | 'porcentaje', valor: string, original: string): boolean {
   const canon = (t: string) => (tipo === 'pesos' ? pesosACentavos(t) : porcentajeANumeric(t));
   const nuevo = canon(valor);
@@ -78,7 +78,7 @@ export interface EntradaHistorial {
   campos: Cambio[];
 }
 
-/** Las filas llegan de v_auditoria ya ordenadas (ediciÃ³n mÃ¡s reciente primero, campos por posiciÃ³n). */
+/** Las filas llegan de v_auditoria ya ordenadas (edición más reciente primero, campos por posición). */
 export function agruparHistorial(filas: readonly FilaHistorial[]): EntradaHistorial[] {
   const porId = new Map<string, EntradaHistorial>();
   for (const f of filas) {

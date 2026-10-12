@@ -2,10 +2,12 @@ import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { movimientoPieza, pieza, vMovimientoPieza, vPieza } from '@/db/schema';
 import { esCodigoValido, esPrefijoValido, normalizarCodigo, siguienteCodigo } from '@/domain/codigos';
+import { calcularCambios } from '@/domain/auditoria';
 import { centavosANumeric } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
 import { MAX_FILAS_LOTE, type FilaLote } from '@/domain/lote';
 import { escaparLike, normalizar } from '@/domain/texto';
+import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
 import { obtenerOCrearCatalogo, resolverCatalogos } from '@/server/catalogos/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 
@@ -58,6 +60,17 @@ export async function sugerirCodigo(db: Ejecutor, prefijo: string): Promise<stri
   );
 }
 
+function descripcionValida(texto: string): string {
+  const descripcion = texto.trim();
+  if (!descripcion || descripcion.length > 300)
+    throw new ErrorNegocio(
+      'pieza_invalida',
+      'La descripción debe tener entre 1 y 300 caracteres.',
+      'descripcion',
+    );
+  return descripcion;
+}
+
 function validarPieza(d: DatosPieza) {
   const codigo = normalizarCodigo(d.codigo);
   if (!esCodigoValido(codigo))
@@ -66,13 +79,7 @@ function validarPieza(d: DatosPieza) {
       'El código solo admite letras, números y guiones (máx. 20).',
       'codigo',
     );
-  const descripcion = d.descripcion.trim();
-  if (!descripcion || descripcion.length > 300)
-    throw new ErrorNegocio(
-      'pieza_invalida',
-      'La descripción debe tener entre 1 y 300 caracteres.',
-      'descripcion',
-    );
+  const descripcion = descripcionValida(d.descripcion);
   const fechaAlta = d.fechaAlta ? parsearFechaISO(d.fechaAlta) : hoyMX();
   if (!fechaAlta) throw new ErrorNegocio('pieza_invalida', 'La fecha de alta no es válida.');
   return {
@@ -82,6 +89,105 @@ function validarPieza(d: DatosPieza) {
     costo: centavosANumeric(d.costoCentavos),
     precio: centavosANumeric(d.precioCentavos),
   };
+}
+
+export interface EdicionPieza {
+  piezaId: string;
+  version: number;
+  adminId: string;
+  motivo?: string | null;
+  categoria: string;
+  material?: string | null;
+  proveedor?: string | null;
+  descripcion: string;
+  costoCentavos: number;
+  precioCentavos: number;
+}
+
+// D4: el pedido ya fijó el precio (precio_lista, R-11). El costo sí se puede corregir, con motivo.
+const PRECIO_FIJADO_POR_PEDIDO: readonly EstadoPieza[] = ['apartada', 'vendida'];
+
+/**
+ * Edita todo menos el código (inmutable por grants) y la fecha de alta. La bitácora la escribe el trigger
+ * kz_auditar; aquí se calcula el diff antes de escribir para no tocar nada en un no-op y para dar el error
+ * de motivo junto al campo.
+ */
+export async function editarPieza(
+  db: Ejecutor,
+  d: EdicionPieza,
+): Promise<{ cambios: number; codigo: string }> {
+  const descripcion = descripcionValida(d.descripcion);
+  const costo = centavosANumeric(d.costoCentavos);
+  const precio = centavosANumeric(d.precioCentavos);
+  return conErroresDeNegocio(() =>
+    db.transaction(async (tx) => {
+      const [actual] = await tx
+        .select({
+          codigo: pieza.codigo,
+          estado: pieza.estado,
+          version: pieza.version,
+          descripcion: pieza.descripcion,
+          categoriaId: pieza.categoriaId,
+          materialId: pieza.materialId,
+          proveedorId: pieza.proveedorId,
+          costo: pieza.costo,
+          precio: pieza.precio,
+        })
+        .from(pieza)
+        .where(eq(pieza.id, d.piezaId))
+        .for('update');
+      if (!actual) throw new ErrorNegocio('no_encontrada', 'La pieza no existe.');
+      if (actual.version !== d.version) throw conflictoVersion();
+      // Mismo criterio que el alta: reutiliza el catálogo existente (normalizado) o lo crea.
+      const categoriaId = await obtenerOCrearCatalogo(tx, 'categoria', d.categoria);
+      const materialId = d.material?.trim() ? await obtenerOCrearCatalogo(tx, 'material', d.material) : null;
+      const proveedorId = d.proveedor?.trim()
+        ? await obtenerOCrearCatalogo(tx, 'proveedor', d.proveedor)
+        : null;
+      const cambios = calcularCambios(
+        {
+          descripcion: actual.descripcion,
+          categoria_id: actual.categoriaId,
+          material_id: actual.materialId,
+          proveedor_id: actual.proveedorId,
+          costo: actual.costo,
+          precio: actual.precio,
+        },
+        {
+          descripcion,
+          categoria_id: categoriaId,
+          material_id: materialId,
+          proveedor_id: proveedorId,
+          costo,
+          precio,
+        },
+      );
+      if (cambios.length === 0) return { cambios: 0, codigo: actual.codigo };
+      if (cambios.some((c) => c.campo === 'precio') && PRECIO_FIJADO_POR_PEDIDO.includes(actual.estado))
+        throw new ErrorNegocio(
+          'pieza_precio_bloqueado',
+          'No se puede cambiar el precio de una pieza apartada o vendida: su pedido ya lo fijó.',
+          'precio',
+        );
+      await fijarContextoAuditoria(tx, {
+        adminId: d.adminId,
+        motivo: motivoPara('pieza', cambios, d.motivo),
+      });
+      await tx
+        .update(pieza)
+        .set({
+          descripcion,
+          categoriaId,
+          materialId,
+          proveedorId,
+          costo,
+          precio,
+          version: sql`${pieza.version} + 1`,
+        })
+        .where(and(eq(pieza.id, d.piezaId), eq(pieza.version, d.version)));
+      return { cambios: cambios.length, codigo: actual.codigo };
+    }),
+  );
 }
 
 export async function altaPieza(db: Ejecutor, d: DatosPieza): Promise<{ id: string; codigo: string }> {

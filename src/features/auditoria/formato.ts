@@ -29,13 +29,22 @@ const TIPO_VENDEDOR: Readonly<Record<string, string>> = {
   consignacion: 'Negocio a consignación',
 };
 
+/** Un valor histórico ilegible no debe romper la ficha: se muestra tal cual. */
+function montoLegible(valor: string): string {
+  try {
+    return formatoMXN(numericACentavos(valor));
+  } catch {
+    return valor;
+  }
+}
+
 /** Valores canónicos de la bitácora (to_jsonb ->> de Postgres) → texto para la ficha. */
 export function formatearValor(campo: string, valor: Valor): string {
   if (valor === null || valor === '') return '—';
   switch (campo) {
     case 'costo':
     case 'precio':
-      return formatoMXN(numericACentavos(valor));
+      return montoLegible(valor);
     case 'comision_pct':
       return `${porcentajeLegible(valor)} %`;
     case 'activo':
