@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { destinosManuales, ETIQUETA_ESTADO } from '@/app/panel/inventario/etiquetas';
+import { destinosManuales, ETIQUETA_ESTADO, ETIQUETA_MOVIMIENTO } from '@/app/panel/inventario/etiquetas';
+import { tipoMovimiento } from '@/db/schema';
 import { POR_PAGINA, leerFiltros } from '@/app/panel/inventario/filtros';
 
 describe('destinosManuales', () => {
@@ -14,6 +15,12 @@ describe('destinosManuales', () => {
   });
   it('todo estado tiene etiqueta', () => {
     expect(Object.keys(ETIQUETA_ESTADO)).toHaveLength(7);
+  });
+});
+
+describe('ETIQUETA_MOVIMIENTO', () => {
+  it('todo tipo de movimiento tiene etiqueta, incluida la corrección', () => {
+    expect(Object.keys(ETIQUETA_MOVIMIENTO).sort()).toEqual([...tipoMovimiento.enumValues].sort());
   });
 });
 

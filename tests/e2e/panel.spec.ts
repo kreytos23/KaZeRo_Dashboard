@@ -104,6 +104,75 @@ test('alta individual, ficha de pieza con destinos válidos y estados', async ({
   await expect(nuevo.locator('option')).toHaveText(['Disponible']);
 });
 
+test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async ({ page }, info) => {
+  const m = marca(info.project.name);
+  const codigo = `W${m}01`;
+  await page.goto('/panel/inventario/nueva');
+  await page.getByLabel('Prefijo').fill(`W${m}`);
+  await page.getByRole('button', { name: 'Sugerir código' }).click();
+  await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
+  await page.getByLabel('Categoría').fill('Pulseras');
+  await page.getByLabel('Descripción').fill(`Pulsera mar ${m}`);
+  await page.getByLabel('Precio').fill('200');
+  await page.getByRole('button', { name: 'Guardar pieza' }).click();
+  await expect(page).toHaveURL(new RegExp(`/panel/inventario/${codigo}$`));
+
+  const cambios = page.getByRole('region', { name: 'Historial de cambios' });
+  const movimientos = page.getByRole('region', { name: 'Historial de movimientos' });
+  await expect(cambios.getByText('Sin cambios registrados.')).toBeVisible();
+
+  // Editar sin dinero: el motivo es opcional.
+  await page.getByText('Editar pieza', { exact: true }).click();
+  await expect(page.getByLabel('Motivo del cambio (opcional)')).not.toHaveAttribute('required', '');
+  await page.getByLabel('Descripción').fill(`Pulsera océano ${m}`);
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(estadoCon(page, 'Cambios guardados.')).toBeVisible();
+  await expect(cambios.getByText(`Pulsera mar ${m} → Pulsera océano ${m}`)).toBeVisible();
+
+  // Guardar sin tocar nada no escribe nada.
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(estadoCon(page, 'Sin cambios.')).toBeVisible();
+
+  // Cambiar el precio vuelve obligatorio el motivo (ayuda del cliente; el servidor lo exige igual).
+  await page.getByLabel('Precio').fill('250');
+  const motivo = page.getByLabel('Motivo del cambio (obligatorio)');
+  await expect(motivo).toBeVisible();
+  await expect(motivo).toHaveAttribute('required', '');
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(motivo).toBeFocused();
+  await motivo.fill('Ajuste de lista');
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(estadoCon(page, 'Cambios guardados.')).toBeVisible();
+  await expect(cambios.getByText(/\$200\.00 → \$250\.00/)).toBeVisible();
+  await expect(cambios.getByText('Motivo: Ajuste de lista')).toBeVisible();
+
+  // La edición avisa al buscador: la nueva descripción se encuentra sin recargar.
+  const buscador = await abrirBuscadorConAtajo(page);
+  await buscador.fill(`oceano ${m.toLowerCase()}`);
+  await expect(page.getByRole('option', { name: new RegExp(codigo) })).toBeVisible();
+  await buscador.press('Escape');
+
+  // Regalo: el formulario de estado desaparece en el mismo render, pero el índice se marca sucio.
+  const reindexado = page.waitForRequest((r) => r.url().includes('/api/busqueda/indice'));
+  await page.getByLabel('Nuevo estado').selectOption({ label: 'Regalo' });
+  await page.getByRole('button', { name: 'Cambiar estado' }).click();
+  await reindexado;
+  await expect(page.getByLabel('Nuevo estado')).toHaveCount(0);
+  await expect(movimientos.getByText('Cambio de estado').first()).toBeVisible();
+
+  // Deshacer: pide motivo y confirmación.
+  await movimientos.getByLabel('Motivo de la corrección').fill('Se marcó por error');
+  await movimientos.getByRole('button', { name: 'Deshacer último cambio' }).click();
+  await expect(movimientos.getByLabel('Confirmo que quiero deshacer este cambio.')).toBeFocused();
+  await movimientos.getByLabel('Confirmo que quiero deshacer este cambio.').check();
+  await movimientos.getByRole('button', { name: 'Deshacer último cambio' }).click();
+  await expect(estadoCon(page, 'Cambio deshecho: la pieza volvió a Disponible.')).toBeVisible();
+  await expect(movimientos.getByRole('button', { name: 'Deshacer último cambio' })).toHaveCount(0);
+  await expect(page.getByLabel('Nuevo estado')).toBeVisible();
+  await expect(movimientos.getByText('Corrección')).toBeVisible();
+  await expect(movimientos.getByText('Se marcó por error')).toBeVisible();
+});
+
 test('cliente con alta rápida se encuentra sin acentos', async ({ page }, info) => {
   const m = marca(info.project.name);
   await page.goto('/panel/clientes');
