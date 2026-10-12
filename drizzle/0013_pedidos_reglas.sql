@@ -139,6 +139,9 @@ $$;
 -- CREATE OR REPLACE conserva dueño y ACL; se reafirma por si acaso. Nadie la invoca directamente.
 REVOKE ALL ON FUNCTION public.kz_auditar() FROM PUBLIC;
 --> statement-breakpoint
+-- OJO servicios: CUALQUIER cambio de `total` (también un recálculo automático al editar líneas) y de
+-- `descuento_manual_monto` exige motivo en el contexto (fijarContextoAuditoria); sin él falla con
+-- auditoria_motivo_dinero. Crear el pedido no lo exige (es INSERT, no UPDATE).
 -- `UPDATE OF`: version, updated_at, liquidado_at y cancelado_at no disparan la bitácora (estado ya lo cuenta).
 -- Las columnas de lealtad, folio, cliente y admin no se auditan: kazero_app no puede cambiarlas (R-27).
 CREATE TRIGGER pedido_auditoria AFTER UPDATE OF vendedor_id, fecha, estado, descuento_manual_monto, descuento_manual_motivo, total, notas, cancelacion_motivo ON pedido
@@ -262,3 +265,130 @@ CREATE OR REPLACE VIEW v_movimiento_pieza WITH (security_invoker = true) AS
   LEFT JOIN pedido p ON p.id = mp.pedido_id;
 --> statement-breakpoint
 GRANT SELECT ON v_pedido, v_pedido_item, v_aplicacion_pago, v_saldo_favor TO kazero_app;
+--> statement-breakpoint
+-- 6. Columnas de solo avance. Los privilegios por columna dejan a la app escribirlas, pero nunca hacia atrás:
+--    - aplicacion_pago.anulada_at: NULL → valor, una sola vez (una anulación no se deshace ni se re-fecha);
+--    - pedido_item.vigente: true → false (una línea cancelada o quitada no revive: R-05 depende de ello);
+--    - pedido_item.quitado_at: NULL → valor, una sola vez y solo al salir del pedido (OLD.vigente); el CHECK
+--      pedido_item_quitado_coherente exige además NOT vigente.
+CREATE OR REPLACE FUNCTION public.kz_aplicacion_pago_solo_avance() RETURNS trigger
+  LANGUAGE plpgsql
+  AS $$
+BEGIN
+  IF OLD.anulada_at IS NOT NULL AND NEW.anulada_at IS DISTINCT FROM OLD.anulada_at THEN
+    RAISE EXCEPTION 'Una aplicación anulada no puede cambiar'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'aplicacion_pago_anulada_final';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER aplicacion_pago_solo_avance BEFORE UPDATE ON aplicacion_pago
+  FOR EACH ROW EXECUTE FUNCTION kz_aplicacion_pago_solo_avance();
+--> statement-breakpoint
+CREATE OR REPLACE FUNCTION public.kz_pedido_item_solo_avance() RETURNS trigger
+  LANGUAGE plpgsql
+  AS $$
+BEGIN
+  IF NOT OLD.vigente AND NEW.vigente THEN
+    RAISE EXCEPTION 'Una línea que salió del pedido no vuelve'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pedido_item_vigente_final';
+  END IF;
+  IF (OLD.quitado_at IS NOT NULL AND NEW.quitado_at IS DISTINCT FROM OLD.quitado_at)
+     OR (OLD.quitado_at IS NULL AND NEW.quitado_at IS NOT NULL AND NOT OLD.vigente) THEN
+    RAISE EXCEPTION 'La fecha en que se quitó la línea no cambia'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pedido_item_quitado_final';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER pedido_item_solo_avance BEFORE UPDATE ON pedido_item
+  FOR EACH ROW EXECUTE FUNCTION kz_pedido_item_solo_avance();
+--> statement-breakpoint
+-- 7. Libro de pagos garantizado por la BD (spec §7.1): lo aplicado vigente de un pago nunca supera su monto y
+--    no se aplica a un pedido cancelado.
+--    ORDEN DE BLOQUEO (sin interbloqueos): cliente → pedido(s) por id → [exhibidores → piezas] → pago. Los
+--    servicios bloquean cliente y pedido ANTES de insertar/anular aplicaciones; este trigger vuelve a tomar el
+--    pedido (ya es suyo: no espera) y DESPUÉS el pago (recién insertado por la misma transacción, o el de otra
+--    aplicación al anular). Ningún servicio debe bloquear un pago antes que sus pedidos.
+--    SECURITY DEFINER: FOR NO KEY UPDATE exige privilegio UPDATE y kazero_app no tiene ninguno sobre `pago`
+--    (los pagos no se editan). search_path fijo y nombres calificados, como kz_auditar; sin EXECUTE para nadie.
+--    En READ COMMITTED cada sentencia de plpgsql toma instantánea nueva: la suma posterior al bloqueo ve lo que
+--    confirmó la transacción que lo tenía.
+CREATE OR REPLACE FUNCTION public.kz_validar_aplicacion_pago() RETURNS trigger
+  LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp
+  AS $$
+DECLARE
+  estado_pedido_tx text;
+  monto_pago numeric(12,2);
+  aplicado numeric(12,2);
+BEGIN
+  -- Anular (o una aplicación que nace anulada) solo resta: no hay nada que validar ni bloquear.
+  IF NEW.anulada_at IS NOT NULL THEN
+    RETURN NEW;
+  END IF;
+  SELECT p.estado::text INTO estado_pedido_tx FROM public.pedido p WHERE p.id = NEW.pedido_id FOR NO KEY UPDATE;
+  IF estado_pedido_tx = 'cancelado' THEN
+    RAISE EXCEPTION 'No se aplican pagos a un pedido cancelado'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'aplicacion_pago_pedido_cancelado';
+  END IF;
+  SELECT pg.monto INTO monto_pago FROM public.pago pg WHERE pg.id = NEW.pago_id FOR NO KEY UPDATE;
+  IF NOT FOUND THEN
+    RETURN NEW; -- La FK rechaza la fila.
+  END IF;
+  SELECT coalesce(sum(a.monto), 0) INTO aplicado
+    FROM public.aplicacion_pago a
+    WHERE a.pago_id = NEW.pago_id AND a.anulada_at IS NULL AND a.id <> NEW.id;
+  IF aplicado + NEW.monto > monto_pago THEN
+    RAISE EXCEPTION 'Lo aplicado supera el monto del pago'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'aplicacion_pago_excede_pago';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+REVOKE ALL ON FUNCTION public.kz_validar_aplicacion_pago() FROM PUBLIC;
+--> statement-breakpoint
+-- Los BEFORE corren por orden de nombre: aplicacion_pago_solo_avance antes que aplicacion_pago_validar_libro,
+-- así una reactivación se rechaza como tal y no como exceso.
+CREATE TRIGGER aplicacion_pago_validar_libro BEFORE INSERT OR UPDATE ON aplicacion_pago
+  FOR EACH ROW EXECUTE FUNCTION kz_validar_aplicacion_pago();
+--> statement-breakpoint
+-- 8. Saldo a favor: un libro por titular que nunca queda negativo. Se serializa por titular con un candado
+--    consultivo de transacción (no bloquea filas de cliente/vendedor, así que no altera el orden de bloqueo
+--    cliente → pedido → ...; los servicios lo toman al final, al insertar el movimiento). Invoker: kazero_app
+--    ya puede leer saldo_favor_mov y los candados consultivos no piden privilegios.
+CREATE OR REPLACE FUNCTION public.kz_validar_saldo_favor() RETURNS trigger
+  LANGUAGE plpgsql
+  AS $$
+DECLARE
+  saldo_actual numeric(12,2);
+BEGIN
+  -- Solo un uso resta. Las entradas con signo equivocado las rechaza el CHECK saldo_favor_signo.
+  IF NEW.tipo::text <> 'uso' OR NEW.monto >= 0 THEN
+    RETURN NEW;
+  END IF;
+  PERFORM pg_advisory_xact_lock(hashtextextended(
+    'saldo_favor:' || CASE WHEN NEW.cliente_id IS NOT NULL THEN 'c:' || NEW.cliente_id::text
+                           ELSE 'v:' || NEW.vendedor_id::text END, 0));
+  SELECT coalesce(sum(s.monto), 0) INTO saldo_actual
+    FROM public.saldo_favor_mov s
+    WHERE (NEW.cliente_id IS NOT NULL AND s.cliente_id = NEW.cliente_id)
+       OR (NEW.vendedor_id IS NOT NULL AND s.vendedor_id = NEW.vendedor_id);
+  IF saldo_actual + NEW.monto < 0 THEN
+    RAISE EXCEPTION 'El saldo a favor no alcanza'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'saldo_favor_insuficiente';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+CREATE TRIGGER saldo_favor_libro BEFORE INSERT ON saldo_favor_mov
+  FOR EACH ROW EXECUTE FUNCTION kz_validar_saldo_favor();
+--> statement-breakpoint
+-- cancelacion y uso siempre nacen de un pedido; sobrante (Plan 4) puede no tenerlo. Va aquí y no en el
+-- esquema TS (como los índices de kz_normalizar de 0003): tipo_saldo_favor es un enum nuevo de 0012, así que
+-- su literal sí puede usarse en esta tanda.
+ALTER TABLE saldo_favor_mov ADD CONSTRAINT saldo_favor_pedido_requerido
+  CHECK (tipo = 'sobrante' OR pedido_id IS NOT NULL);

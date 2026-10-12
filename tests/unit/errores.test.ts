@@ -70,6 +70,17 @@ describe('traducción de errores de Postgres', () => {
     ['aplicacion_pago_monto_positivo', 'El monto debe ser mayor que cero.', 'monto'],
     ['pago_nota_largo', 'La nota admite hasta 200 caracteres.', 'nota'],
     ['pago_idempotency_key_uq', 'Este pago ya se registró.', undefined],
+    ['aplicacion_pago_excede_pago', 'Lo aplicado supera el monto del pago.', 'monto'],
+    ['aplicacion_pago_pedido_cancelado', 'No se pueden aplicar pagos a un pedido cancelado.', undefined],
+    ['aplicacion_pago_anulada_final', 'Una aplicación de pago anulada no puede cambiar.', undefined],
+    ['pedido_item_vigente_final', 'Una pieza que salió del pedido no puede volver a esa línea.', undefined],
+    ['pedido_item_quitado_final', 'Una pieza que salió del pedido no puede volver a esa línea.', undefined],
+    ['saldo_favor_insuficiente', 'El saldo a favor no alcanza para ese monto.', 'monto'],
+    [
+      'saldo_favor_pedido_requerido',
+      'Los datos del pedido son inconsistentes. Recarga la página.',
+      undefined,
+    ],
   ])('traduce la regla de pedidos/pagos %s', (constraint, mensaje, campo) => {
     const e = traducirErrorPg(envuelto({ code: 'P0001', constraint }));
     expect(e).toMatchObject({ codigo: constraint, message: mensaje });

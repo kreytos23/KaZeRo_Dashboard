@@ -204,6 +204,7 @@ export const saldoFavorMov = pgTable(
     index('saldo_favor_mov_vendedor_idx').on(t.vendedorId),
     index('saldo_favor_mov_pedido_idx').on(t.pedidoId),
     check('saldo_favor_un_titular', sql`num_nonnulls(${t.clienteId}, ${t.vendedorId}) = 1`),
+    // En 0013 (SQL, no aquí): CHECK saldo_favor_pedido_requerido y el trigger saldo_favor_libro (nunca negativo).
     // Entradas positivas (cancelación, sobrante), salidas negativas (uso).
     check(
       'saldo_favor_signo',

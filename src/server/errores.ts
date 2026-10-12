@@ -47,6 +47,8 @@ const CAMPOS: Record<string, string> = {
   pago_monto_positivo: 'monto',
   aplicacion_pago_monto_positivo: 'monto',
   pago_nota_largo: 'nota',
+  aplicacion_pago_excede_pago: 'monto',
+  saldo_favor_insuficiente: 'monto',
 };
 
 /** CHECK de coherencia interna de pedidos y pagos: la app nunca debería violarlos (son la última barrera). */
@@ -111,6 +113,14 @@ const MENSAJES: Record<string, string> = {
   aplicacion_pago_monto_positivo: 'El monto debe ser mayor que cero.',
   pago_nota_largo: 'La nota admite hasta 200 caracteres.',
   pago_idempotency_key_uq: 'Este pago ya se registró.',
+  // Libro de pagos y columnas de solo avance (triggers de 0013).
+  aplicacion_pago_excede_pago: 'Lo aplicado supera el monto del pago.',
+  aplicacion_pago_pedido_cancelado: 'No se pueden aplicar pagos a un pedido cancelado.',
+  aplicacion_pago_anulada_final: 'Una aplicación de pago anulada no puede cambiar.',
+  pedido_item_vigente_final: 'Una pieza que salió del pedido no puede volver a esa línea.',
+  pedido_item_quitado_final: 'Una pieza que salió del pedido no puede volver a esa línea.',
+  saldo_favor_insuficiente: 'El saldo a favor no alcanza para ese monto.',
+  saldo_favor_pedido_requerido: PEDIDO_INCONSISTENTE,
 };
 
 function mensajesPg(err: unknown): string[] {

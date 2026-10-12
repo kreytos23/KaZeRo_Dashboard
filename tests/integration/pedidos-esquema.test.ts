@@ -375,14 +375,21 @@ describe('reglas de pedidos en la BD', () => {
     const b = await base();
     const mov = (v: Partial<typeof saldoFavorMov.$inferInsert>) =>
       app((db) =>
-        db
-          .insert(saldoFavorMov)
-          .values({ clienteId: b.clienteId, tipo: 'cancelacion', monto: '50.00', fecha: '2026-10-11', ...v }),
+        db.insert(saldoFavorMov).values({
+          clienteId: b.clienteId,
+          tipo: 'cancelacion',
+          monto: '50.00',
+          fecha: '2026-10-11',
+          pedidoId: b.pedidoId,
+          ...v,
+        }),
       );
     expect(await codigoAl(() => mov({ vendedorId: b.vendedorId }))).toBe('saldo_favor_un_titular');
     expect(await codigoAl(() => mov({ monto: '-5.00' }))).toBe('saldo_favor_signo');
-    await mov({ pedidoId: b.pedidoId });
-    await mov({ monto: '20.00' });
+    // cancelacion y uso nacen de un pedido; sobrante (Plan 4) no necesariamente.
+    expect(await codigoAl(() => mov({ pedidoId: null }))).toBe('saldo_favor_pedido_requerido');
+    await mov({});
+    await mov({ tipo: 'sobrante', monto: '20.00', pedidoId: null });
     const r = await app((db) => db.execute(sql`SELECT cliente_id, vendedor_id, saldo FROM v_saldo_favor`));
     expect(r.rows).toEqual([{ cliente_id: b.clienteId, vendedor_id: null, saldo: '70.00' }]);
   });
@@ -422,6 +429,207 @@ describe('reglas de pedidos en la BD', () => {
       db.execute(sql`SELECT folio, codigo, pieza_estado FROM v_pedido_item WHERE pedido_id = ${b.pedidoId}`),
     );
     expect(i.rows).toEqual([{ folio: b.folio, codigo: 'AA01', pieza_estado: 'disponible' }]);
+  });
+});
+
+/** Barrera manual: la primera transacción escribe y espera; la segunda choca con su bloqueo. */
+function barrera() {
+  let soltar!: () => void;
+  let listo!: () => void;
+  const suelta = new Promise<void>((r) => (soltar = r));
+  const escribio = new Promise<void>((r) => (listo = r));
+  return { soltar, listo, suelta, escribio };
+}
+
+describe('columnas de solo avance (aplicacion_pago, pedido_item)', () => {
+  async function conLinea() {
+    const b = await base();
+    await app((db) =>
+      db
+        .insert(pedidoItem)
+        .values({ pedidoId: b.pedidoId, piezaId: b.piezaId, precioLista: '149.00', precioFinal: '149.00' }),
+    );
+    const upd = (s: ReturnType<typeof sql>) =>
+      codigoAl(() =>
+        app((db) => db.execute(sql`UPDATE pedido_item SET ${s} WHERE pedido_id = ${b.pedidoId}`)),
+      );
+    return { ...b, upd };
+  }
+
+  it('una aplicación anulada no se reactiva ni cambia de fecha de anulación', async () => {
+    const b = await base();
+    const [pg] = await nuevoPago(b, '10');
+    await app((db) =>
+      db
+        .insert(aplicacionPago)
+        .values({ pagoId: pg!.id, pedidoId: b.pedidoId, monto: '10', fecha: '2026-10-11' }),
+    );
+    await app((db) => db.execute(sql`UPDATE aplicacion_pago SET anulada_at = now()`));
+    const upd = (s: ReturnType<typeof sql>) =>
+      codigoAl(() => app((db) => db.execute(sql`UPDATE aplicacion_pago SET ${s}`)));
+    expect(await upd(sql`anulada_at = NULL`)).toBe('aplicacion_pago_anulada_final');
+    expect(await upd(sql`anulada_at = anulada_at + interval '1 day'`)).toBe('aplicacion_pago_anulada_final');
+    // Reescribir el mismo valor no es un cambio.
+    expect(await upd(sql`anulada_at = anulada_at`)).toBeUndefined();
+  });
+
+  it('una línea que dejó de ser vigente no vuelve; quitado_at solo se fija una vez y al salir', async () => {
+    const b = await conLinea();
+    await b.upd(sql`vigente = false`); // como al cancelar el pedido
+    expect(await b.upd(sql`vigente = true`)).toBe('pedido_item_vigente_final');
+    // Una línea ya fuera del pedido (cancelado) no se "quita" después.
+    expect(await b.upd(sql`quitado_at = now()`)).toBe('pedido_item_quitado_final');
+  });
+
+  it('quitado_at no se borra ni se mueve; quitar exige dejar de ser vigente', async () => {
+    const b = await conLinea();
+    expect(await b.upd(sql`quitado_at = now()`)).toBe('pedido_item_quitado_coherente');
+    expect(await b.upd(sql`vigente = false, quitado_at = now()`)).toBeUndefined();
+    expect(await b.upd(sql`quitado_at = NULL`)).toBe('pedido_item_quitado_final');
+    expect(await b.upd(sql`quitado_at = quitado_at - interval '1 day'`)).toBe('pedido_item_quitado_final');
+    expect(await b.upd(sql`vigente = true, quitado_at = NULL`)).toBe('pedido_item_vigente_final');
+  });
+
+  it('cancelar (vigente = false en todas las líneas) libera las piezas: no queda ninguna línea vigente', async () => {
+    const b = await conLinea();
+    await b.upd(sql`vigente = false`);
+    const r = await app((db) =>
+      db.execute<{ n: number }>(
+        sql`SELECT count(*)::int AS n FROM pedido_item WHERE vigente AND pieza_id = ${b.piezaId}`,
+      ),
+    );
+    expect(r.rows[0]!.n).toBe(0);
+    const [p2] = await nuevoPedido(b);
+    await app((db) =>
+      db
+        .insert(pedidoItem)
+        .values({ pedidoId: p2!.id, piezaId: b.piezaId, precioLista: '149.00', precioFinal: '149.00' }),
+    );
+  });
+});
+
+describe('libro de pagos garantizado por la BD', () => {
+  const aplicar = (db: Db | Tx, pagoId: string, pedidoId: string, monto: string) =>
+    db.insert(aplicacionPago).values({ pagoId, pedidoId, monto, fecha: '2026-10-11' });
+
+  it('lo aplicado de un pago no supera su monto; lo anulado no cuenta', async () => {
+    const b = await base();
+    const [p2] = await nuevoPedido(b);
+    const [pg] = await nuevoPago(b, '100');
+    await app((db) => aplicar(db, pg!.id, b.pedidoId, '60'));
+    const e = traducirErrorPg(await capturar(() => app((db) => aplicar(db, pg!.id, p2!.id, '40.01'))));
+    expect(e).toMatchObject({ codigo: 'aplicacion_pago_excede_pago', campo: 'monto' });
+    await app((db) => aplicar(db, pg!.id, p2!.id, '40'));
+    await app((db) =>
+      db.execute(sql`UPDATE aplicacion_pago SET anulada_at = now() WHERE pedido_id = ${p2!.id}`),
+    );
+    await app((db) => aplicar(db, pg!.id, p2!.id, '40'));
+  });
+
+  it('no se aplica un pago a un pedido cancelado', async () => {
+    const b = await base();
+    const [pg] = await nuevoPago(b, '10');
+    await conAuditoria((tx) =>
+      tx
+        .update(pedido)
+        .set({ estado: 'cancelado', canceladoAt: new Date(), cancelacionMotivo: 'x' })
+        .where(eq(pedido.id, b.pedidoId)),
+    );
+    expect(await codigoAl(() => app((db) => aplicar(db, pg!.id, b.pedidoId, '10')))).toBe(
+      'aplicacion_pago_pedido_cancelado',
+    );
+  });
+
+  it('concurrencia: dos aplicaciones simultáneas que juntas exceden el pago → solo una entra', async () => {
+    const b = await base();
+    const [p2] = await nuevoPedido(b);
+    const [pg] = await nuevoPago(b, '100');
+    const x = barrera();
+    const primera = app((db) =>
+      db.transaction(async (tx) => {
+        await aplicar(tx, pg!.id, b.pedidoId, '70');
+        x.listo();
+        await x.suelta;
+      }),
+    );
+    await Promise.race([x.escribio, primera]); // si la primera falla, falla la prueba (no se cuelga)
+    const segunda = capturar(() => app((db) => db.transaction((tx) => aplicar(tx, pg!.id, p2!.id, '70'))));
+    await new Promise((r) => setTimeout(r, 1500)); // la segunda queda esperando el bloqueo del pago
+    x.soltar();
+    await primera;
+    const e = await segunda;
+    expect(traducirErrorPg(e)?.codigo).toBe('aplicacion_pago_excede_pago');
+    const r = await app((db) =>
+      db.execute<{ s: string }>(
+        sql`SELECT sum(monto)::text AS s FROM aplicacion_pago WHERE pago_id = ${pg!.id}`,
+      ),
+    );
+    expect(r.rows[0]!.s).toBe('70.00');
+  });
+
+  it('el saldo a favor de un titular nunca queda negativo', async () => {
+    const b = await base();
+    const mov = (tipo: 'cancelacion' | 'uso', monto: string) =>
+      app((db) =>
+        db
+          .insert(saldoFavorMov)
+          .values({ clienteId: b.clienteId, tipo, monto, fecha: '2026-10-11', pedidoId: b.pedidoId }),
+      );
+    expect(traducirErrorPg(await capturar(() => mov('uso', '-0.01')))).toMatchObject({
+      codigo: 'saldo_favor_insuficiente',
+      campo: 'monto',
+    });
+    await mov('cancelacion', '50.00');
+    await mov('uso', '-50.00');
+    expect(await codigoAl(() => mov('uso', '-0.01'))).toBe('saldo_favor_insuficiente');
+  });
+
+  it('concurrencia: dos usos simultáneos que juntos exceden el saldo → solo uno entra', async () => {
+    const b = await base();
+    const valores = (monto: string, tipo: 'cancelacion' | 'uso' = 'uso') => ({
+      vendedorId: b.vendedorId,
+      tipo,
+      monto,
+      fecha: '2026-10-11',
+      pedidoId: b.pedidoId,
+    });
+    await app((db) => db.insert(saldoFavorMov).values(valores('50.00', 'cancelacion')));
+    const x = barrera();
+    const primera = app((db) =>
+      db.transaction(async (tx) => {
+        await tx.insert(saldoFavorMov).values(valores('-30.00'));
+        x.listo();
+        await x.suelta;
+      }),
+    );
+    await Promise.race([x.escribio, primera]); // si la primera falla, falla la prueba (no se cuelga)
+    const segunda = capturar(() =>
+      app((db) => db.transaction((tx) => tx.insert(saldoFavorMov).values(valores('-30.00')))),
+    );
+    await new Promise((r) => setTimeout(r, 1500));
+    x.soltar();
+    await primera;
+    expect(traducirErrorPg(await segunda)?.codigo).toBe('saldo_favor_insuficiente');
+    const r = await app((db) =>
+      db.execute<{ saldo: string }>(
+        sql`SELECT saldo::text FROM v_saldo_favor WHERE vendedor_id = ${b.vendedorId}`,
+      ),
+    );
+    expect(r.rows[0]!.saldo).toBe('20.00');
+  });
+
+  it('kz_validar_aplicacion_pago es SECURITY DEFINER con search_path fijo y sin EXECUTE para nadie más', async () => {
+    const r = await owner((db) =>
+      db.execute<{ definer: boolean; config: string[] | null; app: boolean; publico: boolean }>(sql`
+        SELECT p.prosecdef AS definer, p.proconfig AS config,
+               has_function_privilege('kazero_app', p.oid, 'EXECUTE') AS app,
+               EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+                       WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') AS publico
+        FROM pg_proc p WHERE p.oid = 'public.kz_validar_aplicacion_pago()'::regprocedure`),
+    );
+    expect(r.rows).toEqual([
+      { definer: true, config: ['search_path=pg_catalog, public, pg_temp'], app: false, publico: false },
+    ]);
   });
 });
 
