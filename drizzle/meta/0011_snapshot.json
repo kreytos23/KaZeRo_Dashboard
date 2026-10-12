@@ -1316,6 +1316,21 @@
           "method": "btree",
           "concurrently": false
         },
+        "pieza_imagen_clave_uq": {
+          "name": "pieza_imagen_clave_uq",
+          "columns": [
+            {
+              "expression": "imagen_clave",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "concurrently": false
+        },
         "pieza_estado_idx": {
           "name": "pieza_estado_idx",
           "columns": [

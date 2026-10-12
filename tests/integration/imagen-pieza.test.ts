@@ -6,7 +6,7 @@ import { pgConstraint } from '@/db/errors';
 import { pieza, vPieza } from '@/db/schema';
 import { rutaImagen } from '@/domain/imagenes';
 import { historialDeCambios } from '@/server/auditoria/servicio';
-import { ErrorNegocio } from '@/server/errores';
+import { ErrorNegocio, traducirErrorPg } from '@/server/errores';
 import { procesarImagen } from '@/server/imagenes/procesar';
 import {
   altaPiezaConFoto,
@@ -93,6 +93,16 @@ describe('esquema de la foto (0010/0011)', () => {
       db.select({ clave: vPieza.imagenClave, estado: vPieza.estado }).from(vPieza).where(eq(vPieza.id, id)),
     );
     expect(f).toEqual({ clave, estado: 'vendida' });
+  });
+
+  it('dos piezas no pueden compartir la misma clave de foto (índice único)', async () => {
+    const a = await app((db) => altaPieza(db, { ...base, codigo: 'IM06' }));
+    const b = await app((db) => altaPieza(db, { ...base, codigo: 'IM07' }));
+    const clave = randomUUID();
+    await fijarFoto(a.id, clave);
+    const e = await capturar(() => fijarFoto(b.id, clave));
+    expect(pgConstraint(e)).toBe('pieza_imagen_clave_uq');
+    expect(traducirErrorPg(e)?.campo).toBe('imagen');
   });
 
   it('v_pieza expone imagen_clave (listas y buscador sin consultas por fila)', async () => {

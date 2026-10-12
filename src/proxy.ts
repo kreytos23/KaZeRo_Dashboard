@@ -25,10 +25,9 @@ export function proxy(req: NextRequest) {
   }
   res.headers.set('Content-Security-Policy', csp);
   // El panel nunca se cachea (lecciones §5); los iconos y el logo públicos, un día.
-  res.headers.set(
-    'Cache-Control',
-    decision === 'pasar' ? cacheControlPara(req.nextUrl.pathname) : 'private, no-store',
-  );
+  // null: la ruta (foto de pieza) pone su propia cabecera; sin sesión siempre es no-store.
+  const cache = decision === 'pasar' ? cacheControlPara(req.nextUrl.pathname) : 'private, no-store';
+  if (cache) res.headers.set('Cache-Control', cache);
   return res;
 }
 

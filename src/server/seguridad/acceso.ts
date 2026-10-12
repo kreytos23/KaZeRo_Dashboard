@@ -31,11 +31,17 @@ export function decidirAcceso(ruta: string, tieneCookie: boolean): DecisionAcces
   return ruta === '/api' || ruta.startsWith('/api/') ? 'no_autenticado' : 'redirigir_login';
 }
 
+// Foto de pieza (Plan 2.2): su Cache-Control lo decide el handler (inmutable solo con la clave vigente).
+const RUTA_IMAGEN_PIEZA =
+  /^\/api\/piezas\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/imagen$/;
+
 /**
  * Solo los iconos y las imágenes de marca (binarios públicos, sin datos) se cachean, por un día y sin
  * `immutable`: sus nombres no llevan hash y un cambio de logo debe verse al día siguiente. HTML y APIs
  * nunca se cachean (lecciones §5). Se compara contra la ruta exacta, igual que en `esPublica`.
+ * `null`: la ruta de la foto de una pieza pone su propia cabecera (el proxy no la pisa).
  */
-export function cacheControlPara(ruta: string): string {
+export function cacheControlPara(ruta: string): string | null {
+  if (RUTA_IMAGEN_PIEZA.test(ruta)) return null;
   return ICONOS.includes(ruta) || IMAGEN_MARCA.test(ruta) ? 'public, max-age=86400' : 'private, no-store';
 }

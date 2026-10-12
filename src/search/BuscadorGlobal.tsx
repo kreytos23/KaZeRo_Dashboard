@@ -40,7 +40,7 @@ function guardarReciente(clave: string) {
 function esIndice(v: unknown): v is IndiceBusqueda {
   if (typeof v !== 'object' || v === null) return false;
   const i = v as Partial<IndiceBusqueda>;
-  return i.v === 1 && Array.isArray(i.piezas) && Array.isArray(i.clientes) && Array.isArray(i.vendedores);
+  return i.v === 2 && Array.isArray(i.piezas) && Array.isArray(i.clientes) && Array.isArray(i.vendedores);
 }
 
 function esCampoDeTexto(t: EventTarget | null): boolean {

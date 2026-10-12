@@ -14,6 +14,7 @@ export class ErrorNegocio extends Error {
 /** Restricción de la BD → nombre del campo en el formulario, para mostrar el error junto a él. */
 const CAMPOS: Record<string, string> = {
   pieza_codigo_uq: 'codigo',
+  pieza_imagen_clave_uq: 'imagen',
   pieza_codigo_formato: 'codigo',
   pieza_descripcion_largo: 'descripcion',
   pieza_montos: 'precio',
@@ -48,6 +49,7 @@ const MENSAJES: Record<string, string> = {
   pieza_cambio_exhibidor: 'La pieza debe regresar antes de cambiar de exhibidor.',
   exhibidor_cierre_coherente: 'El estado de cierre del exhibidor es inconsistente.',
   pieza_exhibidor_solo_si_aplica: 'Solo una pieza en exhibidor o apartada puede tener exhibidor.',
+  pieza_imagen_clave_uq: 'Esa foto ya está asociada a otra pieza. Vuelve a intentarlo.',
   pieza_foto_path_largo: 'La ruta de la foto es demasiado larga.',
   cliente_referencia_largo: 'La referencia admite hasta 120 caracteres.',
   cliente_telefono_largo: 'El teléfono admite hasta 30 caracteres.',

@@ -15,6 +15,7 @@ export async function construirIndice(db: Ejecutor): Promise<IndiceBusqueda> {
         codigo: vPieza.codigo,
         descripcion: vPieza.descripcion,
         estado: vPieza.estado,
+        imagen: vPieza.imagenClave,
       })
       .from(vPieza)
       .orderBy(asc(vPieza.codigo)),
@@ -25,8 +26,8 @@ export async function construirIndice(db: Ejecutor): Promise<IndiceBusqueda> {
     db.select({ id: vVendedor.id, nombre: vVendedor.nombre }).from(vVendedor).orderBy(asc(vVendedor.nombre)),
   ]);
   return {
-    v: 1,
-    piezas: piezas.map((p) => [p.id, p.codigo, p.descripcion, p.estado]),
+    v: 2,
+    piezas: piezas.map((p) => [p.id, p.codigo, p.descripcion, p.estado, p.imagen]),
     clientes: clientes.map((c) => [c.id, c.nombre, c.referencia]),
     vendedores: vendedores.map((v) => [v.id, v.nombre]),
   };

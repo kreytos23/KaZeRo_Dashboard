@@ -178,6 +178,8 @@ export const pieza = pgTable(
   },
   (t) => [
     uniqueIndex('pieza_codigo_uq').on(t.codigo),
+    // Plan 2.2: una clave de foto pertenece a una sola pieza (NULL se repite sin problema).
+    uniqueIndex('pieza_imagen_clave_uq').on(t.imagenClave),
     index('pieza_estado_idx').on(t.estado),
     index('pieza_categoria_idx').on(t.categoriaId),
     index('pieza_material_idx').on(t.materialId),

@@ -3,11 +3,11 @@ import { crearMotor } from '@/search/motor';
 import type { IndiceBusqueda } from '@/search/tipos';
 
 const indice: IndiceBusqueda = {
-  v: 1,
+  v: 2,
   piezas: [
-    ['p1', 'AF12', 'Anillo serpiente con circonitas', 'disponible'],
-    ['p2', 'AF120', 'Pulsera hilo rosa', 'vendida'],
-    ['p3', 'X/1', '<img src=x onerror=alert(1)>', 'disponible'],
+    ['p1', 'AF12', 'Anillo serpiente con circonitas', 'disponible', '9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d'],
+    ['p2', 'AF120', 'Pulsera hilo rosa', 'vendida', null],
+    ['p3', 'X/1', '<img src=x onerror=alert(1)>', 'disponible', null],
   ],
   clientes: [
     ['c1', 'Danya', '5to norte'],
@@ -72,8 +72,17 @@ describe('búsqueda global (diseño §8)', () => {
     expect(r.titulo).toContain('<img');
   });
   it('los href de cliente y vendedor codifican el id', () => {
-    const m = crearMotor({ v: 1, piezas: [], clientes: [['a/b?c', 'Zoe', null]], vendedores: [] });
+    const m = crearMotor({ v: 2, piezas: [], clientes: [['a/b?c', 'Zoe', null]], vendedores: [] });
     expect(m.buscar('zoe')[0]!.href).toBe('/panel/clientes/a%2Fb%3Fc');
+  });
+});
+
+describe('miniaturas (índice v2)', () => {
+  it('las piezas con foto traen su miniatura; las demás y personas, null', () => {
+    const [af12] = motor.buscar('AF12');
+    expect(af12!.miniatura).toBe('/api/piezas/p1/imagen?v=9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d&t=mini');
+    expect(motor.buscar('pulsera hilo')[0]!.miniatura).toBeNull();
+    expect(motor.buscar('danya')[0]!.miniatura).toBeNull();
   });
 });
 

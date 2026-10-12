@@ -39,8 +39,8 @@ describe('índice de búsqueda', () => {
       crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
     );
     expect(await app((db) => construirIndice(db))).toEqual({
-      v: 1,
-      piezas: [[pid.id, 'IX01', 'Anillo luna', 'disponible']],
+      v: 2,
+      piezas: [[pid.id, 'IX01', 'Anillo luna', 'disponible', null]],
       clientes: [[cid, 'Danya', '5to norte']],
       vendedores: [[vid, 'Nelly']],
     });
