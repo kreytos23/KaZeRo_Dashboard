@@ -15,6 +15,7 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
   const [estado, despachar, pendiente] = useActionState<EstadoAccion, FormData>(accionAltaPieza, {});
   const [prefijo, setPrefijo] = useState('');
   const [codigo, setCodigo] = useState('');
+  // Plan 3 Task 12: al agregar "Guardar y agregar otra", este estado `foto` también debe reiniciarse.
   const [foto, setFoto] = useState<File | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [sugiriendo, setSugiriendo] = useState(false);

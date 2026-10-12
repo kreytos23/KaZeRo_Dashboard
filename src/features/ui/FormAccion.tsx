@@ -18,12 +18,15 @@ export function FormAccion({
   children,
   limpiarAlGuardar = false,
   className = 'flex flex-col gap-3',
+  sinControles = false,
 }: {
   accion: Accion;
   textoBoton: string;
   children: React.ReactNode;
   limpiarAlGuardar?: boolean;
   className?: string;
+  /** Mantiene montado el aviso (role=status) pero sin botón: p. ej. tras quitar la foto ya no hay nada que quitar. */
+  sinControles?: boolean;
 }) {
   const [estado, despachar, pendiente] = useActionState(accion, {});
   const form = useRef<HTMLFormElement>(null);
@@ -62,13 +65,15 @@ export function FormAccion({
       <p role="status" className={estado.ok ? 'aviso-exito' : undefined}>
         {estado.ok}
       </p>
-      <button
-        type="submit"
-        disabled={pendiente || !hidratado}
-        className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
-      >
-        {textoBoton}
-      </button>
+      {!sinControles && (
+        <button
+          type="submit"
+          disabled={pendiente || !hidratado}
+          className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
+        >
+          {textoBoton}
+        </button>
+      )}
     </form>
   );
 }

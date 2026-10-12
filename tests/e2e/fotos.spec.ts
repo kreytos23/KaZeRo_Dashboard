@@ -151,7 +151,7 @@ test('agregar, cambiar y quitar la foto desde la ficha quedan en el historial; q
   await expect(confirmar).toHaveAttribute('required', '');
   await confirmar.check();
   await page.getByRole('button', { name: 'Quitar foto' }).click();
-  // El aviso vive en el formulario de quitar, que desaparece con la foto: la prueba es el marcador.
+  await expect(estadoCon(page, 'Foto quitada.')).toBeVisible();
   await expect(region.getByText('Sin foto')).toBeVisible();
 
   const historial = page.getByRole('region', { name: 'Historial de cambios' });

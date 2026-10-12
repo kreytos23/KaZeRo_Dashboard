@@ -68,9 +68,9 @@ describe('barrerImagenesHuerfanas', () => {
     const a = crearAlmacenMemoria();
     for (let i = 0; i < 5; i++) sembrarFoto(a, uuid(200 + i), hace(48));
     const tope = { maxBorrados: 4, lote: 3 };
-    expect(await barrer(a, [], tope)).toMatchObject({ borrados: 4, truncado: true });
-    expect(await barrer(a, [], tope)).toMatchObject({ borrados: 4, truncado: true });
-    expect(await barrer(a, [], tope)).toMatchObject({ borrados: 2, truncado: false });
+    expect(await barrer(a, [uuid(9)], tope)).toMatchObject({ borrados: 4, truncado: true });
+    expect(await barrer(a, [uuid(9)], tope)).toMatchObject({ borrados: 4, truncado: true });
+    expect(await barrer(a, [uuid(9)], tope)).toMatchObject({ borrados: 2, truncado: false });
     expect(await barrer(a, [])).toMatchObject({ revisados: 0, borrados: 0 });
   });
 
@@ -85,14 +85,14 @@ describe('barrerImagenesHuerfanas', () => {
         await a.borrar(rutas);
       },
     };
-    await barrer(espia, [], { lote: 3 });
+    await barrer(espia, [uuid(9)], { lote: 3 });
     expect(lotes).toEqual([3, 3, 2]);
   });
 
   it('respeta el tope de páginas', async () => {
     const a = crearAlmacenMemoria({ tamPagina: 2 });
     for (let i = 0; i < 3; i++) sembrarFoto(a, uuid(300 + i), hace(48));
-    expect(await barrer(a, [], { maxPaginas: 1 })).toMatchObject({
+    expect(await barrer(a, [uuid(9)], { maxPaginas: 1 })).toMatchObject({
       revisados: 2,
       borrados: 2,
       truncado: true,
@@ -177,5 +177,35 @@ describe('barrerImagenesHuerfanas', () => {
     sembrarFoto(a, uuid(50), hace(48));
     await expect(barrer(a, [])).rejects.toThrow();
     expect(a.rutas()).toHaveLength(2);
+  });
+
+  describe('guarda contra una BD equivocada o vacía', () => {
+    it('referenciadas vacío con candidatos: aborta sin borrar', async () => {
+      const a = crearAlmacenMemoria();
+      sembrarFoto(a, uuid(11), hace(48));
+      const r = await barrer(a, []);
+      expect(r).toMatchObject({ abortado: 'sospechoso', huerfanos: 2, borrados: 0 });
+      expect((await a.listar('piezas/')).objetos).toHaveLength(2);
+    });
+    it('más del 50 % de los blobs (y más de 20) como huérfanos: aborta sin borrar', async () => {
+      const a = crearAlmacenMemoria();
+      sembrarFoto(a, uuid(10), hace(100)); // referenciada
+      for (let n = 0; n < 11; n++) sembrarFoto(a, uuid(200 + n), hace(48)); // 22 huérfanos de 24
+      const r = await barrer(a, [uuid(10)]);
+      expect(r).toMatchObject({ abortado: 'sospechoso', huerfanos: 22, borrados: 0 });
+      expect((await a.listar('piezas/')).objetos).toHaveLength(24);
+    });
+    it('pocos huérfanos (<= 20) aunque sean mayoría: sí borra', async () => {
+      const a = crearAlmacenMemoria();
+      sembrarFoto(a, uuid(10), hace(100));
+      for (let n = 0; n < 5; n++) sembrarFoto(a, uuid(200 + n), hace(48));
+      const r = await barrer(a, [uuid(10)]);
+      expect(r.abortado).toBeUndefined();
+      expect(r.borrados).toBe(10);
+    });
+    it('sin candidatos y sin referenciadas no es sospechoso', async () => {
+      const r = await barrer(crearAlmacenMemoria(), []);
+      expect(r.abortado).toBeUndefined();
+    });
   });
 });

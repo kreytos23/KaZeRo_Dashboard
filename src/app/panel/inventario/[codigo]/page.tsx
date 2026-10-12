@@ -66,12 +66,14 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
           <div className="mt-3 flex flex-col gap-4">
             {/* Sin key por versión: así el aviso "Foto guardada." sobrevive al refresco de la ficha. */}
             <FormFoto piezaId={p.id} version={p.version} tieneFoto={Boolean(p.imagenClave)} />
-            {p.imagenClave && (
-              <FormAccion
-                accion={accionQuitarImagen}
-                textoBoton="Quitar foto"
-                className="flex flex-col gap-3"
-              >
+            {/* Siempre montado: si se desmontara al quedar sin foto, "Foto quitada." nunca se anunciaría. */}
+            <FormAccion
+              accion={accionQuitarImagen}
+              textoBoton="Quitar foto"
+              className="flex flex-col gap-3"
+              sinControles={!p.imagenClave}
+            >
+              {p.imagenClave && (
                 <Fragment key={p.version}>
                   <input type="hidden" name="piezaId" value={p.id} />
                   <input type="hidden" name="version" value={p.version} />
@@ -80,8 +82,8 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
                     Confirmo que quiero quitar la foto.
                   </label>
                 </Fragment>
-              </FormAccion>
-            )}
+              )}
+            </FormAccion>
           </div>
         </details>
       </section>

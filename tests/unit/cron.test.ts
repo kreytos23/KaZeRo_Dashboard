@@ -78,4 +78,15 @@ describe('GET /api/tareas/limpiar-imagenes', () => {
     expect(res.status).toBe(500);
     expect(await res.text()).not.toContain('secreto');
   });
+  it('avisa en el log (sin el valor) cuando CRON_SECRET existe pero es demasiado corto', () => {
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    autorizarCron(req('Bearer abc123XYZ'), 'abc123XYZ');
+    expect(aviso).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(aviso.mock.calls)).not.toContain('abc123XYZ');
+    aviso.mockClear();
+    autorizarCron(req(), undefined);
+    autorizarCron(req(`Bearer ${SECRETO}`), SECRETO);
+    expect(aviso).not.toHaveBeenCalled();
+    aviso.mockRestore();
+  });
 });

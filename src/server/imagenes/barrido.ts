@@ -12,6 +12,8 @@ export interface ResumenBarrido {
   borrados: number;
   truncado: boolean;
   simulado: boolean;
+  /** Se abortó sin borrar: el resultado parece una BD equivocada o vacía, no huérfanos reales. */
+  abortado?: 'sospechoso';
 }
 
 /**
@@ -72,6 +74,17 @@ export async function barrerImagenesHuerfanas(o: {
   }
   r.huerfanos = candidatos.length;
   if (candidatos.length > maxBorrados) r.truncado = true;
+  // Guarda: si la BD consultada fuera la equivocada o estuviera vacía, TODO parecería huérfano.
+  const sospechoso =
+    candidatos.length > 0 &&
+    (vigentes.size === 0 || (candidatos.length > 20 && candidatos.length > r.revisados / 2));
+  if (sospechoso) {
+    r.abortado = 'sospechoso';
+    console.error(
+      `Barrido de fotos abortado: ${candidatos.length} huérfanos de ${r.revisados} blobs y ${vigentes.size} claves vigentes`,
+    );
+    return r;
+  }
   if (o.simular) return r;
 
   const aBorrar = candidatos.slice(0, maxBorrados);
