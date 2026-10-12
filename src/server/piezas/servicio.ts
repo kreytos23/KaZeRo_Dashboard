@@ -1,8 +1,9 @@
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { movimientoPieza, pieza, vMovimientoPieza, vPieza } from '@/db/schema';
+import { exhibidor, movimientoPieza, pieza, vMovimientoPieza, vPieza } from '@/db/schema';
 import { esCodigoValido, esPrefijoValido, normalizarCodigo, siguienteCodigo } from '@/domain/codigos';
-import { calcularCambios } from '@/domain/auditoria';
+import { calcularCambios, validarMotivo } from '@/domain/auditoria';
+import { destinoCorreccion } from '@/domain/correccion';
 import { centavosANumeric } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
 import { MAX_FILAS_LOTE, type FilaLote } from '@/domain/lote';
@@ -293,7 +294,7 @@ const PARES_MANUALES: Record<string, readonly EstadoManual[]> = {
 
 export async function cambiarEstado(
   db: Ejecutor,
-  d: { piezaId: string; version: number; aEstado: EstadoManual; nota?: string },
+  d: { piezaId: string; version: number; aEstado: EstadoManual; nota?: string; adminId?: string | null },
 ): Promise<void> {
   if (!ESTADOS_MANUALES.includes(d.aEstado)) {
     throw new ErrorNegocio('pieza_transicion', 'Ese cambio de estado no está permitido para la pieza.');
@@ -327,7 +328,106 @@ export async function cambiarEstado(
         aEstado: d.aEstado,
         exhibidorId: actual.estado === 'en_exhibidor' ? actual.exhibidorId : null,
         nota,
+        adminId: d.adminId ?? null,
       });
+    }),
+  );
+}
+
+export interface ResultadoCorreccion {
+  codigo: string;
+  aEstado: 'disponible' | 'en_exhibidor';
+  exhibidorNombre: string | null;
+  /** Venía de un exhibidor que ya se cerró: quedó disponible (la UI lo avisa). */
+  exhibidorCerrado: boolean;
+}
+
+const CORRECCION_NO_DISPONIBLE =
+  'Solo se puede deshacer el último cambio manual a regalo, defecto o guardada.';
+
+/**
+ * R-07: deshace el último movimiento si fue un cambio manual a regalo/defecto/guardada.
+ *
+ * Orden de bloqueo del proyecto (exhibidor → pieza), el mismo de enviar/regresar/cerrar:
+ * 1. se lee el último movimiento sin bloquear, solo para saber qué exhibidor bloquear;
+ * 2. si hay exhibidor, se bloquea PRIMERO con NO KEY UPDATE (un cierre concurrente espera, o ya terminó y
+ *    se ve cerrado);
+ * 3. luego la pieza FOR UPDATE;
+ * 4. bajo los bloqueos se vuelve a leer el último movimiento y se compara la versión: si cambió algo desde
+ *    el paso 1, hubo una carrera → conflicto.
+ * El FOR SHARE del trigger kz_validar_transicion_pieza (0009) cae sobre un bloqueo de esta misma transacción
+ * y nunca espera; el trigger repite la regla de destinoCorreccion como última barrera.
+ */
+export async function deshacerUltimoCambio(
+  db: Ejecutor,
+  d: { piezaId: string; version: number; adminId: string; motivo: string },
+): Promise<ResultadoCorreccion> {
+  const m = validarMotivo(d.motivo, true, 'Escribe el motivo de la corrección.');
+  if (!m.ok) throw new ErrorNegocio('motivo', m.error, 'motivo');
+  return conErroresDeNegocio(() =>
+    db.transaction(async (tx) => {
+      const ultimoMovimiento = async () => {
+        const [u] = await tx
+          .select({
+            orden: movimientoPieza.orden,
+            tipo: movimientoPieza.tipo,
+            deEstado: movimientoPieza.deEstado,
+            aEstado: movimientoPieza.aEstado,
+            exhibidorId: movimientoPieza.exhibidorId,
+          })
+          .from(movimientoPieza)
+          .where(eq(movimientoPieza.piezaId, d.piezaId))
+          .orderBy(desc(movimientoPieza.orden))
+          .limit(1);
+        return u;
+      };
+      const previo = await ultimoMovimiento();
+      let ex: { estado: 'abierto' | 'cerrado'; nombre: string } | undefined;
+      if (previo?.exhibidorId) {
+        [ex] = await tx
+          .select({ estado: exhibidor.estado, nombre: exhibidor.nombre })
+          .from(exhibidor)
+          .where(eq(exhibidor.id, previo.exhibidorId))
+          .for('no key update'); // ver `bloquear` en exhibidores/servicio.ts
+      }
+      const [actual] = await tx
+        .select({ codigo: pieza.codigo, estado: pieza.estado, version: pieza.version })
+        .from(pieza)
+        .where(eq(pieza.id, d.piezaId))
+        .for('update');
+      if (!actual) throw new ErrorNegocio('no_encontrada', 'La pieza no existe.');
+      if (actual.version !== d.version) throw conflictoVersion();
+      const ultimo = await ultimoMovimiento();
+      if (ultimo?.orden !== previo?.orden) throw conflictoVersion();
+      const destino = destinoCorreccion(actual.estado, ultimo, ex?.estado === 'abierto');
+      if (!destino) throw new ErrorNegocio('correccion_no_disponible', CORRECCION_NO_DISPONIBLE);
+      const filas = await tx
+        .update(pieza)
+        .set({
+          estado: destino.aEstado,
+          exhibidorId: destino.exhibidorId,
+          version: sql`${pieza.version} + 1`,
+        })
+        .where(and(eq(pieza.id, d.piezaId), eq(pieza.version, d.version)))
+        .returning({ id: pieza.id });
+      if (filas.length === 0) throw conflictoVersion();
+      // Coherente con movimiento_pieza_coherente: de = estado actual (= a_estado del último movimiento);
+      // si vuelve al exhibidor, exhibidor_id = el de la pieza.
+      await tx.insert(movimientoPieza).values({
+        piezaId: d.piezaId,
+        tipo: 'correccion',
+        deEstado: actual.estado,
+        aEstado: destino.aEstado,
+        exhibidorId: destino.exhibidorId,
+        nota: m.motivo,
+        adminId: d.adminId,
+      });
+      return {
+        codigo: actual.codigo,
+        aEstado: destino.aEstado,
+        exhibidorNombre: ex?.nombre ?? null,
+        exhibidorCerrado: destino.exhibidorCerrado,
+      };
     }),
   );
 }
@@ -352,6 +452,9 @@ export function historial(db: Ejecutor, piezaId: string) {
       nota: vMovimientoPieza.nota,
       fecha: vMovimientoPieza.fecha,
       exhibidorNombre: vMovimientoPieza.exhibidorNombre,
+      exhibidorId: vMovimientoPieza.exhibidorId,
+      exhibidorEstado: vMovimientoPieza.exhibidorEstado,
+      adminEmail: vMovimientoPieza.adminEmail,
     })
     .from(vMovimientoPieza)
     .where(eq(vMovimientoPieza.piezaId, piezaId))

@@ -171,9 +171,13 @@ DECLARE
   previo_a text;
   previo_exhibidor uuid;
 BEGIN
-  -- FOR UPDATE: serializa los movimientos de una pieza (los servicios ya la tienen bloqueada; aquí no espera).
+  -- FOR NO KEY UPDATE: serializa los movimientos de una pieza sin chocar con el FOR KEY SHARE que toman las
+  -- FK que apuntan a pieza (p. ej. las líneas de pedido del Plan 3).
+  -- Los servicios DEBEN bloquear la pieza (FOR UPDATE, o con el UPDATE de la pieza) ANTES de insertar su
+  -- movimiento: `orden` sale de nextval al armar la fila, antes de este trigger, así que dos inserciones sin
+  -- ese bloqueo previo podrían quedar con `orden` invertido respecto al orden real en que se validaron.
   SELECT p.estado::text, p.exhibidor_id INTO estado_actual, exhibidor_actual
-    FROM public.pieza p WHERE p.id = NEW.pieza_id FOR UPDATE;
+    FROM public.pieza p WHERE p.id = NEW.pieza_id FOR NO KEY UPDATE;
   IF NOT FOUND THEN
     RETURN NEW; -- La FK rechaza la fila.
   END IF;
