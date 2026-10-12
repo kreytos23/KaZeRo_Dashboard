@@ -5,6 +5,7 @@ import { startTransition, useActionState, useEffect, useRef, useState } from 're
 import { Campo } from '@/features/ui/Campo';
 import { ErroresCampo, useEnfocarPrimerInvalido } from '@/features/ui/errores-campo';
 import type { EstadoAccion } from '@/features/ui/estado';
+import { useHidratado } from '@/features/ui/hidratado';
 import { marcarIndiceSucio } from '@/search/eventos';
 import { accionAltaPieza, accionSugerirCodigo } from '../acciones';
 
@@ -16,6 +17,7 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
   const [aviso, setAviso] = useState<string | null>(null);
   const [sugiriendo, setSugiriendo] = useState(false);
   const form = useRef<HTMLFormElement>(null);
+  const hidratado = useHidratado();
   useEnfocarPrimerInvalido(form, estado);
 
   // Éxito: `ok` trae el código creado. Se avisa al buscador y se va a la ficha.
@@ -46,6 +48,8 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
   return (
     <form
       ref={form}
+      method="post"
+      data-hidratado={hidratado ? 'si' : 'no'}
       className="flex max-w-xl flex-col gap-3"
       aria-busy={enviando}
       onSubmit={(e) => {
@@ -107,7 +111,7 @@ export function FormNuevaPieza({ categorias }: { categorias: string[] }) {
       )}
       <button
         type="submit"
-        disabled={enviando}
+        disabled={enviando || !hidratado}
         className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
       >
         Guardar pieza

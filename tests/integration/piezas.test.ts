@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
-import { exhibidor, pieza } from '@/db/schema';
+import { exhibidor, movimientoPieza, pieza } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { parsearLote } from '@/domain/lote';
@@ -170,6 +170,14 @@ describe('transiciones manuales acotadas', () => {
         .values({ vendedorId: vid, nombre: 'Exhibidor Rosa', fechaEnvio: '2026-10-09' })
         .returning({ id: exhibidor.id });
       await db.update(pieza).set({ estado: 'en_exhibidor', exhibidorId: ex!.id }).where(eq(pieza.id, f.id));
+      // El historial debe ser coherente con la pieza (0009, movimiento_pieza_coherente).
+      await db.insert(movimientoPieza).values({
+        piezaId: f.id,
+        tipo: 'envio_exhibidor',
+        deEstado: 'disponible',
+        aEstado: 'en_exhibidor',
+        exhibidorId: ex!.id,
+      });
     });
     return (await app((db) => obtenerPiezaPorCodigo(db, codigo)))!;
   }

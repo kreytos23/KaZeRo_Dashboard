@@ -34,6 +34,9 @@ const CAMPOS: Record<string, string> = {
   cliente_notas_largo: 'notas',
   exhibidor_nombre_largo: 'nombre',
   movimiento_nota_largo: 'nota',
+  auditoria_motivo_dinero: 'motivo',
+  auditoria_motivo_largo: 'motivo',
+  movimiento_correccion_completa: 'motivo',
 };
 
 const MENSAJES: Record<string, string> = {
@@ -66,6 +69,11 @@ const MENSAJES: Record<string, string> = {
   proveedor_nombre_uq: 'Ese proveedor ya existe.',
   codigo_recuperacion_usado: 'Un código de recuperación usado no puede modificarse.',
   admin_email_uq: 'Ya existe un administrador con ese correo.',
+  auditoria_motivo_dinero: 'Escribe el motivo: cambiaste un monto.',
+  auditoria_motivo_largo: 'El motivo admite hasta 200 caracteres.',
+  auditoria_sin_admin: 'No se pudo registrar quién hizo el cambio. Recarga la página.',
+  movimiento_correccion_completa: 'La corrección necesita un motivo.',
+  movimiento_coherente: 'El movimiento no coincide con el historial de la pieza.',
 };
 
 function mensajesPg(err: unknown): string[] {

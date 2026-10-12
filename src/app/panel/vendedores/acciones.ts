@@ -31,14 +31,28 @@ export async function accionCrearVendedor(_: EstadoAccion, fd: FormData): Promis
 }
 
 export async function accionEditarVendedor(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
-  await requerirSesion();
+  const { adminId } = await requerirSesion();
   return ejecutarAccion(async () => {
     const id = uuidDe(fd, 'id');
     const version = versionDe(fd);
     const datos = leer(fd);
-    await conDb((db) => actualizarVendedor(db, { id, version, activo: fd.get('activo') === 'on', ...datos }));
+    const { cambios } = await conDb((db) =>
+      actualizarVendedor(db, {
+        id,
+        version,
+        adminId,
+        motivo: texto(fd, 'motivo'),
+        activo: fd.get('activo') === 'on',
+        ...datos,
+      }),
+    );
+    if (cambios === 0) return 'Sin cambios.';
     revalidatePath(`/panel/vendedores/${id}`);
     revalidatePath('/panel/vendedores');
+    // El nombre del vendedor aparece en clientes (vendedor habitual) y exhibidores.
+    revalidatePath('/panel/clientes/[id]', 'page');
+    revalidatePath('/panel/exhibidores');
+    revalidatePath('/panel/exhibidores/[id]', 'page');
     return 'Cambios guardados.';
   });
 }

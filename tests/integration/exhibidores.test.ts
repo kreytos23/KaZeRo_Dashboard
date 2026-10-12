@@ -12,7 +12,7 @@ import {
 } from '@/server/exhibidores/servicio';
 import { altaPieza, cambiarEstado, historial, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { actualizarVendedor, crearVendedor, obtenerVendedor } from '@/server/vendedores/servicio';
-import { truncarTodo, urlApp, urlOwner } from './utilidades';
+import { adminDePrueba, truncarTodo, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 
@@ -98,10 +98,12 @@ describe('exhibidores', () => {
       ),
     ).rejects.toThrow('El exhibidor no existe.');
     const v = (await app((db) => obtenerVendedor(db, vendedorId)))!;
+    const adminId = await adminDePrueba();
     await app((db) =>
       actualizarVendedor(db, {
         id: v.id,
         version: v.version,
+        adminId,
         nombre: v.nombre,
         tipo: v.tipo,
         comisionPct: v.comisionPct,

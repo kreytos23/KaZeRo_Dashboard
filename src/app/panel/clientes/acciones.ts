@@ -19,15 +19,17 @@ export async function accionCrearCliente(_: EstadoAccion, fd: FormData): Promise
 }
 
 export async function accionEditarCliente(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
-  await requerirSesion();
+  const { adminId } = await requerirSesion();
   return ejecutarAccion(async () => {
     const id = uuidDe(fd, 'id');
     const version = versionDe(fd);
     const vendedorHabitualId = uuidOpcionalDe(fd, 'vendedorHabitualId');
-    await conDb((db) =>
+    const { cambios } = await conDb((db) =>
       actualizarCliente(db, {
         id,
         version,
+        adminId,
+        motivo: texto(fd, 'motivo'),
         nombre: texto(fd, 'nombre'),
         referencia: texto(fd, 'referencia'),
         telefono: texto(fd, 'telefono'),
@@ -38,6 +40,7 @@ export async function accionEditarCliente(_: EstadoAccion, fd: FormData): Promis
         notas: texto(fd, 'notas'),
       }),
     );
+    if (cambios === 0) return 'Sin cambios.';
     revalidatePath(`/panel/clientes/${id}`);
     revalidatePath('/panel/clientes');
     return 'Cambios guardados.';

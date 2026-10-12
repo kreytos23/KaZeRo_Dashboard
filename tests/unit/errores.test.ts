@@ -20,6 +20,28 @@ describe('traducción de errores de Postgres', () => {
     expect(e).toBeInstanceOf(ErrorNegocio);
     expect(e?.message).toBe('Ya existe una pieza con ese código.');
   });
+  it('traduce las reglas de la bitácora al campo motivo', () => {
+    const e = traducirErrorPg(envuelto({ code: 'P0001', constraint: 'auditoria_motivo_dinero' }));
+    expect(e).toMatchObject({
+      codigo: 'auditoria_motivo_dinero',
+      campo: 'motivo',
+      message: 'Escribe el motivo: cambiaste un monto.',
+    });
+    expect(
+      traducirErrorPg(envuelto({ code: 'P0001', constraint: 'auditoria_sin_admin' }))?.campo,
+    ).toBeUndefined();
+    expect(
+      traducirErrorPg(envuelto({ code: '23514', constraint: 'movimiento_correccion_completa' }))?.campo,
+    ).toBe('motivo');
+  });
+  it('traduce el movimiento incoherente con la pieza', () => {
+    const e = traducirErrorPg(envuelto({ code: 'P0001', constraint: 'movimiento_coherente' }));
+    expect(e).toMatchObject({
+      codigo: 'movimiento_coherente',
+      message: 'El movimiento no coincide con el historial de la pieza.',
+    });
+    expect(e?.campo).toBeUndefined();
+  });
   it('traduce la transición de pieza rechazada por el trigger', () => {
     expect(traducirErrorPg(envuelto({ code: 'P0001', constraint: 'pieza_transicion' }))?.codigo).toBe(
       'pieza_transicion',

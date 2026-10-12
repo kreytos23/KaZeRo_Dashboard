@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { conDb } from '@/db/client';
+import { mensajeCorreccion } from '@/domain/correccion';
 import { pesosACentavos } from '@/domain/dinero';
 import { parsearLote } from '@/domain/lote';
 import type { EstadoAccion } from '@/features/ui/estado';
@@ -13,6 +14,8 @@ import {
   altaLote,
   altaPieza,
   cambiarEstado,
+  deshacerUltimoCambio,
+  editarPieza,
   sugerirCodigo,
   type EstadoManual,
 } from '@/server/piezas/servicio';
@@ -91,8 +94,15 @@ export async function accionAltaLote(_: EstadoLote, fd: FormData): Promise<Estad
   return { error: 'No se dio de alta nada. Corrige lo siguiente y vuelve a intentar:', lineas };
 }
 
+/** La ficha y el listado de piezas: ruta literal (precisa) y patrón (red de seguridad, lecciones §4). */
+function revalidarPieza(codigo: string) {
+  revalidatePath(`/panel/inventario/${encodeURIComponent(codigo)}`);
+  revalidatePath('/panel/inventario/[codigo]', 'page');
+  revalidatePath('/panel/inventario');
+}
+
 export async function accionCambiarEstado(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
-  await requerirSesion();
+  const { adminId } = await requerirSesion();
   return ejecutarAccion(async () => {
     const aEstado = texto(fd, 'aEstado');
     if (!(ESTADOS_MANUALES as readonly string[]).includes(aEstado))
@@ -103,10 +113,55 @@ export async function accionCambiarEstado(_: EstadoAccion, fd: FormData): Promis
         version: versionDe(fd),
         aEstado: aEstado as EstadoManual,
         nota: largoMax(fd, 'nota', 'Nota', 200),
+        adminId,
       }),
     );
     revalidatePath('/panel/inventario/[codigo]', 'page');
     revalidatePath('/panel/inventario');
     return 'Estado actualizado.';
+  });
+}
+
+export async function accionEditarPieza(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const { cambios, codigo } = await conDb((db) =>
+      editarPieza(db, {
+        piezaId: uuidDe(fd, 'piezaId'),
+        version: versionDe(fd),
+        adminId,
+        motivo: largoMax(fd, 'motivo', 'Motivo', 200),
+        categoria: largoMax(fd, 'categoria', 'Categoría', 80),
+        material: largoMax(fd, 'material', 'Material', 80),
+        proveedor: largoMax(fd, 'proveedor', 'Proveedor', 80),
+        descripcion: largoMax(fd, 'descripcion', 'Descripción', 300),
+        costoCentavos: monto(fd, 'costo', 'Costo', true),
+        precioCentavos: monto(fd, 'precio', 'Precio'),
+      }),
+    );
+    if (cambios === 0) return 'Sin cambios.';
+    revalidarPieza(codigo);
+    return 'Cambios guardados.';
+  });
+}
+
+export async function accionDeshacerCambio(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    if (texto(fd, 'confirmo') !== 'si')
+      throw new ErrorNegocio('sin_confirmacion', 'Confirma que quieres deshacer el cambio.', 'confirmo');
+    const r = await conDb((db) =>
+      deshacerUltimoCambio(db, {
+        piezaId: uuidDe(fd, 'piezaId'),
+        version: versionDe(fd),
+        adminId,
+        motivo: largoMax(fd, 'motivo', 'Motivo', 200),
+      }),
+    );
+    revalidarPieza(r.codigo);
+    // Puede volver a un exhibidor: cambia su lista y su conteo.
+    revalidatePath('/panel/exhibidores/[id]', 'page');
+    revalidatePath('/panel/exhibidores');
+    return mensajeCorreccion(r);
   });
 }

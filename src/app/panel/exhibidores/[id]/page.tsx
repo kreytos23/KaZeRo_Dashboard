@@ -4,12 +4,16 @@ import { notFound } from 'next/navigation';
 import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
-import { AreaTexto } from '@/features/ui/Campo';
+import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
+import { AreaTexto, Campo } from '@/features/ui/Campo';
+import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { FormAccion } from '@/features/ui/FormAccion';
+import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
+import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { obtenerExhibidor } from '@/server/exhibidores/servicio';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
-import { accionCerrar, accionEnviar, accionRegresar } from '../acciones';
+import { accionCerrar, accionEditarExhibidor, accionEnviar, accionRegresar } from '../acciones';
 
 export const metadata = { title: 'Exhibidor' };
 
@@ -17,14 +21,20 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [e, vendedor] = await conDbLectura(async (db) => {
+  const [e, vendedor, cambios] = await conDbLectura(async (db) => {
     const ex = await obtenerExhibidor(db, id.data);
-    return [ex, ex ? await obtenerVendedor(db, ex.vendedorId) : null] as const;
+    if (!ex) return [null, null, []] as const;
+    const [v, c] = await Promise.all([
+      obtenerVendedor(db, ex.vendedorId),
+      historialDeCambios(db, 'exhibidor', ex.id),
+    ]);
+    return [ex, v, c] as const;
   });
   if (!e) notFound();
   const abierto = e.estado === 'abierto';
   return (
     <section className="flex max-w-3xl flex-col gap-6">
+      <AvisoIndiceSucio version={e.version} />
       <div>
         <h1 className="text-2xl font-semibold">{e.nombre}</h1>
         <p className="text-tinta-suave">
@@ -42,6 +52,34 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
       {abierto && vendedor && !vendedor.activo && (
         <p className="aviso-atencion">
           El vendedor de este exhibidor está inactivo: no se podrán enviar piezas hasta reactivarlo.
+        </p>
+      )}
+      {abierto ? (
+        <details className="tarjeta p-4">
+          <summary className="min-h-11 cursor-pointer content-center font-medium">Editar exhibidor</summary>
+          <FormAccion
+            accion={accionEditarExhibidor}
+            textoBoton="Guardar cambios"
+            className="mt-3 flex flex-col gap-3"
+          >
+            <Fragment key={e.version}>
+              <input type="hidden" name="exhibidorId" value={e.id} />
+              <input type="hidden" name="version" value={e.version} />
+              <Campo etiqueta="Nombre" name="nombre" defaultValue={e.nombre} required maxLength={120} />
+              <Campo
+                etiqueta="Fecha de envío"
+                name="fechaEnvio"
+                type="date"
+                defaultValue={e.fechaEnvio}
+                required
+              />
+              <CampoMotivo />
+            </Fragment>
+          </FormAccion>
+        </details>
+      ) : (
+        <p className="text-sm text-tinta-suave">
+          Un exhibidor cerrado es un registro histórico: su nombre y su fecha de envío ya no se editan.
         </p>
       )}
       {abierto && (
@@ -91,6 +129,7 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
           </p>
         </FormAccion>
       )}
+      <HistorialCambios entradas={cambios} />
     </section>
   );
 }

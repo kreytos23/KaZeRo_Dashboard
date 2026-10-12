@@ -1,4 +1,16 @@
-import { bigint, boolean, date, integer, numeric, pgView, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  boolean,
+  date,
+  integer,
+  numeric,
+  pgView,
+  smallint,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core';
+import { entidadAuditoria } from './auditoria';
 import { estadoExhibidor, estadoPieza, tipoMovimiento, tipoVendedor } from './inventario';
 
 // Vistas de SOLO LECTURA creadas en 0003_inventario_reglas.sql (security_invoker, columnas explícitas).
@@ -9,6 +21,7 @@ export const vCatalogo = pgView('v_catalogo', {
   tipo: text('tipo').$type<'categoria' | 'material' | 'proveedor'>().notNull(),
   id: uuid('id').notNull(),
   nombre: text('nombre').notNull(),
+  version: integer('version').notNull(),
 }).existing();
 
 export const vVendedor = pgView('v_vendedor', {
@@ -64,6 +77,9 @@ export const vMovimientoPieza = pgView('v_movimiento_pieza', {
   fecha: ts('fecha').notNull(),
   exhibidorId: uuid('exhibidor_id'),
   exhibidorNombre: text('exhibidor_nombre'),
+  adminId: uuid('admin_id'),
+  adminEmail: text('admin_email'),
+  exhibidorEstado: estadoExhibidor('exhibidor_estado'),
 }).existing();
 
 export const vExhibidor = pgView('v_exhibidor', {
@@ -82,4 +98,19 @@ export const vAdmin = pgView('v_admin', {
   id: uuid('id').notNull(),
   email: text('email').notNull(),
   createdAt: ts('created_at').notNull(),
+}).existing();
+
+// Creada en 0009_auditoria_reglas.sql: una fila por campo cambiado, con el correo del admin (sin N+1).
+export const vAuditoria = pgView('v_auditoria', {
+  auditoriaId: uuid('auditoria_id').notNull(),
+  orden: bigint('orden', { mode: 'number' }).notNull(),
+  entidad: entidadAuditoria('entidad').notNull(),
+  entidadId: uuid('entidad_id').notNull(),
+  motivo: text('motivo'),
+  fecha: ts('fecha').notNull(),
+  adminEmail: text('admin_email').notNull(),
+  posicion: smallint('posicion').notNull(),
+  campo: text('campo').notNull(),
+  antes: text('antes'),
+  despues: text('despues'),
 }).existing();

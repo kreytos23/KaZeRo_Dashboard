@@ -14,18 +14,24 @@ import {
   listarVendedores,
   obtenerVendedor,
 } from '@/server/vendedores/servicio';
-import { truncarTodo, urlApp } from './utilidades';
+import { adminDePrueba, truncarTodo, urlApp } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 
-beforeEach(truncarTodo);
+let adminId: string;
+beforeEach(async () => {
+  await truncarTodo();
+  adminId = await adminDePrueba();
+});
 
 describe('catálogos', () => {
   it('obtenerOCrear reutiliza el existente aunque cambien mayúsculas y acentos', async () => {
     const a = await app((db) => obtenerOCrearCatalogo(db, 'proveedor', 'Zabbel'));
     const b = await app((db) => obtenerOCrearCatalogo(db, 'proveedor', ' ZABBEL '));
     expect(b).toBe(a);
-    expect(await app((db) => listarCatalogo(db, 'proveedor'))).toEqual([{ id: a, nombre: 'Zabbel' }]);
+    expect(await app((db) => listarCatalogo(db, 'proveedor'))).toEqual([
+      { id: a, nombre: 'Zabbel', version: 1 },
+    ]);
   });
   it('crear rechaza duplicados con mensaje de negocio', async () => {
     await app((db) => crearCatalogo(db, 'material', 'Oro laminado'));
@@ -53,12 +59,12 @@ describe('vendedores (R-40)', () => {
     );
     const v = await app((db) => obtenerVendedor(db, id));
     expect(v).toMatchObject({ nombre: 'Nelly', comisionPct: '15.00', activo: true, version: 1 });
-    await app((db) => actualizarVendedor(db, { ...v!, comisionPct: '18.00' }));
+    await app((db) => actualizarVendedor(db, { ...v!, adminId, comisionPct: '18.00', motivo: 'Prueba' }));
     expect((await app((db) => obtenerVendedor(db, id)))?.comisionPct).toBe('18.00');
     // La misma versión vieja ya no sirve: otra pestaña la modificó.
-    await expect(app((db) => actualizarVendedor(db, { ...v!, comisionPct: '20.00' }))).rejects.toThrow(
-      'Otra pestaña modificó este registro',
-    );
+    await expect(
+      app((db) => actualizarVendedor(db, { ...v!, adminId, comisionPct: '20.00', motivo: 'Prueba' })),
+    ).rejects.toThrow('Otra pestaña modificó este registro');
   });
   it('nombres únicos sin importar mayúsculas', async () => {
     await app((db) => crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }));
@@ -75,14 +81,16 @@ describe('vendedores (R-40)', () => {
     }
     const id = await app((db) => crearVendedor(db, { nombre: 'Rosa', tipo: 'casa', comisionPct: '12.5' }));
     const v = (await app((db) => obtenerVendedor(db, id)))!;
-    await expect(app((db) => actualizarVendedor(db, { ...v, comisionPct: '10%' }))).rejects.toThrow(mensaje);
+    await expect(app((db) => actualizarVendedor(db, { ...v, adminId, comisionPct: '10%' }))).rejects.toThrow(
+      mensaje,
+    );
   });
   it('soloActivos filtra los inactivos', async () => {
     const id = await app((db) =>
       crearVendedor(db, { nombre: 'BLNail', tipo: 'consignacion', comisionPct: '18.00' }),
     );
     const v = (await app((db) => obtenerVendedor(db, id)))!;
-    await app((db) => actualizarVendedor(db, { ...v, activo: false }));
+    await app((db) => actualizarVendedor(db, { ...v, adminId, activo: false }));
     expect(await app((db) => listarVendedores(db, { soloActivos: true }))).toEqual([]);
   });
 });
@@ -98,7 +106,9 @@ describe('clientes (R-70)', () => {
     );
     const id = await app((db) => crearCliente(db, { nombre: 'Danya', referencia: '5to norte' }));
     const c = (await app((db) => obtenerCliente(db, id)))!;
-    await app((db) => actualizarCliente(db, { ...c, vendedorHabitualId: vid, cumpleanos: '1990-05-17' }));
+    await app((db) =>
+      actualizarCliente(db, { ...c, adminId, vendedorHabitualId: vid, cumpleanos: '1990-05-17' }),
+    );
     expect(await app((db) => obtenerCliente(db, id))).toMatchObject({
       vendedorHabitualNombre: 'Nelly',
       cumpleanos: '1990-05-17',

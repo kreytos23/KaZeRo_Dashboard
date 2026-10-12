@@ -62,7 +62,9 @@ async function minutosBloqueo(db: Ejecutor, email: string, ahora: Date): Promise
         inArray(accesoLog.evento, ['login_ok', 'password_fallido', 'totp_fallido']),
       ),
     )
-    .orderBy(desc(accesoLog.createdAt))
+    // Desempate determinista: en el mismo instante, los fallos van antes que el login_ok (false < true),
+    // así un login_ok simultáneo no corta el conteo según el orden físico de las filas.
+    .orderBy(desc(accesoLog.createdAt), sql`(${accesoLog.evento} = 'login_ok')`)
     .limit(POLITICA.maxFallos + 1);
   const fallos: Date[] = [];
   for (const f of filas) {

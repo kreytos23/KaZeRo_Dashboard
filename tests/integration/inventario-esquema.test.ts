@@ -5,7 +5,7 @@ import { pgCode } from '@/db/errors';
 import { categoria, cliente, exhibidor, movimientoPieza, pieza, vendedor } from '@/db/schema';
 import { normalizar } from '@/domain/texto';
 import { traducirErrorPg } from '@/server/errores';
-import { truncarTodo, urlApp, urlOwner } from './utilidades';
+import { adminDePrueba, truncarTodo, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 
@@ -225,7 +225,14 @@ describe('reglas de inventario en la BD', () => {
         db.execute<{ u: string }>(sql`SELECT updated_at::text AS u FROM cliente WHERE id = ${c!.id}`),
       );
     const antes = await leer();
-    await app((db) => db.update(cliente).set({ notas: 'x' }).where(eq(cliente.id, c!.id)));
+    const adminId = await adminDePrueba();
+    // notas es columna auditada (0009): la edición necesita el contexto de auditoría en su transacción.
+    await app((db) =>
+      db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT set_config('kazero.admin_id', ${adminId}, true)`);
+        await tx.update(cliente).set({ notas: 'x' }).where(eq(cliente.id, c!.id));
+      }),
+    );
     const despues = await leer();
     expect(despues.rows[0]!.u > antes.rows[0]!.u).toBe(true);
   });
@@ -247,7 +254,7 @@ describe('buenas prácticas del esquema (lecciones §3)', () => {
     expect(r.rows).toEqual([]);
   });
 
-  it('las 7 vistas de lectura usan security_invoker y kazero_app puede leerlas', async () => {
+  it('las 8 vistas de lectura usan security_invoker y kazero_app puede leerlas', async () => {
     const r = await conDbUrl(urlOwner(), (db) =>
       db.execute<{ vista: string; invoker: boolean; lectura: boolean }>(sql`
         SELECT c.relname AS vista,
@@ -258,6 +265,7 @@ describe('buenas prácticas del esquema (lecciones §3)', () => {
     );
     expect(r.rows.map((f) => f.vista)).toEqual([
       'v_admin',
+      'v_auditoria',
       'v_catalogo',
       'v_cliente',
       'v_exhibidor',

@@ -2,8 +2,12 @@ import { Fragment } from 'react';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
+import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { AreaTexto, Campo, Selector } from '@/features/ui/Campo';
+import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { FormAccion } from '@/features/ui/FormAccion';
+import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
+import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { obtenerCliente } from '@/server/clientes/servicio';
 import { listarVendedores } from '@/server/vendedores/servicio';
@@ -15,8 +19,12 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [c, vendedores] = await conDbLectura((db) =>
-    Promise.all([obtenerCliente(db, id.data), listarVendedores(db)]),
+  const [c, vendedores, cambios] = await conDbLectura((db) =>
+    Promise.all([
+      obtenerCliente(db, id.data),
+      listarVendedores(db),
+      historialDeCambios(db, 'cliente', id.data),
+    ]),
   );
   if (!c) notFound();
   const opciones = [
@@ -27,6 +35,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
   ];
   return (
     <section className="flex max-w-3xl flex-col gap-6">
+      <AvisoIndiceSucio version={c.version} />
       <h1 className="text-2xl font-semibold">{c.nombre}</h1>
       <FormAccion accion={accionEditarCliente} textoBoton="Guardar cambios">
         {/* key por versión en los campos (no en el formulario): refresca los defaultValue sin perder el estado de la acción. */}
@@ -63,8 +72,10 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
             defaultValue={c.vendedorHabitualId ?? ''}
           />
           <AreaTexto etiqueta="Notas" name="notas" defaultValue={c.notas} rows={3} maxLength={2000} />
+          <CampoMotivo />
         </Fragment>
       </FormAccion>
+      <HistorialCambios entradas={cambios} />
       <p className="text-sm text-tinta-suave">
         Los pedidos, el saldo y la tarjeta de lealtad aparecerán aquí con el módulo de pedidos.
       </p>
