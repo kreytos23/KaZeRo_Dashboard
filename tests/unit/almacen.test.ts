@@ -218,6 +218,20 @@ describe('almacén en memoria', () => {
       '2026-01-02T00:00:00.000Z',
     ]);
   });
+  it('sembrar fija la fecha de subida y tamPagina acota las páginas', async () => {
+    const a = crearAlmacenMemoria({ tamPagina: 1 });
+    a.sembrar(RUTA, new Date('2020-05-05T00:00:00Z'));
+    a.sembrar(RUTA_C, new Date('2021-05-05T00:00:00Z'));
+    const p1 = await a.listar('piezas/');
+    expect(p1.objetos).toHaveLength(1);
+    expect(p1.siguiente).not.toBeNull();
+    const p2 = await a.listar('piezas/', p1.siguiente!);
+    expect(p2.siguiente).toBeNull();
+    const fechas = [...p1.objetos, ...p2.objetos].map((o) => [o.ruta, o.subidoEn.toISOString()]);
+    expect(fechas).toContainEqual([RUTA, '2020-05-05T00:00:00.000Z']);
+    expect(fechas).toContainEqual([RUTA_C, '2021-05-05T00:00:00.000Z']);
+    expect(() => a.sembrar('piezas/leeme.txt', new Date())).toThrow();
+  });
   it('simula fallas a pedido y expone sus rutas', async () => {
     const a = crearAlmacenMemoria();
     await a.guardar(RUTA, Uint8Array.of(1));

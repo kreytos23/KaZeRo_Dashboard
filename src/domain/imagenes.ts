@@ -77,6 +77,12 @@ export const esUuid = (v: string) => UUID.test(v);
 export const esVariante = (v: string): v is Variante => (VARIANTES as readonly string[]).includes(v);
 export const esRutaImagen = (ruta: string) => RUTA.test(ruta);
 
+/** Clave de una ruta de foto de pieza; null si la ruta no es exactamente una de las nuestras. */
+export function claveDeRuta(ruta: string): string | null {
+  if (!esRutaImagen(ruta)) return null;
+  return ruta.split('/')[2]!.slice(0, 36);
+}
+
 /** Ruta en el almacén. Se construye siempre desde la BD (pieza y clave), nunca desde el cliente. */
 export function rutaImagen(piezaId: string, clave: string, variante: Variante): string {
   if (!esUuid(piezaId) || !esUuid(clave) || !esVariante(variante))

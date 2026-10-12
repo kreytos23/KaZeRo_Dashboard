@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { pieza, vPieza } from '@/db/schema';
 import { rutaImagen } from '@/domain/imagenes';
@@ -149,4 +149,13 @@ export async function claveImagenDePieza(db: Ejecutor, piezaId: string): Promise
     .where(eq(vPieza.id, piezaId))
     .limit(1);
   return f?.clave ?? null;
+}
+
+/** Claves de foto vigentes: una sola consulta a la vista (sin N+1). Las usa el barrido de huérfanas. */
+export async function clavesDeImagenReferenciadas(db: Ejecutor): Promise<Set<string>> {
+  const filas = await db
+    .select({ clave: vPieza.imagenClave })
+    .from(vPieza)
+    .where(isNotNull(vPieza.imagenClave));
+  return new Set(filas.map((f) => f.clave!));
 }

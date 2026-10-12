@@ -3,6 +3,7 @@ import {
   LADO_MINIMO,
   LIMITE_PIXELES,
   MAX_BYTES_SUBIDA,
+  claveDeRuta,
   detectarFormato,
   dimensionesAjustadas,
   esRutaImagen,
@@ -122,5 +123,16 @@ describe('rutas y URLs (nunca vienen del cliente)', () => {
   });
   it('URL de la app con la clave como versión (caché inmutable)', () => {
     expect(urlImagenPieza(PIEZA, CLAVE, 'mini')).toBe(`/api/piezas/${PIEZA}/imagen?v=${CLAVE}&t=mini`);
+  });
+});
+
+describe('claveDeRuta', () => {
+  it('la clave de una ruta válida; null para todo lo demás', () => {
+    expect(claveDeRuta(rutaImagen(PIEZA, CLAVE, 'mini'))).toBe(CLAVE);
+    expect(claveDeRuta(rutaImagen(PIEZA, CLAVE, 'grande'))).toBe(CLAVE);
+    expect(claveDeRuta('piezas/leeme.txt')).toBeNull();
+    expect(claveDeRuta(`capturas/${PIEZA}/${CLAVE}-mini.webp`)).toBeNull();
+    expect(claveDeRuta(`piezas/${PIEZA}/../${CLAVE}-mini.webp`)).toBeNull();
+    expect(claveDeRuta('')).toBeNull();
   });
 });

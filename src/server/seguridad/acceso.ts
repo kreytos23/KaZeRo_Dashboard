@@ -3,6 +3,9 @@ const PUBLICAS = ['/login', '/api/health'];
 // Iconos que Next genera desde src/app (el login sin sesión también los pide).
 const ICONOS = ['/icon.png', '/apple-icon.png', '/favicon.ico'];
 const ARCHIVOS_PUBLICOS = ['/robots.txt', ...ICONOS];
+// Tareas programadas: sin cookie (las llama Vercel Cron) pero protegidas en el handler con CRON_SECRET.
+// Solo la ruta exacta (sin barra final ni subrutas); la guarda estática de Route Handlers exige autorizarCron().
+const TAREAS_PROGRAMADAS = ['/api/tareas/limpiar-imagenes'];
 // Imágenes de marca de public/marca: un único segmento con nombre simple, sin subcarpetas.
 const IMAGEN_MARCA = /^\/marca\/[a-z0-9-]+\.(?:webp|png)$/;
 
@@ -20,6 +23,7 @@ function esPublica(ruta: string) {
   if (segmentos.some((s) => s === '' || s === '.' || s === '..' || s.includes('%') || s.includes('\\')))
     return false;
   if (ARCHIVOS_PUBLICOS.includes(sinBarraFinal)) return true;
+  if (TAREAS_PROGRAMADAS.includes(ruta)) return true;
   // Contra la ruta original, no la recortada: `/marca/logo.webp/` no es un archivo.
   if (IMAGEN_MARCA.test(ruta)) return true;
   return PUBLICAS.some((p) => sinBarraFinal === p || sinBarraFinal.startsWith(`${p}/`));

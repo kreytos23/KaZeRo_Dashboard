@@ -13,6 +13,9 @@ const ES_RUTA = /^route\.(?:ts|tsx|js|jsx|mjs)$/;
 const METODOS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
 /** Únicas rutas sin sesión: health (público a propósito). */
 const PUBLICAS = new Set(['health/route.ts', 'health/listo/route.ts']);
+/** Única otra excepción: la llama Vercel Cron y se autoriza SOLO con CRON_SECRET (autorizarCron en la primera sentencia). */
+const CON_SECRETO_CRON = new Set(['tareas/limpiar-imagenes/route.ts']);
+const EXCEPCIONES = new Set([...PUBLICAS, ...CON_SECRETO_CRON]);
 
 function archivos(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {
@@ -182,14 +185,24 @@ describe('guarda: Route Handlers privados validan la sesión', () => {
     expect(todas.length).toBeGreaterThanOrEqual(4);
   });
   it('la lista de excepciones es exactamente esta (agregar otra obliga a tocar esta prueba)', () => {
-    expect([...PUBLICAS].sort()).toEqual(['health/listo/route.ts', 'health/route.ts']);
+    expect([...EXCEPCIONES].sort()).toEqual([
+      'health/listo/route.ts',
+      'health/route.ts',
+      'tareas/limpiar-imagenes/route.ts',
+    ]);
     const existentes = new Set(archivos(API).map(rel));
-    for (const p of PUBLICAS) expect(existentes.has(p)).toBe(true);
+    for (const p of EXCEPCIONES) expect(existentes.has(p)).toBe(true);
   });
   it('todas las rutas de src/app/api (salvo la lista cerrada) cumplen', () => {
     const malas = archivos(API)
-      .filter((a) => !PUBLICAS.has(rel(a)))
+      .filter((a) => !EXCEPCIONES.has(rel(a)))
       .flatMap((a) => revisarRuta(readFileSync(a, 'utf8'), 'sesion', a).map((f) => `${rel(a)}: ${f}`));
+    expect(malas).toEqual([]);
+  });
+  it('la ruta del cron exige autorizarCron() como primera sentencia de cada handler', () => {
+    const malas = [...CON_SECRETO_CRON].flatMap((r) =>
+      revisarRuta(readFileSync(join(API, r), 'utf8'), 'cron', r).map((f) => r + ': ' + f),
+    );
     expect(malas).toEqual([]);
   });
 });
@@ -276,5 +289,30 @@ describe('guarda estricta: autoprueba con fixtures', () => {
     expect(ES_RUTA.test('route.mjs')).toBe(true);
     expect(ES_RUTA.test('route.tsx')).toBe(true);
     expect(ES_RUTA.test('route.test.ts')).toBe(false);
+  });
+});
+
+describe('guarda estricta del cron: autoprueba con fixtures', () => {
+  const IMPORTA_CRON = `import { autorizarCron } from '@/server/seguridad/cron';\n`;
+  const cron = (cuerpo: string) => `${IMPORTA_CRON}export async function GET(req: Request) { ${cuerpo} }`;
+  it('acepta if (!autorizarCron(req)) return …', () => {
+    expect(revisarRuta(cron('if (!autorizarCron(req)) return x; return y;'), 'cron')).toEqual([]);
+  });
+  it.each([
+    ['sin guarda', cron('return y;')],
+    ['la guarda en la segunda sentencia', cron('log(); if (!autorizarCron(req)) return x; return y;')],
+    ['guarda de sesión en lugar de cron', cron('if (!(await sesionDeApi())) return x; return y;')],
+    ['sin negar', cron('if (autorizarCron(req)) return x; return y;')],
+    [
+      'sin importar',
+      'export async function GET(req: Request) { if (!autorizarCron(req)) return x; return y; }',
+    ],
+    [
+      'redefinida localmente',
+      `${IMPORTA_CRON}const autorizarCron = () => true;\nexport async function GET(req: Request) { if (!autorizarCron()) return x; return y; }`,
+    ],
+    ['reexportación', `export { GET } from '../otra/route';`],
+  ])('rechaza: %s', (_n, codigo) => {
+    expect(revisarRuta(codigo, 'cron').length).toBeGreaterThan(0);
   });
 });

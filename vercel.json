@@ -2,6 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "regions": ["cle1"],
+  "crons": [{ "path": "/api/tareas/limpiar-imagenes", "schedule": "0 10 * * *" }],
   "git": {
     "deploymentEnabled": false
   }

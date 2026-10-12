@@ -101,3 +101,33 @@ describe('ruta de foto de pieza', () => {
     expect(cacheControlPara('/api/busqueda/indice')).toBe('private, no-store');
   });
 });
+
+describe('tarea programada de limpieza', () => {
+  it('el proxy la deja pasar sin cookie (la protege CRON_SECRET en el handler), solo la ruta exacta', () => {
+    expect(decidirAcceso('/api/tareas/limpiar-imagenes', false)).toBe('pasar');
+    expect(decidirAcceso('/api/tareas/limpiar-imagenes/x', false)).toBe('no_autenticado');
+    expect(decidirAcceso('/api/tareas', false)).toBe('no_autenticado');
+    expect(decidirAcceso('/api/tareas/otra', false)).toBe('no_autenticado');
+    expect(cacheControlPara('/api/tareas/limpiar-imagenes')).toBe('private, no-store');
+  });
+  it.each([
+    '/api/tareas/limpiar-imagenes/',
+    '/api/tareas/limpiar-imagenes//',
+    '/api/Tareas/limpiar-imagenes',
+    '/api/tareas/Limpiar-Imagenes',
+    '/api/tareas/limpiar-imagenes/..',
+    '/api/tareas/../limpiar-imagenes',
+    '/api/tareas/./limpiar-imagenes',
+    '/api/tareas/limpiar-imagenes%2f',
+    '/api/tareas/limpiar%2dimagenes',
+    '/api/tareas/limpiar-imagenes\\',
+    '/api/tareas/limpiar-imagenesx',
+    '/api//tareas/limpiar-imagenes',
+    '/api/tareas/limpiar-imagenes.json',
+  ])('%s: variante dudosa, sigue privada (401 sin cookie)', (ruta) => {
+    expect(decidirAcceso(ruta, false)).toBe('no_autenticado');
+  });
+  it('fuera de /api la ruta no es pública', () => {
+    expect(decidirAcceso('/x/api/tareas/limpiar-imagenes', false)).toBe('redirigir_login');
+  });
+});
