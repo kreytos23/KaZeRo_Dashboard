@@ -8,6 +8,10 @@ const BPS_MAX = 10_000;
  * reglas-de-negocio: "en cada línea"). BigInt porque precio máximo × 10000 rebasa Number.MAX_SAFE_INTEGER.
  */
 export function descuentoLinea(precioCentavos: number, pctBps: number): number {
+  if (!Number.isSafeInteger(precioCentavos) || precioCentavos < 0)
+    throw new RangeError('El precio debe ser un entero no negativo en centavos.');
+  if (!Number.isInteger(pctBps) || pctBps < 0 || pctBps > BPS_MAX)
+    throw new RangeError('El porcentaje debe ser un entero entre 0 y 10000 (centésimas de punto).');
   return Number((BigInt(precioCentavos) * BigInt(pctBps) + 5000n) / 10000n);
 }
 
@@ -39,6 +43,7 @@ export function calcularTotales(
   const preciosFinales = precios.map((p) => p - descuentoLinea(p, pctBps));
   const subtotal = precios.reduce((a, b) => a + b, 0);
   const despuesLealtad = preciosFinales.reduce((a, b) => a + b, 0);
+  if (!Number.isSafeInteger(subtotal)) throw new RangeError('El subtotal excede el rango seguro.');
   return {
     subtotal,
     descuentoLealtad: subtotal - despuesLealtad,

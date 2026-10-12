@@ -1,4 +1,5 @@
 import { conDbLectura } from '@/db/client';
+import { limpiarIdempotenciaCron } from '@/server/idempotencia';
 import { almacenImagenes } from '@/server/imagenes/almacen';
 import { barrerImagenesHuerfanas } from '@/server/imagenes/barrido';
 import { clavesDeImagenReferenciadas } from '@/server/piezas/imagen';
@@ -19,7 +20,9 @@ export async function GET(req: Request) {
       clavesReferenciadas: () => conDbLectura(clavesDeImagenReferenciadas),
     });
     console.info('[barrido-imagenes]', JSON.stringify(resumen)); // solo conteos
-    return Response.json(resumen, { headers: SIN_CACHE });
+    const idempotenciaBorradas = await limpiarIdempotenciaCron();
+    console.info('[limpieza-idempotencia]', JSON.stringify({ idempotenciaBorradas })); // solo conteo
+    return Response.json({ ...resumen, idempotenciaBorradas }, { headers: SIN_CACHE });
   } catch (e) {
     console.error('[barrido-imagenes] falló', e instanceof Error ? e.name : typeof e);
     return Response.json({ error: 'barrido_fallido' }, { status: 500, headers: SIN_CACHE });

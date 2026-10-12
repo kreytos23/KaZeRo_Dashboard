@@ -91,3 +91,20 @@ describe('folios y porcentajes', () => {
     expect(formatoPct(1250)).toBe('12.5 %');
   });
 });
+
+describe('validación de entradas (RangeError)', () => {
+  it.each([
+    [1.5, 1000],
+    [-1, 1000],
+    [Number.NaN, 1000],
+    [Number.MAX_SAFE_INTEGER + 1, 1000],
+    [100, -1],
+    [100, 10001],
+    [100, 0.5],
+  ])('descuentoLinea(%s, %s) lanza RangeError', (p, b) => {
+    expect(() => descuentoLinea(p, b)).toThrow(RangeError);
+  });
+  it('el subtotal fuera del rango seguro lanza RangeError', () => {
+    expect(() => calcularTotales([Number.MAX_SAFE_INTEGER, 1], 0, 0)).toThrow(RangeError);
+  });
+});
