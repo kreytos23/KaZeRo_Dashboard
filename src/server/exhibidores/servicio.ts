@@ -57,9 +57,10 @@ export async function editarExhibidor(
         .where(eq(exhibidor.id, d.exhibidorId))
         .for('no key update'); // ver el comentario de `bloquear`
       if (!actual) throw new ErrorNegocio('no_encontrado', 'El exhibidor no existe.');
+      // Primero la versión: un cliente con datos viejos debe ver el conflicto, no "cerrado".
+      if (actual.version !== d.version) throw conflictoVersion();
       if (actual.estado === 'cerrado')
         throw new ErrorNegocio('exhibidor_cerrado', 'Un exhibidor cerrado ya no se edita.');
-      if (actual.version !== d.version) throw conflictoVersion();
       const cambios = calcularCambios(
         { nombre: actual.nombre, fecha_envio: actual.fechaEnvio },
         { nombre: v.nombre, fecha_envio: v.fechaEnvio },

@@ -72,6 +72,14 @@ function descripcionValida(texto: string): string {
   return descripcion;
 }
 
+function montoValido(centavos: number, etiqueta: string, campo: string): string {
+  try {
+    return centavosANumeric(centavos);
+  } catch {
+    throw new ErrorNegocio('pieza_invalida', `${etiqueta}: el monto no es válido.`, campo);
+  }
+}
+
 function validarPieza(d: DatosPieza) {
   const codigo = normalizarCodigo(d.codigo);
   if (!esCodigoValido(codigo))
@@ -118,8 +126,8 @@ export async function editarPieza(
   d: EdicionPieza,
 ): Promise<{ cambios: number; codigo: string }> {
   const descripcion = descripcionValida(d.descripcion);
-  const costo = centavosANumeric(d.costoCentavos);
-  const precio = centavosANumeric(d.precioCentavos);
+  const costo = montoValido(d.costoCentavos, 'Costo', 'costo');
+  const precio = montoValido(d.precioCentavos, 'Precio', 'precio');
   return conErroresDeNegocio(() =>
     db.transaction(async (tx) => {
       const [actual] = await tx

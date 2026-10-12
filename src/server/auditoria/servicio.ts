@@ -61,18 +61,28 @@ export async function historialDeCambios(
   return agruparHistorial(filas);
 }
 
-/** Para listas (catálogos): una consulta para todas las entidades de esos tipos, agrupada por id. */
+/**
+ * Para listas (catálogos): una consulta para todas las entidades de esos tipos, agrupada por id.
+ * `limite` cuenta ENTRADAS (ediciones), no filas de campo: se eligen las N más recientes y luego todos sus
+ * campos, así la entrada más antigua nunca queda cortada a la mitad.
+ */
 export async function historialPorEntidad(
   db: Ejecutor,
   entidades: readonly EntidadAuditada[],
   limite = 500,
 ): Promise<Map<string, EntradaHistorial[]>> {
+  const ultimas = db
+    .select({ id: vAuditoria.auditoriaId })
+    .from(vAuditoria)
+    .where(inArray(vAuditoria.entidad, [...entidades]))
+    .groupBy(vAuditoria.auditoriaId)
+    .orderBy(desc(sql`max(${vAuditoria.orden})`))
+    .limit(limite);
   const filas = await db
     .select({ ...columnas, entidadId: vAuditoria.entidadId })
     .from(vAuditoria)
-    .where(inArray(vAuditoria.entidad, [...entidades]))
-    .orderBy(...recientes)
-    .limit(limite);
+    .where(and(inArray(vAuditoria.entidad, [...entidades]), inArray(vAuditoria.auditoriaId, ultimas)))
+    .orderBy(...recientes);
   const porEntidad = new Map<string, typeof filas>();
   for (const f of filas) porEntidad.set(f.entidadId, [...(porEntidad.get(f.entidadId) ?? []), f]);
   return new Map([...porEntidad].map(([id, fs]) => [id, agruparHistorial(fs)]));

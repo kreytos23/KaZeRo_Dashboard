@@ -84,8 +84,11 @@ async function enFila<T extends unknown[]>(
         for (;;) {
           const r = await tx.execute<{ n: number }>(
             // Esperar una fila bloqueada es esperar el transactionid de quien la tiene (sin `database`):
-            // se cuentan los procesos en espera, no los bloqueos.
-            sql`SELECT count(DISTINCT pid)::int AS n FROM pg_locks WHERE NOT granted`,
+            // se cuentan los procesos en espera, no los bloqueos. No se une con pg_stat_activity: oculta
+            // las sesiones de otros roles (datname NULL) y dejaría de contar a quien espera.
+            sql`SELECT count(DISTINCT l.pid)::int AS n FROM pg_locks l
+              WHERE NOT l.granted AND l.pid <> pg_backend_pid()
+                AND (l.database IS NULL OR l.database = (SELECT oid FROM pg_database WHERE datname = current_database()))`,
           );
           if (r.rows[0]!.n >= esperando) break;
           if (Date.now() > limite) throw new Error('La operación no llegó a esperar el bloqueo');

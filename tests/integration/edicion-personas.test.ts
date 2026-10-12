@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
-import { historialDeCambios } from '@/server/auditoria/servicio';
+import { historialDeCambios, historialPorEntidad } from '@/server/auditoria/servicio';
 import { crearCatalogo, listarCatalogo, renombrarCatalogo } from '@/server/catalogos/servicio';
 import { actualizarCliente, crearCliente, obtenerCliente } from '@/server/clientes/servicio';
 import {
@@ -147,6 +147,21 @@ describe('exhibidor (D5)', () => {
       ),
     ).rejects.toThrow('Un exhibidor cerrado ya no se edita.');
   });
+  it('versión vieja sobre un exhibidor cerrado es conflicto, no "cerrado"', async () => {
+    const e = await abierto();
+    await app((db) => cerrarExhibidor(db, { exhibidorId: e.id, version: e.version }));
+    await expect(
+      app((db) =>
+        editarExhibidor(db, {
+          exhibidorId: e.id,
+          version: e.version,
+          adminId,
+          nombre: 'Otro',
+          fechaEnvio: e.fechaEnvio,
+        }),
+      ),
+    ).rejects.toMatchObject({ codigo: 'conflicto' });
+  });
 });
 
 describe('catálogos (D6)', () => {
@@ -199,5 +214,24 @@ describe('catálogos (D6)', () => {
     await expect(
       app((db) => renombrarCatalogo(db, { tipo: 'proveedor', id, version: 1, adminId, nombre: 'Zabbel' })),
     ).rejects.toThrow('Otra pestaña modificó este registro');
+  });
+});
+
+describe('historialPorEntidad', () => {
+  it('el límite cuenta entradas: la más antigua dentro del límite no queda cortada', async () => {
+    const id = await app((db) =>
+      crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18' }),
+    );
+    let v = (await app((db) => obtenerVendedor(db, id)))!;
+    // Dos ediciones de 2 campos cada una: 4 filas de campo, 2 entradas.
+    await app((db) => actualizarVendedor(db, { ...v, adminId, nombre: 'Nelly A', activo: false }));
+    v = (await app((db) => obtenerVendedor(db, id)))!;
+    await app((db) => actualizarVendedor(db, { ...v, adminId, nombre: 'Nelly B', activo: true }));
+    // Con limite = 3 filas se cortaría la entrada antigua; con 2 entradas deben venir completas.
+    const h = (await app((db) => historialPorEntidad(db, ['vendedor'], 2))).get(id)!;
+    expect(h.map((e) => e.campos.length)).toEqual([2, 2]);
+    const una = (await app((db) => historialPorEntidad(db, ['vendedor'], 1))).get(id)!;
+    expect(una).toHaveLength(1);
+    expect(una[0]!.campos).toHaveLength(2);
   });
 });

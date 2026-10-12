@@ -79,6 +79,17 @@ describe('editar pieza con bitácora (R-08, R-09)', () => {
     ]);
   });
 
+  it('montos fuera de rango son error de negocio en su campo, no RangeError crudo', async () => {
+    const p = await nueva();
+    await expect(app((db) => editarPieza(db, edicion(p, { costoCentavos: -1 })))).rejects.toMatchObject({
+      name: 'ErrorNegocio',
+      codigo: 'pieza_invalida',
+      campo: 'costo',
+    });
+    await expect(
+      app((db) => editarPieza(db, edicion(p, { precioCentavos: Number.NaN }))),
+    ).rejects.toMatchObject({ name: 'ErrorNegocio', codigo: 'pieza_invalida', campo: 'precio' });
+  });
   it('sin cambios no escribe nada ni sube la versión (no-op)', async () => {
     const p = await nueva();
     // "anillos" en minúsculas es la misma categoría (kz_normalizar): no cuenta como cambio.
