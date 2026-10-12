@@ -68,3 +68,99 @@ describe('procesarImagen (R-39)', () => {
     });
   });
 });
+
+describe('procesarImagen: entradas hostiles y espacios de color (R-39)', () => {
+  const rechazo = (mensaje: string) => ({ campo: 'imagen', message: mensaje });
+
+  it('rechaza un WebP animado', async () => {
+    const ancho = 300;
+    const alto = 300;
+    const cuadros = Buffer.alloc(ancho * alto * 3 * 2);
+    cuadros.fill(40, 0, cuadros.length / 2);
+    cuadros.fill(200, cuadros.length / 2);
+    const animado = await sharp(cuadros, {
+      raw: { width: ancho, height: alto * 2, channels: 3, pageHeight: alto },
+    })
+      .webp({ delay: [100, 100], loop: 0 })
+      .toBuffer();
+    expect((await sharp(animado, { pages: -1 }).metadata()).pages).toBe(2);
+    await expect(procesarImagen(new Uint8Array(animado))).rejects.toMatchObject(
+      rechazo('Las imágenes animadas no se aceptan.'),
+    );
+  });
+
+  it('un GIF animado se rechaza por formato (no es JPG, PNG o WebP)', async () => {
+    const ancho = 300;
+    const alto = 300;
+    const cuadros = Buffer.alloc(ancho * alto * 3 * 2, 90);
+    const gif = await sharp(cuadros, {
+      raw: { width: ancho, height: alto * 2, channels: 3, pageHeight: alto },
+    })
+      .gif({ delay: [100, 100], loop: 0 })
+      .toBuffer();
+    await expect(procesarImagen(new Uint8Array(gif))).rejects.toMatchObject(
+      rechazo('El archivo no es una foto JPG, PNG o WebP.'),
+    );
+  });
+
+  it('bomba de píxeles: PNG de 6000×6000 de un solo color (pesa poco) → mensaje de megapíxeles', async () => {
+    const bomba = await sharp({
+      create: { width: 6000, height: 6000, channels: 3, background: '#808080' },
+    })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    expect(bomba.length).toBeLessThan(3 * 1024 * 1024);
+    await expect(procesarImagen(new Uint8Array(bomba))).rejects.toMatchObject(
+      rechazo('La foto es demasiado grande (máximo 30 megapíxeles).'),
+    );
+  });
+
+  it('JPEG CMYK → WebP sRGB de 8 bits', async () => {
+    const cmyk = await sharp({ create: { width: 400, height: 300, channels: 3, background: '#2060c0' } })
+      .toColourspace('cmyk')
+      .jpeg()
+      .toBuffer();
+    expect((await sharp(cmyk).metadata()).space).toBe('cmyk');
+    const r = await procesarImagen(new Uint8Array(cmyk));
+    const m = await sharp(r.grande).metadata();
+    expect({ formato: m.format, espacio: m.space, profundidad: m.depth }).toEqual({
+      formato: 'webp',
+      espacio: 'srgb',
+      profundidad: 'uchar',
+    });
+  });
+
+  it('PNG de 16 bits → WebP sRGB de 8 bits', async () => {
+    const png16 = await sharp({ create: { width: 300, height: 300, channels: 3, background: '#336699' } })
+      .toColourspace('rgb16')
+      .png()
+      .toBuffer();
+    expect((await sharp(png16).metadata()).depth).toBe('ushort');
+    const r = await procesarImagen(new Uint8Array(png16));
+    const m = await sharp(r.grande).metadata();
+    expect({ espacio: m.space, profundidad: m.depth }).toEqual({ espacio: 'srgb', profundidad: 'uchar' });
+  });
+
+  it('perfil Display P3: el color se convierte a sRGB (no solo se descarta el perfil)', async () => {
+    // Imagen con dos zonas (no plana). Naranja P3 (200,100,50): al pasar a sRGB el valor numérico
+    // cambia a ~(188,106,63); si solo se quitara el perfil, saldría igual que entró.
+    const ancho = 300;
+    const crudo = Buffer.alloc(ancho * ancho * 3);
+    for (let y = 0; y < ancho; y++)
+      for (let x = 0; x < ancho; x++)
+        crudo.set(x < 150 ? [200, 100, 50] : [30, 60, 160], (y * ancho + x) * 3);
+    const p3 = await sharp(crudo, { raw: { width: ancho, height: ancho, channels: 3 } })
+      .withIccProfile('p3')
+      .jpeg({ quality: 100, chromaSubsampling: '4:4:4' })
+      .toBuffer();
+    expect((await sharp(p3).metadata()).icc).toBeDefined();
+    const r = await procesarImagen(new Uint8Array(p3));
+    const { data, info } = await sharp(r.grande).raw().toBuffer({ resolveWithObject: true });
+    const pixel = (x: number, y: number) => [
+      ...data.subarray((y * info.width + x) * info.channels).subarray(0, 3),
+    ];
+    const cerca = (a: number[], b: number[], tol: number) => a.every((v, i) => Math.abs(v - b[i]!) <= tol);
+    expect(cerca(pixel(40, 150), [188, 106, 63], 5)).toBe(true);
+    expect(cerca(pixel(40, 150), [200, 100, 50], 6)).toBe(false);
+  });
+});

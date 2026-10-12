@@ -13,6 +13,7 @@ export const LADO_MAXIMO_SUBIDA = 2048;
 export const BYTES_OBJETIVO_SUBIDA = 2_500_000;
 export const CALIDADES_SUBIDA = [0.9, 0.8, 0.7] as const;
 
+export const MENSAJE_FOTO_GRANDE = 'La foto es demasiado grande (máximo 30 megapíxeles).';
 export const MENSAJE_FOTO_ILEGIBLE = 'No se pudo leer la foto. Intenta con otra.';
 
 const VARIANTES: readonly Variante[] = ['grande', 'mini'];
@@ -58,7 +59,7 @@ export function validarSubida(
 export function rechazoPorMetadatos(m: { ancho?: number; alto?: number; paginas?: number }): string | null {
   if (!m.ancho || !m.alto) return MENSAJE_FOTO_ILEGIBLE;
   if ((m.paginas ?? 1) > 1) return 'Las imágenes animadas no se aceptan.';
-  if (m.ancho * m.alto > LIMITE_PIXELES) return 'La foto es demasiado grande (máximo 30 megapíxeles).';
+  if (m.ancho * m.alto > LIMITE_PIXELES) return MENSAJE_FOTO_GRANDE;
   if (Math.min(m.ancho, m.alto) < LADO_MINIMO) return 'La foto es muy pequeña (mínimo 200 px por lado).';
   return null;
 }
