@@ -78,13 +78,13 @@ jobs:
           key: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ hashFiles('src/**', 'next.config.ts') }}
           restore-keys: nextjs-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}-
       - run: pnpm build
+      # Se empaqueta con tar para conservar los symlinks de .next/node_modules (paquetes externos
+      # como sharp apuntan al store de pnpm); upload-artifact los copiaría sin sus dependencias.
+      - run: tar -cf next-build.tar --exclude=.next/cache .next
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: next-build
-          path: |
-            .next
-            !.next/cache
-          include-hidden-files: true
+          path: next-build.tar
           retention-days: 1
 
   e2e:
@@ -100,7 +100,8 @@ jobs:
         with: { node-version: '${{ env.NODE_VERSION }}', cache: pnpm }
       - run: pnpm install --frozen-lockfile
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
-        with: { name: next-build, path: .next }
+        with: { name: next-build }
+      - run: tar -xf next-build.tar && rm next-build.tar
       - name: Cache de navegadores de Playwright
         id: cache-pw
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
