@@ -54,9 +54,12 @@ async function loginConCodigo(email: string, password: string, codigo: string, t
   return app((db) => verificarSegundoFactor(db, { preToken: pre.preToken, codigo, ...red }, llaveTotp(), t));
 }
 
-/** Inicia sesión de verdad (fila en `sesion`) y devuelve su token e id. */
+/**
+ * Inicia sesión de verdad (fila en `sesion`) y devuelve su token e id. El login_ok queda 1 s antes de `t`
+ * para no empatar con los fallos que las pruebas registran en `t`.
+ */
 async function sesionReal(t: Date) {
-  const s = await login('duena@kazero.mx', PASS, secreto, t);
+  const s = await login('duena@kazero.mx', PASS, secreto, new Date(t.getTime() - 1000));
   if (!s.ok) throw new Error('login falló');
   const v = await app((db) => validarSesion(db, s.token, t));
   if (!v) throw new Error('sesión inválida');

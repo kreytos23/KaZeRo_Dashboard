@@ -6,6 +6,7 @@ import {
   cerrarSesion,
   cerrarTodas,
   iniciarLogin,
+  registrarAcceso,
   validarSesion,
   verificarSegundoFactor,
 } from '@/server/auth/servicio';
@@ -89,6 +90,22 @@ describe('login en dos pasos', () => {
     expect(a).toEqual({ ok: false, motivo: 'credenciales' });
     expect(b).toEqual({ ok: false, motivo: 'credenciales' });
   });
+
+  it.each(['login_ok primero', 'login_ok al final'])(
+    'un login_ok en el mismo instante que los fallos no corta el conteo (%s)',
+    async (orden) => {
+      const t0 = new Date('2026-10-08T12:00:00Z');
+      const fallos = Array.from({ length: POLITICA.maxFallos }, () => 'password_fallido' as const);
+      const eventos =
+        orden === 'login_ok primero' ? ['login_ok' as const, ...fallos] : [...fallos, 'login_ok' as const];
+      // Filas insertadas una por una (orden físico controlado), todas con el mismo created_at.
+      for (const evento of eventos) await app((db) => registrarAcceso(db, EMAIL, evento, red, t0));
+      const r = await app((db) =>
+        iniciarLogin(db, { email: EMAIL, password: PASSWORD, ...red }, new Date(t0.getTime() + 1000)),
+      );
+      expect(r).toMatchObject({ ok: false, motivo: 'bloqueado' });
+    },
+  );
 
   it(`bloquea tras ${POLITICA.maxFallos} fallos en ${POLITICA.ventanaMin} min y libera después`, async () => {
     const t0 = new Date('2026-10-08T12:00:00Z');
