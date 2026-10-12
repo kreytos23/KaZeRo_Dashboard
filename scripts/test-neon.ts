@@ -1,7 +1,8 @@
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { rmSync, writeFileSync } from 'node:fs';
-import { userInfo } from 'node:os';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir, userInfo } from 'node:os';
+import { join } from 'node:path';
 import { hostNormalizado } from './lib/guarda-bd';
 import { asignarPasswordApp, migrar } from './lib/migrar';
 import { borrarRama, cadenaConexion, crearRama } from './lib/neon';
@@ -19,6 +20,9 @@ const sufijo = process.env.GITHUB_RUN_ID
       .username.toLowerCase()
       .replace(/[^a-z0-9]/g, '')}-${Date.now()}`;
 const rama = `test-${sufijo}`;
+
+// E2E guarda las fotos en un directorio temporal (nunca Blob real); se borra al terminar.
+const dirImagenes = modo === 'e2e' ? mkdtempSync(join(tmpdir(), 'kazero-e2e-imagenes-')) : null;
 
 // Hija de development: copia instantánea (copy-on-write). Caduca en 2 h por si el proceso muere antes de borrarla.
 console.log(`[test-neon] Creando rama temporal ${rama} (padre: development)…`);
@@ -43,12 +47,17 @@ try {
         DATABASE_URL_OWNER: owner,
         KAZERO_RAMA_PRUEBA: rama,
         KAZERO_TOTP_KEY: randomBytes(32).toString('base64'),
+        // Token vacío: que un .env.local con el token del store de desarrollo no se cuele en E2E.
+        ...(dirImagenes
+          ? { KAZERO_ALMACEN_IMAGENES: 'disco', KAZERO_DIR_IMAGENES: dirImagenes, BLOB_READ_WRITE_TOKEN: '' }
+          : {}),
       },
     },
   );
   process.exitCode = r.status ?? 1;
 } finally {
   rmSync(ARCHIVO_RAMA_PRUEBA, { force: true });
+  if (dirImagenes) rmSync(dirImagenes, { recursive: true, force: true });
   console.log(`[test-neon] Borrando rama ${rama}…`);
   borrarRama(rama);
 }
