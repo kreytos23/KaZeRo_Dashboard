@@ -84,7 +84,7 @@ export function rutaImagen(piezaId: string, clave: string, variante: Variante): 
   return `piezas/${piezaId}/${clave}-${variante}.webp`;
 }
 
-/** URL servida por la app. `v` = clave: cambia con cada foto, así la respuesta puede ser `immutable`. */
+/** URL servida por la app. `v` = clave: cambia con cada foto, así la caché de un día nunca sirve una foto vieja. */
 export function urlImagenPieza(piezaId: string, clave: string, variante: Variante): string {
   return `/api/piezas/${piezaId}/imagen?v=${clave}&t=${variante}`;
 }

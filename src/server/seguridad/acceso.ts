@@ -31,7 +31,7 @@ export function decidirAcceso(ruta: string, tieneCookie: boolean): DecisionAcces
   return ruta === '/api' || ruta.startsWith('/api/') ? 'no_autenticado' : 'redirigir_login';
 }
 
-// Foto de pieza (Plan 2.2): su Cache-Control lo decide el handler (inmutable solo con la clave vigente).
+// Foto de pieza (Plan 2.2): su Cache-Control lo decide el handler (privada, un día, solo con la clave vigente).
 const RUTA_IMAGEN_PIEZA =
   /^\/api\/piezas\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/imagen$/;
 

@@ -49,13 +49,13 @@ describe('GET /api/piezas/[id]/imagen (D7)', () => {
     expect(r.headers.get('location')).toBe(`http://localhost/api/piezas/${PIEZA}/imagen?v=${CLAVE}&t=mini`);
     expect(r.headers.get('cache-control')).toBe('private, no-store');
   });
-  it('vigente: WebP con caché privada inmutable y cabeceras de seguridad; lee la ruta que dice la BD', async () => {
+  it('vigente: WebP con caché privada de un día (sin immutable) y cabeceras de seguridad; lee la ruta que dice la BD', async () => {
     const r = await pedir(PIEZA);
     expect(r.status).toBe(200);
     expect(Object.fromEntries(r.headers)).toMatchObject({
       'content-type': 'image/webp',
       'content-length': '3',
-      'cache-control': 'private, max-age=31536000, immutable',
+      'cache-control': 'private, max-age=86400',
       'x-content-type-options': 'nosniff',
       'content-disposition': 'inline',
       'cross-origin-resource-policy': 'same-origin',
@@ -64,11 +64,19 @@ describe('GET /api/piezas/[id]/imagen (D7)', () => {
     expect(leer).toHaveBeenCalledWith(`piezas/${PIEZA}/${CLAVE}-mini.webp`);
     expect(new Uint8Array(await r.arrayBuffer())).toEqual(Uint8Array.of(1, 2, 3));
   });
-  it('If-None-Match igual: 304 sin leer el almacén', async () => {
+  it('If-None-Match igual: no responde 304 por su cuenta; lee el almacén (200, o 404 si el blob no está)', async () => {
     leer.mockClear();
     const r = await pedir(PIEZA, `?v=${CLAVE}&t=mini`, { 'if-none-match': `"${CLAVE}-mini"` });
-    expect(r.status).toBe(304);
-    expect(leer).not.toHaveBeenCalled();
+    expect(r.status).toBe(200);
+    expect(leer).toHaveBeenCalledTimes(1);
+    leer.mockResolvedValueOnce(null);
+    const sinBlob = await pedir(PIEZA, `?v=${CLAVE}&t=mini`, { 'if-none-match': `"${CLAVE}-mini"` });
+    expect(sinBlob.status).toBe(404);
+  });
+  it('la caché nunca es immutable ni dura más de un día (navegador compartido tras cerrar sesión)', async () => {
+    const cc = (await pedir(PIEZA)).headers.get('cache-control') ?? '';
+    expect(cc).not.toContain('immutable');
+    expect(Number(/max-age=(\d+)/.exec(cc)?.[1])).toBeLessThanOrEqual(86400);
   });
   it('blob ausente: 404; almacén caído: 503 (sin filtrar el error)', async () => {
     leer.mockResolvedValueOnce(null);

@@ -8,15 +8,16 @@ export const dynamic = 'force-dynamic';
 
 const SIN_CACHE = { 'Cache-Control': 'private, no-store' };
 const json = (cuerpo: object, status: number) => Response.json(cuerpo, { status, headers: SIN_CACHE });
-const INMUTABLE = {
-  'Cache-Control': 'private, max-age=31536000, immutable',
+const CACHEABLE = {
+  'Cache-Control': 'private, max-age=86400',
   'X-Content-Type-Options': 'nosniff',
   'Cross-Origin-Resource-Policy': 'same-origin',
 };
 
 /**
- * Foto privada (D7). Nunca acepta una ruta del cliente: la clave vigente sale de v_pieza. `v` solo sirve
- * para que la URL cambie con cada foto y la respuesta pueda cachearse como inmutable en el navegador.
+ * Foto privada (D7). Nunca acepta una ruta del cliente: la clave vigente sale de v_pieza. `v` hace que la URL cambie con cada
+ * foto. La caché del navegador es privada y de un día, sin `immutable` (equipo compartido tras cerrar sesión), y no
+ * hay atajo 304: siempre se confirma contra la BD y el almacén antes de responder.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await sesionDeApi())) return json({ error: 'no_autenticado' }, 401);
@@ -32,14 +33,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       headers: { ...SIN_CACHE, Location: new URL(urlImagenPieza(id, clave, t), req.url).toString() },
     });
   const etiqueta = `"${clave}-${t}"`;
-  if (req.headers.get('if-none-match') === etiqueta)
-    return new Response(null, { status: 304, headers: { ...INMUTABLE, ETag: etiqueta } });
   try {
     const archivo = await almacenImagenes().leer(rutaImagen(id, clave, t));
     if (!archivo) return json({ error: 'no_encontrada' }, 404);
     return new Response(archivo.cuerpo, {
       headers: {
-        ...INMUTABLE,
+        ...CACHEABLE,
         'Content-Type': 'image/webp',
         'Content-Disposition': 'inline',
         ETag: etiqueta,
