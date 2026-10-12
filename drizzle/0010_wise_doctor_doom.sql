@@ -1,0 +1,1 @@
+ALTER TABLE "pieza" ADD COLUMN "imagen_clave" uuid;

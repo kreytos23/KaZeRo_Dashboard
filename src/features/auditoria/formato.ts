@@ -21,6 +21,7 @@ export const ETIQUETA_CAMPO: Readonly<Record<string, string>> = {
   vendedor_habitual: 'Vendedor habitual',
   notas: 'Notas',
   fecha_envio: 'Fecha de envío',
+  imagen_clave: 'Foto',
 };
 
 const TIPO_VENDEDOR: Readonly<Record<string, string>> = {
@@ -54,4 +55,11 @@ export function formatearValor(campo: string, valor: Valor): string {
     default:
       return valor;
   }
+}
+
+/** Línea de un campo en el historial. La foto se describe (agregada/cambiada/quitada), nunca con su clave. */
+export function textoCambio(campo: string, antes: Valor, despues: Valor): string {
+  if (campo === 'imagen_clave')
+    return antes === null ? 'agregada' : despues === null ? 'quitada' : 'cambiada';
+  return `${formatearValor(campo, antes)} → ${formatearValor(campo, despues)}`;
 }

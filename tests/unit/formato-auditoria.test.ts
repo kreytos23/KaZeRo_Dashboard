@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ETIQUETA_CAMPO, formatearValor } from '@/features/auditoria/formato';
+import { ETIQUETA_CAMPO, formatearValor, textoCambio } from '@/features/auditoria/formato';
 import { CAMPOS_DINERO } from '@/domain/auditoria';
 
 describe('formato del historial de cambios', () => {
@@ -22,5 +22,22 @@ describe('formato del historial de cambios', () => {
   it('todo campo de dinero tiene etiqueta', () => {
     for (const campos of Object.values(CAMPOS_DINERO))
       for (const c of campos) expect(ETIQUETA_CAMPO[c]).toBeTruthy();
+  });
+});
+
+describe('textoCambio: la foto no muestra uuids (D8)', () => {
+  it.each([
+    [null, 'a1', 'agregada'],
+    ['a1', 'b2', 'cambiada'],
+    ['a1', null, 'quitada'],
+  ] as const)('%s → %s: %s', (antes, despues, texto) => {
+    expect(textoCambio('imagen_clave', antes, despues)).toBe(texto);
+  });
+  it('los demás campos siguen como "antes → después"', () => {
+    expect(textoCambio('precio', '149.00', '199.00')).toBe('$149.00 → $199.00');
+    expect(textoCambio('material', null, 'Plata')).toBe('— → Plata');
+  });
+  it('la foto tiene etiqueta', () => {
+    expect(ETIQUETA_CAMPO.imagen_clave).toBe('Foto');
   });
 });
