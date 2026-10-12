@@ -8,7 +8,7 @@ export const llaveTotp = () => process.env.KAZERO_TOTP_KEY!;
 /** Limpia inventario, personas y auth. Solo el dueño puede TRUNCATE. */
 export function truncarTodo() {
   return conDbUrl(urlOwner(), (db) =>
-    db.execute(sql`TRUNCATE auditoria_campo, auditoria, movimiento_pieza, pieza, exhibidor, cliente, vendedor, categoria, material, proveedor,
+    db.execute(sql`TRUNCATE auditoria_campo, auditoria, saldo_favor_mov, aplicacion_pago, pago, pedido_item, pedido, movimiento_pieza, pieza, exhibidor, cliente, vendedor, categoria, material, proveedor,
       codigo_recuperacion, sesion, acceso_log, idempotencia, admin RESTART IDENTITY CASCADE`),
   );
 }

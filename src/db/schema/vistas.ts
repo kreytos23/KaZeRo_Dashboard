@@ -12,6 +12,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { entidadAuditoria } from './auditoria';
 import { estadoExhibidor, estadoPieza, tipoMovimiento, tipoVendedor } from './inventario';
+import { estadoPedido, metodoPago, motivoSinLealtad } from './pedidos';
 
 // Vistas de SOLO LECTURA creadas en 0003_inventario_reglas.sql (security_invoker, columnas explícitas).
 // `.existing()`: drizzle-kit no las genera ni las borra. Toda lectura de servicios va por aquí.
@@ -81,6 +82,9 @@ export const vMovimientoPieza = pgView('v_movimiento_pieza', {
   adminId: uuid('admin_id'),
   adminEmail: text('admin_email'),
   exhibidorEstado: estadoExhibidor('exhibidor_estado'),
+  // Plan 3 (0013), al final.
+  pedidoId: uuid('pedido_id'),
+  pedidoFolio: integer('pedido_folio'),
 }).existing();
 
 export const vExhibidor = pgView('v_exhibidor', {
@@ -92,6 +96,8 @@ export const vExhibidor = pgView('v_exhibidor', {
   vendedorId: uuid('vendedor_id').notNull(),
   vendedorNombre: text('vendedor_nombre').notNull(),
   piezasActuales: integer('piezas_actuales').notNull(),
+  // Plan 3 (0013): apartadas en un pedido que conservan este exhibidor.
+  piezasApartadas: integer('piezas_apartadas').notNull(),
 }).existing();
 
 // Creada en 0007_admins_grants.sql: solo columnas no sensibles de admin.
@@ -114,4 +120,73 @@ export const vAuditoria = pgView('v_auditoria', {
   campo: text('campo').notNull(),
   antes: text('antes'),
   despues: text('despues'),
+}).existing();
+
+// Creadas en 0013_pedidos_reglas.sql (Plan 3). Los numeric llegan como string.
+export const vPedido = pgView('v_pedido', {
+  id: uuid('id').notNull(),
+  folio: integer('folio').notNull(),
+  fecha: date('fecha').notNull(),
+  estado: estadoPedido('estado').notNull(),
+  version: integer('version').notNull(),
+  clienteId: uuid('cliente_id').notNull(),
+  clienteNombre: text('cliente_nombre').notNull(),
+  vendedorId: uuid('vendedor_id').notNull(),
+  vendedorNombre: text('vendedor_nombre').notNull(),
+  cuentaTarjeta: boolean('cuenta_tarjeta').notNull(),
+  cicloTarjeta: integer('ciclo_tarjeta'),
+  posicionTarjeta: integer('posicion_tarjeta'),
+  descuentoLealtadPct: numeric('descuento_lealtad_pct').notNull(),
+  sinLealtadMotivo: motivoSinLealtad('sin_lealtad_motivo'),
+  descuentoManualMonto: numeric('descuento_manual_monto').notNull(),
+  descuentoManualMotivo: text('descuento_manual_motivo'),
+  subtotal: numeric('subtotal').notNull(),
+  descuentoLealtadMonto: numeric('descuento_lealtad_monto').notNull(),
+  total: numeric('total').notNull(),
+  pagado: numeric('pagado').notNull(),
+  saldo: numeric('saldo').notNull(),
+  piezas: integer('piezas').notNull(),
+  notas: text('notas').notNull(),
+  createdAt: ts('created_at').notNull(),
+  liquidadoAt: ts('liquidado_at'),
+  canceladoAt: ts('cancelado_at'),
+  cancelacionMotivo: text('cancelacion_motivo'),
+}).existing();
+
+export const vPedidoItem = pgView('v_pedido_item', {
+  id: uuid('id').notNull(),
+  pedidoId: uuid('pedido_id').notNull(),
+  folio: integer('folio').notNull(),
+  pedidoEstado: estadoPedido('pedido_estado').notNull(),
+  clienteId: uuid('cliente_id').notNull(),
+  clienteNombre: text('cliente_nombre').notNull(),
+  piezaId: uuid('pieza_id').notNull(),
+  codigo: text('codigo').notNull(),
+  descripcion: text('descripcion').notNull(),
+  piezaEstado: estadoPieza('pieza_estado').notNull(),
+  exhibidorId: uuid('exhibidor_id'),
+  precioLista: numeric('precio_lista').notNull(),
+  precioFinal: numeric('precio_final').notNull(),
+  vigente: boolean('vigente').notNull(),
+  quitadoAt: ts('quitado_at'),
+}).existing();
+
+export const vAplicacionPago = pgView('v_aplicacion_pago', {
+  id: uuid('id').notNull(),
+  pedidoId: uuid('pedido_id').notNull(),
+  pagoId: uuid('pago_id').notNull(),
+  monto: numeric('monto').notNull(),
+  fecha: date('fecha').notNull(),
+  anuladaAt: ts('anulada_at'),
+  metodo: metodoPago('metodo').notNull(),
+  nota: text('nota'),
+  pagadorTipo: text('pagador_tipo').$type<'cliente' | 'vendedor'>().notNull(),
+  pagadorNombre: text('pagador_nombre').notNull(),
+  createdAt: ts('created_at').notNull(),
+}).existing();
+
+export const vSaldoFavor = pgView('v_saldo_favor', {
+  clienteId: uuid('cliente_id'),
+  vendedorId: uuid('vendedor_id'),
+  saldo: numeric('saldo').notNull(),
 }).existing();

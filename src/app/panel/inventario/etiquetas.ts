@@ -18,6 +18,8 @@ export const ETIQUETA_MOVIMIENTO: Record<string, string> = {
   cancelacion_venta: 'Venta cancelada',
   cambio_estado: 'Cambio de estado',
   correccion: 'Corrección',
+  apartado: 'Apartada en pedido',
+  liberacion: 'Liberada de pedido',
 };
 
 type Manual = 'regalo' | 'defecto' | 'guardada' | 'disponible';

@@ -142,6 +142,68 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       ].map((c) => `pieza.${c}:UPDATE`),
     );
   });
+  it('matriz EXACTA de privilegios de tabla de kazero_app en todo public', async () => {
+    const r = await conDbUrl(urlOwner(), (db) =>
+      db.execute<{ p: string }>(sql`
+        SELECT table_name || ':' || privilege_type AS p FROM information_schema.table_privileges
+        WHERE grantee = 'kazero_app' AND table_schema = 'public'
+          AND table_name IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public')`),
+    );
+    const t = (tabla: string, ...privs: string[]) => privs.map((p) => `${tabla}:${p}`);
+    // La lista se escribe a mano a propósito: si alguien agrega un grant, esta prueba obliga a decidirlo aquí.
+    const esperado = [
+      ...t('acceso_log', 'DELETE', 'INSERT', 'SELECT'),
+      ...t('admin', 'SELECT'),
+      ...t('aplicacion_pago', 'INSERT', 'SELECT'),
+      ...t('auditoria', 'SELECT'), // Plan 2.1: la escribe solo kz_auditar (SECURITY DEFINER)
+      ...t('auditoria_campo', 'SELECT'),
+      ...t('categoria', 'INSERT', 'SELECT', 'UPDATE'),
+      ...t('cliente', 'INSERT', 'SELECT', 'UPDATE'),
+      ...t('codigo_recuperacion', 'INSERT', 'SELECT'),
+      ...t('exhibidor', 'INSERT', 'SELECT', 'UPDATE'),
+      ...t('idempotencia', 'DELETE', 'INSERT', 'SELECT', 'UPDATE'),
+      ...t('material', 'INSERT', 'SELECT', 'UPDATE'),
+      ...t('movimiento_pieza', 'INSERT', 'SELECT'),
+      ...t('pago', 'INSERT', 'SELECT'),
+      ...t('pedido', 'INSERT', 'SELECT'),
+      ...t('pedido_item', 'INSERT', 'SELECT'),
+      ...t('pieza', 'INSERT', 'SELECT'), // UPDATE por columna desde el Plan 2.1 (lo vigila su prueba)
+      ...t('proveedor', 'INSERT', 'SELECT', 'UPDATE'),
+      ...t('saldo_favor_mov', 'INSERT', 'SELECT'),
+      ...t('sesion', 'DELETE', 'INSERT', 'SELECT', 'UPDATE'),
+      ...t('vendedor', 'INSERT', 'SELECT', 'UPDATE'),
+    ].sort();
+    expect(r.rows.map((x) => x.p).sort()).toEqual(esperado);
+  });
+  it('UPDATE por columna en pedido, pedido_item y aplicacion_pago (R-11, R-27)', async () => {
+    const r = await conDbUrl(urlOwner(), (db) =>
+      db.execute<{ p: string }>(sql`
+        SELECT table_name || '.' || column_name AS p FROM information_schema.column_privileges
+        WHERE grantee = 'kazero_app' AND table_schema = 'public' AND privilege_type = 'UPDATE'
+          AND table_name IN ('pedido', 'pedido_item', 'aplicacion_pago')`),
+    );
+    const pedidoCols = [
+      'vendedor_id',
+      'fecha',
+      'estado',
+      'descuento_manual_monto',
+      'descuento_manual_motivo',
+      'total',
+      'notas',
+      'liquidado_at',
+      'cancelado_at',
+      'cancelacion_motivo',
+      'version',
+      'updated_at',
+    ];
+    expect(r.rows.map((x) => x.p).sort()).toEqual(
+      [
+        ...pedidoCols.map((c) => `pedido.${c}`),
+        ...['vigente', 'quitado_at', 'updated_at'].map((c) => `pedido_item.${c}`),
+        'aplicacion_pago.anulada_at',
+      ].sort(),
+    );
+  });
   it('kazero_app no tiene ningún privilegio sobre la secuencia de la bitácora', async () => {
     const r = await conDbUrl(urlOwner(), (db) =>
       db.execute<{ p: boolean }>(sql`

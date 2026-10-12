@@ -19,6 +19,7 @@ export type ExhibidorResumen = {
   vendedorId: string;
   vendedorNombre: string;
   piezasActuales: number;
+  piezasApartadas: number;
 };
 
 function datosValidos(d: { nombre: string; fechaEnvio: string }) {
