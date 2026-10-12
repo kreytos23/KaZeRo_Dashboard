@@ -1,8 +1,10 @@
 import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { cliente, vCliente } from '@/db/schema';
+import { calcularCambios } from '@/domain/auditoria';
 import { parsearFechaISO } from '@/domain/fechas';
 import { escaparLike, normalizar } from '@/domain/texto';
+import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 
 export interface DatosCliente {
@@ -53,17 +55,53 @@ export function crearCliente(db: Ejecutor, d: DatosCliente): Promise<string> {
 
 export function actualizarCliente(
   db: Ejecutor,
-  d: { id: string; version: number } & DatosCliente,
-): Promise<void> {
-  const valores = validar(d);
-  return conErroresDeNegocio(async () => {
-    const filas = await db
-      .update(cliente)
-      .set({ ...valores, version: sql`${cliente.version} + 1` })
-      .where(and(eq(cliente.id, d.id), eq(cliente.version, d.version)))
-      .returning({ id: cliente.id });
-    if (filas.length === 0) throw conflictoVersion();
-  });
+  d: { id: string; version: number; adminId: string; motivo?: string | null } & DatosCliente,
+): Promise<{ cambios: number }> {
+  const v = validar(d);
+  return conErroresDeNegocio(() =>
+    db.transaction(async (tx) => {
+      const [actual] = await tx
+        .select({
+          version: cliente.version,
+          nombre: cliente.nombre,
+          referencia: cliente.referencia,
+          telefono: cliente.telefono,
+          cumpleanos: cliente.cumpleanos,
+          redSocial: cliente.redSocial,
+          usuarioRed: cliente.usuarioRed,
+          vendedorHabitualId: cliente.vendedorHabitualId,
+          notas: cliente.notas,
+        })
+        .from(cliente)
+        .where(eq(cliente.id, d.id))
+        .for('no key update');
+      if (!actual) throw new ErrorNegocio('no_encontrado', 'El cliente no existe.');
+      if (actual.version !== d.version) throw conflictoVersion();
+      const fila = (x: typeof actual | typeof v) => ({
+        nombre: x.nombre,
+        referencia: x.referencia,
+        telefono: x.telefono,
+        cumpleanos: x.cumpleanos,
+        red_social: x.redSocial,
+        usuario_red: x.usuarioRed,
+        vendedor_habitual_id: x.vendedorHabitualId,
+        notas: x.notas,
+      });
+      const cambios = calcularCambios(fila(actual), fila(v));
+      if (cambios.length === 0) return { cambios: 0 };
+      await fijarContextoAuditoria(tx, {
+        adminId: d.adminId,
+        motivo: motivoPara('cliente', cambios, d.motivo),
+      });
+      const filas = await tx
+        .update(cliente)
+        .set({ ...v, version: sql`${cliente.version} + 1` })
+        .where(and(eq(cliente.id, d.id), eq(cliente.version, d.version)))
+        .returning({ id: cliente.id });
+      if (filas.length === 0) throw conflictoVersion();
+      return { cambios: cambios.length };
+    }),
+  );
 }
 
 // Lecturas por la vista v_cliente (ya trae el nombre del vendedor habitual: sin consulta extra por fila).

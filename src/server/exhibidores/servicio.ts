@@ -2,7 +2,9 @@ import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { exhibidor, movimientoPieza, pieza, vExhibidor, vPieza, vendedor } from '@/db/schema';
 import { normalizarCodigo } from '@/domain/codigos';
+import { calcularCambios } from '@/domain/auditoria';
 import { parsearFechaISO } from '@/domain/fechas';
+import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 
 const MAX_CODIGOS = 500;
@@ -19,16 +21,70 @@ export type ExhibidorResumen = {
   piezasActuales: number;
 };
 
-export async function crearExhibidor(
-  db: Ejecutor,
-  d: { vendedorId: string; nombre: string; fechaEnvio: string },
-): Promise<string> {
+function datosValidos(d: { nombre: string; fechaEnvio: string }) {
   const nombre = d.nombre.trim();
   if (!nombre || nombre.length > 120)
     throw new ErrorNegocio('exhibidor_invalido', 'El nombre debe tener entre 1 y 120 caracteres.', 'nombre');
   const fechaEnvio = parsearFechaISO(d.fechaEnvio);
   if (!fechaEnvio)
     throw new ErrorNegocio('exhibidor_invalido', 'La fecha de envío no es válida.', 'fechaEnvio');
+  return { nombre, fechaEnvio };
+}
+
+/** D5: solo nombre y fecha de envío, y solo mientras está abierto (uno cerrado es registro histórico). */
+export async function editarExhibidor(
+  db: Ejecutor,
+  d: {
+    exhibidorId: string;
+    version: number;
+    adminId: string;
+    motivo?: string | null;
+    nombre: string;
+    fechaEnvio: string;
+  },
+): Promise<{ cambios: number }> {
+  const v = datosValidos(d);
+  return conErroresDeNegocio(() =>
+    db.transaction(async (tx) => {
+      const [actual] = await tx
+        .select({
+          estado: exhibidor.estado,
+          version: exhibidor.version,
+          nombre: exhibidor.nombre,
+          fechaEnvio: exhibidor.fechaEnvio,
+        })
+        .from(exhibidor)
+        .where(eq(exhibidor.id, d.exhibidorId))
+        .for('no key update'); // ver el comentario de `bloquear`
+      if (!actual) throw new ErrorNegocio('no_encontrado', 'El exhibidor no existe.');
+      if (actual.estado === 'cerrado')
+        throw new ErrorNegocio('exhibidor_cerrado', 'Un exhibidor cerrado ya no se edita.');
+      if (actual.version !== d.version) throw conflictoVersion();
+      const cambios = calcularCambios(
+        { nombre: actual.nombre, fecha_envio: actual.fechaEnvio },
+        { nombre: v.nombre, fecha_envio: v.fechaEnvio },
+      );
+      if (cambios.length === 0) return { cambios: 0 };
+      await fijarContextoAuditoria(tx, {
+        adminId: d.adminId,
+        motivo: motivoPara('exhibidor', cambios, d.motivo),
+      });
+      const filas = await tx
+        .update(exhibidor)
+        .set({ ...v, version: sql`${exhibidor.version} + 1` })
+        .where(and(eq(exhibidor.id, d.exhibidorId), eq(exhibidor.version, d.version)))
+        .returning({ id: exhibidor.id });
+      if (filas.length === 0) throw conflictoVersion();
+      return { cambios: cambios.length };
+    }),
+  );
+}
+
+export async function crearExhibidor(
+  db: Ejecutor,
+  d: { vendedorId: string; nombre: string; fechaEnvio: string },
+): Promise<string> {
+  const { nombre, fechaEnvio } = datosValidos(d);
   return conErroresDeNegocio(async () => {
     const [e] = await db
       .insert(exhibidor)

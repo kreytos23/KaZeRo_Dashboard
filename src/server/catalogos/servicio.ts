@@ -1,8 +1,10 @@
-import { asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { categoria, material, proveedor, vCatalogo } from '@/db/schema';
+import { calcularCambios } from '@/domain/auditoria';
 import { normalizar } from '@/domain/texto';
-import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
+import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
+import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 
 export type TipoCatalogo = 'categoria' | 'material' | 'proveedor';
 
@@ -33,7 +35,7 @@ async function buscar(db: Ejecutor, tipo: TipoCatalogo, nombre: string) {
 /** Lectura: por la vista v_catalogo. */
 export function listarCatalogo(db: Ejecutor, tipo: TipoCatalogo) {
   return db
-    .select({ id: vCatalogo.id, nombre: vCatalogo.nombre })
+    .select({ id: vCatalogo.id, nombre: vCatalogo.nombre, version: vCatalogo.version })
     .from(vCatalogo)
     .where(eq(vCatalogo.tipo, tipo))
     .orderBy(asc(vCatalogo.nombre));
@@ -90,4 +92,45 @@ export function crearCatalogo(db: Ejecutor, tipo: TipoCatalogo, nombre: string):
     const [nuevo] = await db.insert(t).values({ nombre: limpio }).returning({ id: t.id });
     return nuevo!.id;
   });
+}
+
+/** D6: renombra con bloqueo optimista. La unicidad la da el índice kz_normalizar (→ "Ese material ya existe."). */
+export function renombrarCatalogo(
+  db: Ejecutor,
+  d: {
+    tipo: TipoCatalogo;
+    id: string;
+    version: number;
+    adminId: string;
+    motivo?: string | null;
+    nombre: string;
+  },
+): Promise<{ cambios: number }> {
+  const nombre = limpiar(d.nombre);
+  const t = TABLAS[d.tipo];
+  return conErroresDeNegocio(() =>
+    db.transaction(async (tx) => {
+      // NO KEY UPDATE: el alta de piezas toma KEY SHARE sobre el catálogo por la FK.
+      const [actual] = await tx
+        .select({ version: t.version, nombre: t.nombre })
+        .from(t)
+        .where(eq(t.id, d.id))
+        .for('no key update');
+      if (!actual) throw new ErrorNegocio('no_encontrado', 'Registro no encontrado.');
+      if (actual.version !== d.version) throw conflictoVersion();
+      const cambios = calcularCambios({ nombre: actual.nombre }, { nombre });
+      if (cambios.length === 0) return { cambios: 0 };
+      await fijarContextoAuditoria(tx, {
+        adminId: d.adminId,
+        motivo: motivoPara(d.tipo, cambios, d.motivo),
+      });
+      const filas = await tx
+        .update(t)
+        .set({ nombre, version: sql`${t.version} + 1` })
+        .where(and(eq(t.id, d.id), eq(t.version, d.version)))
+        .returning({ id: t.id });
+      if (filas.length === 0) throw conflictoVersion();
+      return { cambios: cambios.length };
+    }),
+  );
 }
