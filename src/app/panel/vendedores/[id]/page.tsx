@@ -4,8 +4,12 @@ import { notFound } from 'next/navigation';
 import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
 import { porcentajeLegible } from '@/domain/dinero';
+import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { Campo, Selector } from '@/features/ui/Campo';
+import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { FormAccion } from '@/features/ui/FormAccion';
+import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
+import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarExhibidores } from '@/server/exhibidores/servicio';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
@@ -18,12 +22,17 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [v, exhibidores] = await conDbLectura((db) =>
-    Promise.all([obtenerVendedor(db, id.data), listarExhibidores(db, { vendedorId: id.data })]),
+  const [v, exhibidores, cambios] = await conDbLectura((db) =>
+    Promise.all([
+      obtenerVendedor(db, id.data),
+      listarExhibidores(db, { vendedorId: id.data }),
+      historialDeCambios(db, 'vendedor', id.data),
+    ]),
   );
   if (!v) notFound();
   return (
     <section className="flex max-w-3xl flex-col gap-6">
+      <AvisoIndiceSucio version={v.version} />
       <h1 className="text-2xl font-semibold">{v.nombre}</h1>
       <FormAccion accion={accionEditarVendedor} textoBoton="Guardar cambios">
         {/* key por versión en los campos (no en el formulario): refresca los defaultValue sin perder el estado de la acción. */}
@@ -42,6 +51,7 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
           <label className="flex min-h-11 items-center gap-2 text-sm font-medium">
             <input type="checkbox" name="activo" defaultChecked={v.activo} className="size-5" /> Activo
           </label>
+          <CampoMotivo montos={[{ name: 'comision', tipo: 'porcentaje' }]} />
         </Fragment>
       </FormAccion>
       <h2 className="text-lg font-semibold">Exhibidores</h2>
@@ -55,6 +65,7 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
           </li>
         ))}
       </ul>
+      <HistorialCambios entradas={cambios} />
     </section>
   );
 }

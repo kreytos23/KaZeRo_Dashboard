@@ -24,7 +24,7 @@ export async function accionEditarCliente(_: EstadoAccion, fd: FormData): Promis
     const id = uuidDe(fd, 'id');
     const version = versionDe(fd);
     const vendedorHabitualId = uuidOpcionalDe(fd, 'vendedorHabitualId');
-    await conDb((db) =>
+    const { cambios } = await conDb((db) =>
       actualizarCliente(db, {
         id,
         version,
@@ -40,6 +40,7 @@ export async function accionEditarCliente(_: EstadoAccion, fd: FormData): Promis
         notas: texto(fd, 'notas'),
       }),
     );
+    if (cambios === 0) return 'Sin cambios.';
     revalidatePath(`/panel/clientes/${id}`);
     revalidatePath('/panel/clientes');
     return 'Cambios guardados.';

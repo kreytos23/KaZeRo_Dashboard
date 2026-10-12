@@ -7,7 +7,13 @@ import { ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
 import { partirCodigos } from '@/features/exhibidores/codigos';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { ErrorNegocio } from '@/server/errores';
-import { cerrarExhibidor, crearExhibidor, enviarPiezas, regresarPiezas } from '@/server/exhibidores/servicio';
+import {
+  cerrarExhibidor,
+  crearExhibidor,
+  editarExhibidor,
+  enviarPiezas,
+  regresarPiezas,
+} from '@/server/exhibidores/servicio';
 
 const codigosDe = (fd: FormData) => partirCodigos(texto(fd, 'codigos'));
 
@@ -74,5 +80,32 @@ export async function accionCerrar(_: EstadoAccion, fd: FormData): Promise<Estad
     await conDb((db) => cerrarExhibidor(db, { exhibidorId, version }));
     revalidarPiezas(exhibidorId);
     return 'Exhibidor cerrado.';
+  });
+}
+
+export async function accionEditarExhibidor(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const exhibidorId = uuidDe(fd, 'exhibidorId');
+    if (texto(fd, 'nombre').length > 200)
+      throw new ErrorNegocio(
+        'exhibidor_invalido',
+        'El nombre debe tener entre 1 y 120 caracteres.',
+        'nombre',
+      );
+    const { cambios } = await conDb((db) =>
+      editarExhibidor(db, {
+        exhibidorId,
+        version: versionDe(fd),
+        adminId,
+        motivo: texto(fd, 'motivo'),
+        nombre: texto(fd, 'nombre'),
+        fechaEnvio: texto(fd, 'fechaEnvio').slice(0, 20),
+      }),
+    );
+    if (cambios === 0) return 'Sin cambios.';
+    revalidarPiezas(exhibidorId); // la ficha de pieza muestra el nombre del exhibidor
+    revalidatePath('/panel/vendedores/[id]', 'page');
+    return 'Cambios guardados.';
   });
 }

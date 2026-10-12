@@ -35,9 +35,15 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await page.getByRole('link', { name: `Nelly ${m}` }).click();
   await expect(page.getByRole('heading', { name: `Nelly ${m}` })).toBeVisible();
   await page.getByLabel('Comisión (%)').fill('20');
+  // R-09: cambiar dinero exige motivo; el campo lo anuncia en su etiqueta.
+  await expect(page.getByLabel('Motivo del cambio (obligatorio)')).toBeVisible();
+  await page.getByLabel('Motivo del cambio').fill('Nueva tabla de comisiones');
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(estadoCon(page, 'Cambios guardados.')).toBeVisible();
   await expect(page.getByLabel('Comisión (%)')).toHaveValue('20');
+  const historial = page.getByRole('region', { name: 'Historial de cambios' });
+  await expect(historial).toContainText('Comisión: 18 % → 20 %');
+  await expect(historial).toContainText('Motivo: Nueva tabla de comisiones');
 
   await irA(page, '/panel/inventario/nueva');
   await page.getByLabel('Prefijo').fill(prefijo);
@@ -194,6 +200,76 @@ test('cliente con alta rápida se encuentra sin acentos', async ({ page }, info)
   await page.getByLabel('Notas').fill('Prefiere plata');
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(estadoCon(page, 'Cambios guardados.')).toBeVisible();
+
+  // Cambiar el teléfono (sin dinero: el motivo es opcional) deja antes → después en el historial.
+  const historial = page.getByRole('region', { name: 'Historial de cambios' });
+  await expect(page.getByLabel('Motivo del cambio (opcional)')).toBeVisible();
+  await page.getByLabel('Teléfono').fill('5551234567');
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(historial).toContainText('Teléfono: — → 5551234567');
+  await page.getByLabel('Teléfono').fill('5559876543');
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(historial).toContainText('Teléfono: 5551234567 → 5559876543');
+  // Sin cambios: no se escribe nada.
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(estadoCon(page, 'Sin cambios.')).toBeVisible();
+});
+
+test('editar un exhibidor abierto y renombrar un catálogo, ambos con historial', async ({ page }, info) => {
+  const m = marca(info.project.name);
+
+  await irA(page, '/panel/vendedores');
+  await page.getByLabel('Nombre').fill(`Edith ${m}`);
+  await page.getByLabel('Tipo').selectOption('consignacion');
+  await page.getByLabel('Comisión (%)').fill('10');
+  await page.getByRole('button', { name: 'Agregar vendedor' }).click();
+  await expect(estadoCon(page, 'Vendedor agregado.')).toBeVisible();
+
+  await irA(page, '/panel/exhibidores');
+  await page.getByLabel('Vendedor', { exact: true }).selectOption({ label: `Edith ${m}` });
+  await page.getByLabel('Nombre del exhibidor').fill(`Vitrina ${m}`);
+  await page.getByRole('button', { name: 'Crear exhibidor' }).click();
+  await expect(estadoCon(page, 'Exhibidor creado.')).toBeVisible();
+  await page.getByRole('link', { name: `Vitrina ${m}` }).click();
+  await expect(page.getByRole('heading', { name: `Vitrina ${m}` })).toBeVisible();
+
+  // Editar nombre (el desplegable se abre con el teclado: es un <summary>).
+  await page.getByText('Editar exhibidor').click();
+  await page.getByLabel('Nombre', { exact: true }).fill(`Vitrina nueva ${m}`);
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(estadoCon(page, 'Cambios guardados.')).toBeVisible();
+  await expect(page.getByRole('heading', { name: `Vitrina nueva ${m}` })).toBeVisible();
+  const historialEx = page.getByRole('region', { name: 'Historial de cambios' });
+  await expect(historialEx).toContainText(`Nombre: Vitrina ${m} → Vitrina nueva ${m}`);
+
+  // Cerrado: ya no se edita y se explica por qué.
+  await page.getByLabel('Confirmo que quiero cerrar este exhibidor; no se puede reabrir.').check();
+  await page.getByRole('button', { name: 'Cerrar exhibidor' }).click();
+  await expect(estadoCon(page, 'Exhibidor cerrado.')).toBeVisible();
+  await expect(page.getByText('Editar exhibidor')).toHaveCount(0);
+  await expect(page.getByText('Un exhibidor cerrado es un registro histórico')).toBeVisible();
+
+  // Catálogo: renombrar con error por campo si ya existe, y con historial por elemento.
+  await irA(page, '/panel/catalogos');
+  const viejo = `Cat${m}`;
+  const otro = `Otra${m}`;
+  const nuevo = `Cat nueva ${m}`;
+  for (const nombre of [viejo, otro]) {
+    await page.getByLabel('Nueva categoría').fill(nombre);
+    await page.getByRole('button', { name: 'Agregar' }).first().click();
+    await expect(page.locator('summary', { hasText: nombre })).toBeVisible();
+  }
+  await page.locator('summary', { hasText: viejo }).click();
+  const campo = page.getByLabel(`Nuevo nombre para ${viejo}`);
+  await campo.fill(otro);
+  await page.getByRole('button', { name: 'Guardar nombre' }).click();
+  await expect(page.getByText('Esa categoría ya existe.')).toBeVisible();
+  await expect(campo).toHaveAttribute('aria-invalid', 'true');
+  await campo.fill(nuevo);
+  await page.getByRole('button', { name: 'Guardar nombre' }).click();
+  await expect(estadoCon(page, 'Nombre actualizado.')).toBeVisible();
+  const historialCat = page.getByRole('region', { name: `Cambios de ${nuevo}` });
+  await expect(historialCat).toContainText(`Nombre: ${viejo} → ${nuevo}`);
 });
 
 test('agregar administrador muestra el QR y los códigos hasta ocultarlos', async ({ page }, info) => {
