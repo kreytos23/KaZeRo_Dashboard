@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { destinosManuales, ETIQUETA_ESTADO, ETIQUETA_MOVIMIENTO } from '@/app/panel/inventario/etiquetas';
+import {
+  destinosManuales,
+  ETIQUETA_ESTADO,
+  ETIQUETA_MOVIMIENTO,
+  textoBotonFoto,
+} from '@/app/panel/inventario/etiquetas';
 import { tipoMovimiento } from '@/db/schema';
 import { POR_PAGINA, leerFiltros } from '@/app/panel/inventario/filtros';
+
+describe('textoBotonFoto', () => {
+  it('el botón de la foto dice Subir o Cambiar según haya foto', () => {
+    expect(textoBotonFoto(false)).toBe('Subir foto');
+    expect(textoBotonFoto(true)).toBe('Cambiar foto');
+  });
+});
 
 describe('destinosManuales', () => {
   it('coincide con las transiciones manuales del servicio', () => {

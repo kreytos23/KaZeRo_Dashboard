@@ -229,11 +229,33 @@ export function BuscadorGlobal() {
               }}
               className={`min-h-11 cursor-pointer px-3 py-2 ${i === sel ? 'bg-rubor-suave' : ''}`}
             >
-              <span className="block text-xs font-semibold uppercase tracking-wide text-tinta-suave">
-                {ETIQUETA_TIPO[r.tipo]}
+              <span className="flex items-center gap-3">
+                {r.tipo === 'pieza' &&
+                  (r.miniatura ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- miniatura privada servida por /api con sesión
+                    <img
+                      src={r.miniatura}
+                      alt=""
+                      width={40}
+                      height={40}
+                      loading="lazy"
+                      decoding="async"
+                      className="size-10 shrink-0 rounded border border-borde bg-white object-cover"
+                    />
+                  ) : (
+                    <span
+                      aria-hidden="true"
+                      className="size-10 shrink-0 rounded border border-borde bg-white"
+                    />
+                  ))}
+                <span className="min-w-0">
+                  <span className="block text-xs font-semibold uppercase tracking-wide text-tinta-suave">
+                    {ETIQUETA_TIPO[r.tipo]}
+                  </span>
+                  <span className="block text-sm font-medium">{r.titulo}</span>
+                  <span className="block text-xs text-tinta-suave">{r.subtitulo}</span>
+                </span>
               </span>
-              <span className="block text-sm font-medium">{r.titulo}</span>
-              <span className="block text-xs text-tinta-suave">{r.subtitulo}</span>
             </li>
           ))}
       </ul>

@@ -6,6 +6,7 @@ import { codigoDeSegmento, tituloDeCodigo } from '@/domain/codigos';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { describirDestino, destinoCorreccion } from '@/domain/correccion';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
+import { FotoPieza } from '@/features/imagenes/FotoPieza';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { FormAccion } from '@/features/ui/FormAccion';
@@ -15,9 +16,10 @@ import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarCatalogo } from '@/server/catalogos/servicio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { historial, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
-import { accionCambiarEstado, accionEditarPieza } from '../acciones';
+import { accionCambiarEstado, accionEditarPieza, accionQuitarImagen } from '../acciones';
 import { ETIQUETA_ESTADO, ETIQUETA_MOVIMIENTO, destinosManuales } from '../etiquetas';
 import { FormDeshacerCambio } from './FormDeshacerCambio';
+import { FormFoto } from './FormFoto';
 
 // El título sale del código de la URL (normalizado y validado): sin consulta extra a la BD.
 export async function generateMetadata({ params }: { params: Promise<{ codigo: string }> }) {
@@ -52,6 +54,37 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
         <h1 className="font-mono text-2xl font-semibold">{p.codigo}</h1>
         <p className="text-tinta-suave">{p.descripcion}</p>
       </div>
+      <section aria-labelledby="foto-pieza" className="flex flex-col gap-3">
+        <h2 id="foto-pieza" className="sr-only">
+          Foto
+        </h2>
+        <FotoPieza piezaId={p.id} clave={p.imagenClave} alt={p.descripcion} variante="grande" />
+        <details className="tarjeta p-4">
+          <summary className="min-h-11 cursor-pointer content-center font-medium">
+            {p.imagenClave ? 'Cambiar o quitar la foto' : 'Agregar foto'}
+          </summary>
+          <div className="mt-3 flex flex-col gap-4">
+            {/* Sin key por versión: así el aviso "Foto guardada." sobrevive al refresco de la ficha. */}
+            <FormFoto piezaId={p.id} version={p.version} tieneFoto={Boolean(p.imagenClave)} />
+            {p.imagenClave && (
+              <FormAccion
+                accion={accionQuitarImagen}
+                textoBoton="Quitar foto"
+                className="flex flex-col gap-3"
+              >
+                <Fragment key={p.version}>
+                  <input type="hidden" name="piezaId" value={p.id} />
+                  <input type="hidden" name="version" value={p.version} />
+                  <label className="flex min-h-11 items-center gap-2">
+                    <input type="checkbox" name="confirmo" value="si" required />
+                    Confirmo que quiero quitar la foto.
+                  </label>
+                </Fragment>
+              </FormAccion>
+            )}
+          </div>
+        </details>
+      </section>
       <dl className="grid grid-cols-2 gap-2 text-sm">
         <dt className="font-medium">Estado</dt>
         <dd>{ETIQUETA_ESTADO[p.estado]}</dd>
