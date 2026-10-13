@@ -63,7 +63,7 @@ export default async function globalSetup() {
   });
   mkdirSync(DIR_DATOS, { recursive: true });
   rmSync(RUTA_PASO, { force: true });
-  writeFileSync(RUTA_DATOS, JSON.stringify({ email, password, secretoTotp: a.secretoTotp }));
+  writeFileSync(RUTA_DATOS, JSON.stringify({ adminId: a.id, email, password, secretoTotp: a.secretoTotp }));
   writeFileSync(RUTA_DATOS_REGEN, JSON.stringify(regen));
   await sesionPrecargada(a.id, RUTA_ESTADO);
   await sesionPrecargada(r.id, RUTA_ESTADO_REGEN);
