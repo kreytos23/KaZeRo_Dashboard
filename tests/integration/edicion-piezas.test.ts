@@ -12,7 +12,7 @@ import {
   type EdicionPieza,
   type FichaPieza,
 } from '@/server/piezas/servicio';
-import { adminDePrueba, truncarTodo, urlApp, urlOwner } from './utilidades';
+import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 const base = {
@@ -26,8 +26,7 @@ const base = {
 
 let adminId: string;
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
 });
 
 async function nueva(codigo = 'ED01'): Promise<FichaPieza> {

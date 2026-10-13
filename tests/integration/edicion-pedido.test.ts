@@ -9,7 +9,7 @@ import { registrarPagoDePedido } from '@/server/pagos/servicio';
 import { cancelarPedido, crearPedido, editarPedido, type DatosEdicion } from '@/server/pedidos/servicio';
 import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
-import { adminDePrueba, truncarTodo, urlApp, urlOwner } from './utilidades';
+import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 let adminId = '';
@@ -60,8 +60,7 @@ async function editar(id: string, cambios: Partial<DatosEdicion>) {
 }
 
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
   ctx = {
     vendedorId: await app((db) => crearVendedor(db, { nombre: 'Kazero', tipo: 'casa', comisionPct: '0.00' })),
     clienteId: await app((db) => crearCliente(db, { nombre: 'Michelle' })),

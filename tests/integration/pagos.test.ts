@@ -14,7 +14,7 @@ import { registrarPagoDePedido, type DatosPagoPedido } from '@/server/pagos/serv
 import { cancelarPedido, crearPedido } from '@/server/pedidos/servicio';
 import { altaPieza, historial, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
-import { adminDePrueba, truncarTodo, urlApp } from './utilidades';
+import { reiniciarConAdmin, urlApp } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 let adminId = '';
@@ -58,8 +58,7 @@ const ficha = (id: string) =>
   app(async (db) => (await db.select().from(vPedido).where(eq(vPedido.id, id)))[0]!);
 
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
   ctx = {
     vendedorId: await app((db) =>
       crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),

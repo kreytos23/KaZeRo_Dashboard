@@ -17,15 +17,14 @@ import {
   obtenerPiezaPorCodigo,
 } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
-import { adminDePrueba, truncarTodo, urlApp } from './utilidades';
+import { reiniciarConAdmin, urlApp } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 const ficha = (codigo = 'CO01') => app((db) => obtenerPiezaPorCodigo(db, codigo)).then((f) => f!);
 
 let adminId: string;
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
 });
 
 async function nueva(codigo = 'CO01') {

@@ -9,7 +9,7 @@ import { crearExhibidor, enviarPiezas, regresarPiezas } from '@/server/exhibidor
 import { crearPedido, type DatosPedido } from '@/server/pedidos/servicio';
 import { altaPieza, historial, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { actualizarVendedor, crearVendedor } from '@/server/vendedores/servicio';
-import { adminDePrueba, truncarTodo, urlApp, urlOwner } from './utilidades';
+import { reiniciarConAdmin, truncarTodo, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 let adminId = '';
@@ -54,8 +54,7 @@ beforeAll(async () => {
   await truncarTodo();
 });
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
   const vendedorId = await app((db) =>
     crearVendedor(db, { nombre: 'Kazero', tipo: 'casa', comisionPct: '0.00' }),
   );

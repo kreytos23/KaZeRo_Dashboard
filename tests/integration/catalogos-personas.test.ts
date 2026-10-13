@@ -14,14 +14,13 @@ import {
   listarVendedores,
   obtenerVendedor,
 } from '@/server/vendedores/servicio';
-import { adminDePrueba, truncarTodo, urlApp } from './utilidades';
+import { reiniciarConAdmin, urlApp } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 
 let adminId: string;
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
 });
 
 describe('catálogos', () => {

@@ -11,14 +11,13 @@ import {
 } from '@/server/exhibidores/servicio';
 import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { actualizarVendedor, crearVendedor, obtenerVendedor } from '@/server/vendedores/servicio';
-import { adminDePrueba, truncarTodo, urlApp } from './utilidades';
+import { reiniciarConAdmin, urlApp } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 
 let adminId: string;
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
 });
 
 describe('vendedor (R-08, R-09)', () => {

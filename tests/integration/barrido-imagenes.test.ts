@@ -7,7 +7,7 @@ import { cambiarImagenPieza, clavesDeImagenReferenciadas } from '@/server/piezas
 import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { crearAlmacenMemoria } from '../apoyo/almacen-memoria';
 import { jpegDePrueba } from '../apoyo/imagenes';
-import { adminDePrueba, truncarTodo, urlApp } from './utilidades';
+import { reiniciarConAdmin, urlApp } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 
@@ -15,8 +15,7 @@ const base = { categoria: 'Anillos', descripcion: 'Anillo luna', costoCentavos: 
 
 let adminId: string;
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
 });
 
 describe('barrido contra la BD real', () => {

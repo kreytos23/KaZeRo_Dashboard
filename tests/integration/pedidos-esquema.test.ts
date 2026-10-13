@@ -18,7 +18,7 @@ import {
 } from '@/db/schema';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { traducirErrorPg } from '@/server/errores';
-import { adminDePrueba, truncarTodo, urlApp, urlOwner } from './utilidades';
+import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 const owner = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlOwner(), fn);
@@ -131,8 +131,7 @@ const moverPieza = (
   );
 
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
 });
 
 describe('reglas de pedidos en la BD', () => {

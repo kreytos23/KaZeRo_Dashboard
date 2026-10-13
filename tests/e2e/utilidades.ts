@@ -2,11 +2,13 @@ import { expect, type Page } from '@playwright/test';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { generarCodigoTotp } from '../../src/server/auth/totp';
 
-export const RUTA_DATOS = 'playwright/.datos/admin.json';
-export const RUTA_ESTADO = 'playwright/.datos/estado.json';
-export const RUTA_ESTADO_REGEN = 'playwright/.datos/estado-regen.json';
-export const RUTA_DATOS_REGEN = 'playwright/.datos/admin-regen.json';
-export const RUTA_PASO = 'playwright/.datos/ultimo-paso';
+// Cada proceso de Playwright (uno por proyecto, ver scripts/test-neon.ts) usa su propio directorio de datos.
+export const DIR_DATOS = process.env.KAZERO_E2E_DATOS ?? 'playwright/.datos';
+export const RUTA_DATOS = `${DIR_DATOS}/admin.json`;
+export const RUTA_ESTADO = `${DIR_DATOS}/estado.json`;
+export const RUTA_ESTADO_REGEN = `${DIR_DATOS}/estado-regen.json`;
+export const RUTA_DATOS_REGEN = `${DIR_DATOS}/admin-regen.json`;
+export const RUTA_PASO = `${DIR_DATOS}/ultimo-paso`;
 
 export function datosAdmin(): { email: string; password: string; secretoTotp: string } {
   return JSON.parse(readFileSync(RUTA_DATOS, 'utf8'));

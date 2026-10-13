@@ -5,7 +5,7 @@ import { conDbUrl } from '@/db/pool';
 import { categoria } from '@/db/schema';
 import { ErrorNegocio } from '@/server/errores';
 import { conIdempotencia, limpiarIdempotencia } from '@/server/idempotencia';
-import { adminDePrueba, truncarTodo, urlApp, urlOwner } from './utilidades';
+import { reiniciarConAdmins, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 const owner = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlOwner(), fn);
@@ -48,9 +48,9 @@ const cuantas = () =>
   );
 
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba('a@kazero.test');
-  otroAdminId = await adminDePrueba('b@kazero.test');
+  const ids = await reiniciarConAdmins('a@kazero.test', 'b@kazero.test');
+  adminId = ids[0]!;
+  otroAdminId = ids[1]!;
 });
 
 describe('conIdempotencia (R-37)', () => {

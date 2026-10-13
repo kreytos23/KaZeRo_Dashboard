@@ -6,7 +6,14 @@ import { sesion } from '../../src/db/schema';
 import { crearAdmin } from '../../src/server/auth/admin';
 import { nuevoToken } from '../../src/server/auth/tokens';
 import { verificarRamaPrueba } from '../../scripts/lib/rama-prueba';
-import { RUTA_DATOS, RUTA_DATOS_REGEN, RUTA_ESTADO, RUTA_ESTADO_REGEN, RUTA_PASO } from './utilidades';
+import {
+  DIR_DATOS,
+  RUTA_DATOS,
+  RUTA_DATOS_REGEN,
+  RUTA_ESTADO,
+  RUTA_ESTADO_REGEN,
+  RUTA_PASO,
+} from './utilidades';
 
 /** Sesión completa creada directo en BD + storageState con su cookie (así no se repite el login con TOTP). */
 async function sesionPrecargada(adminId: string, ruta: string) {
@@ -42,7 +49,7 @@ async function sesionPrecargada(adminId: string, ruta: string) {
 }
 
 export default async function globalSetup() {
-  verificarRamaPrueba(process.env);
+  verificarRamaPrueba(process.env, process.env.KAZERO_ARCHIVO_RAMA);
   const email = 'e2e@kazero.test';
   const password = randomBytes(18).toString('base64url');
   const regen = { email: 'regen@kazero.test', password: randomBytes(18).toString('base64url') };
@@ -54,7 +61,7 @@ export default async function globalSetup() {
     const key = process.env.KAZERO_TOTP_KEY!;
     return [await crearAdmin(db, { email, password }, key), await crearAdmin(db, regen, key)] as const;
   });
-  mkdirSync('playwright/.datos', { recursive: true });
+  mkdirSync(DIR_DATOS, { recursive: true });
   rmSync(RUTA_PASO, { force: true });
   writeFileSync(RUTA_DATOS, JSON.stringify({ email, password, secretoTotp: a.secretoTotp }));
   writeFileSync(RUTA_DATOS_REGEN, JSON.stringify(regen));

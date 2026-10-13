@@ -9,7 +9,7 @@ import { registrarPagoDePedido } from '@/server/pagos/servicio';
 import { cancelarPedido, crearPedido } from '@/server/pedidos/servicio';
 import { altaPieza, historial, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
-import { adminDePrueba, truncarTodo, urlApp, urlOwner } from './utilidades';
+import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 let adminId = '';
@@ -46,8 +46,7 @@ async function cancelar(id: string, motivo = 'Ya no la quiere', key = randomUUID
 }
 
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
   ctx = {
     vendedorId: await app((db) =>
       crearVendedor(db, { nombre: 'Zeltzin', tipo: 'revendedora', comisionPct: '15.00' }),

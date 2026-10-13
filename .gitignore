@@ -24,6 +24,7 @@ docs/
 .superpowers/
 
 .neon-prueba.json
+.neon-prueba-*.json
 playwright/.datos/
 next-env.d.ts
 *.tsbuildinfo

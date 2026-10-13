@@ -3,6 +3,9 @@ import { hostNormalizado } from './guarda-bd';
 
 export const ARCHIVO_RAMA_PRUEBA = '.neon-prueba.json';
 
+/** Integración en paralelo: un archivo de registro por worker (rama propia). */
+export const archivoRamaTrabajador = (indice: number) => `.neon-prueba-${indice}.json`;
+
 /**
  * Las suites truncan tablas: si alguna vez pueden apuntar a otra base, acabarán haciéndolo (lecciones §3).
  * Solo se permite la rama test-* que acaba de crear scripts/test-neon.ts.

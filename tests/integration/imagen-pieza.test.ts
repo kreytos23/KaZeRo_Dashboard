@@ -17,7 +17,7 @@ import {
 import { altaPieza, listarPiezas, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { crearAlmacenMemoria } from '../apoyo/almacen-memoria';
 import { jpegDePrueba } from '../apoyo/imagenes';
-import { adminDePrueba, truncarTodo, urlApp, urlOwner } from './utilidades';
+import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 const owner = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlOwner(), fn);
@@ -25,8 +25,7 @@ const base = { categoria: 'Anillos', descripcion: 'Anillo luna', costoCentavos: 
 
 let adminId: string;
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
 });
 
 async function capturar(fn: () => Promise<unknown>) {
