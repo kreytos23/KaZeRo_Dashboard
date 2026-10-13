@@ -44,4 +44,14 @@ describe('GET /api/pedidos/previa', () => {
       { clienteId: U, codigos: ['AF12', 'AF13'], cuentaTarjeta: true },
     );
   });
+  it('si la base falla: 500 JSON sin caché y sin filtrar el mensaje', async () => {
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    previsualizar.mockRejectedValue(new Error('conexión a postgres://secreto falló'));
+    const r = await pedir(`?cliente=${U}&tarjeta=1`);
+    expect(r.status).toBe(500);
+    expect(r.headers.get('cache-control')).toBe('private, no-store');
+    expect(await r.json()).toEqual({ error: 'error_interno' });
+    expect(JSON.stringify(log.mock.calls)).not.toContain('secreto');
+    log.mockRestore();
+  });
 });

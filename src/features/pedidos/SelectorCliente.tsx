@@ -1,9 +1,10 @@
 'use client';
 
-import { useContext, useId, useMemo, useState } from 'react';
+import { useContext, useId, useMemo, useRef, useState } from 'react';
 import { accionClienteRapido } from '@/app/panel/pedidos/acciones';
 import { normalizar } from '@/domain/texto';
 import { ErroresCampo } from '@/features/ui/errores-campo';
+import { unaALaVez } from '@/features/ui/una-a-la-vez';
 import { crearMotor } from '@/search/motor';
 import { marcarIndiceSucio } from '@/search/eventos';
 import { useIndiceBusqueda } from '@/search/useIndiceBusqueda';
@@ -39,6 +40,8 @@ export function SelectorCliente({
   const [abierto, setAbierto] = useState(false);
   const [creando, setCreando] = useState(false);
   const [errorAlta, setErrorAlta] = useState('');
+  // Un doble clic (o Enter repetido) antes de re-renderizar no debe crear dos clientes: el guardián es síncrono.
+  const altaRapida = useRef(unaALaVez(accionClienteRapido));
 
   const motor = useMemo(() => (indice ? crearMotor(indice) : null), [indice]);
   const limpio = q.trim().replace(/\s+/g, ' ');
@@ -74,7 +77,7 @@ export function SelectorCliente({
     setCreando(true);
     setErrorAlta('');
     try {
-      const r = await accionClienteRapido(limpio);
+      const r = await altaRapida.current(limpio);
       if (r.error || !r.id) {
         setErrorAlta(r.error ?? 'No se pudo crear el cliente. Intenta de nuevo.');
         return;

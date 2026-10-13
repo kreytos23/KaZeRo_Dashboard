@@ -36,7 +36,11 @@ export async function accionCrearPedido(_: EstadoAccion, fd: FormData): Promise<
       throw new ErrorNegocio('cliente_requerido', 'Elige un cliente.', 'clienteId');
     const codigos = fd.getAll('codigo').filter((c): c is string => typeof c === 'string');
     if (codigos.length > MAX_PIEZAS_PEDIDO)
-      throw new ErrorNegocio('sin_piezas', `Máximo ${MAX_PIEZAS_PEDIDO} piezas por pedido.`, 'codigos');
+      throw new ErrorNegocio(
+        'demasiadas_piezas',
+        `Máximo ${MAX_PIEZAS_PEDIDO} piezas por pedido.`,
+        'codigos',
+      );
     const r = await conDb((db) =>
       crearPedido(db, {
         key: uuidDe(fd, 'key'),

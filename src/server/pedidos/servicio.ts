@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import {
   aplicacionPago,
@@ -280,7 +280,7 @@ export async function cancelarPedido(
           if (itemIds.length)
             await tx
               .update(pedidoItem)
-              .set({ vigente: false, quitadoAt: new Date() })
+              .set({ vigente: false, quitadoAt: sql`now()` })
               .where(inArray(pedidoItem.id, itemIds));
           // R-17 + P2: lo abonado pasa a saldo a favor de quien pagó; las aplicaciones se anulan.
           const aplicaciones = await tx
@@ -297,7 +297,7 @@ export async function cancelarPedido(
           if (aplicaciones.length) {
             await tx
               .update(aplicacionPago)
-              .set({ anuladaAt: new Date() })
+              .set({ anuladaAt: sql`now()` })
               .where(
                 inArray(
                   aplicacionPago.id,
@@ -320,7 +320,7 @@ export async function cancelarPedido(
             .update(pedido)
             .set({
               estado: 'cancelado',
-              canceladoAt: new Date(),
+              canceladoAt: sql`now()`,
               cancelacionMotivo: motivo,
               version: sql`${pedido.version} + 1`,
             })
@@ -408,7 +408,8 @@ export async function editarPedido(
             })
             .from(pedidoItem)
             .innerJoin(pieza, eq(pieza.id, pedidoItem.piezaId))
-            .where(and(eq(pedidoItem.pedidoId, p.id), eq(pedidoItem.vigente, true)));
+            .where(and(eq(pedidoItem.pedidoId, p.id), eq(pedidoItem.vigente, true)))
+            .orderBy(asc(pieza.codigo));
           const enPedido = new Set(items.map((i) => i.codigo));
           const ajenas = v.quitar.filter((c) => !enPedido.has(c));
           if (ajenas.length)
@@ -496,7 +497,7 @@ export async function editarPedido(
             });
             await tx
               .update(pedidoItem)
-              .set({ vigente: false, quitadoAt: new Date() })
+              .set({ vigente: false, quitadoAt: sql`now()` })
               .where(
                 and(
                   eq(pedidoItem.pedidoId, p.id),

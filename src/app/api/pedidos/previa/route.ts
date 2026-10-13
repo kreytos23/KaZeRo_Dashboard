@@ -14,6 +14,12 @@ export async function GET(req: Request) {
     );
   const consulta = leerConsultaPrevia(new URL(req.url).searchParams);
   if (!consulta) return Response.json({ error: 'consulta_invalida' }, { status: 400, headers: SIN_CACHE });
-  const previa = await conDbLectura((db) => previsualizarPedido(db, consulta));
-  return Response.json(previa, { headers: SIN_CACHE });
+  try {
+    const previa = await conDbLectura((db) => previsualizarPedido(db, consulta));
+    return Response.json(previa, { headers: SIN_CACHE });
+  } catch (e) {
+    // Solo el nombre del error: el mensaje puede traer datos de clientes.
+    console.error('[pedidos/previa] falló', e instanceof Error ? e.name : typeof e);
+    return Response.json({ error: 'error_interno' }, { status: 500, headers: SIN_CACHE });
+  }
 }

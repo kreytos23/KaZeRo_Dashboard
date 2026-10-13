@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { conDbUrl } from '@/db/pool';
+import { conDbUrl, type Ejecutor } from '@/db/pool';
 import { pedido, pieza, vPedido, vPedidoItem } from '@/db/schema';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { crearCliente } from '@/server/clientes/servicio';
 import { crearExhibidor, enviarPiezas, regresarPiezas } from '@/server/exhibidores/servicio';
+import { bloquearPiezasParaApartar } from '@/server/pedidos/comun';
 import { crearPedido, type DatosPedido } from '@/server/pedidos/servicio';
 import { altaPieza, historial, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { actualizarVendedor, crearVendedor } from '@/server/vendedores/servicio';
@@ -46,6 +47,39 @@ function crear(d: Partial<DatosPedido> & { codigos: string[] }) {
 async function comprasLiquidadas(n: number, prefijo = 'LQ') {
   const codigos = await piezas(prefijo, n, 0);
   for (const c of codigos) expect((await crear({ codigos: [c] })).estado).toBe('liquidado');
+}
+/**
+ * Ejecutor que corre `despues` justo tras resolverse la PRIMERA consulta `select` (la lectura sin bloqueo del
+ * exhibidor en bloquearPiezasParaApartar). Hace determinista la carrera "enviar entre la lectura y el bloqueo".
+ */
+function intercalar(tx: Ejecutor, despues: () => Promise<void>): Ejecutor {
+  let usado = false;
+  const envolver = <B extends object>(constructor: B): B =>
+    new Proxy(constructor, {
+      get(t, prop) {
+        if (prop === 'then')
+          return (ok: (v: unknown) => unknown, ko: (e: unknown) => unknown) =>
+            (t as unknown as Promise<unknown>)
+              .then(async (v) => {
+                await despues();
+                return v;
+              })
+              .then(ok, ko);
+        const v = Reflect.get(t, prop, t) as unknown;
+        return typeof v === 'function' ? (...a: unknown[]) => envolver(v.apply(t, a) as object) : v;
+      },
+    });
+  return new Proxy(tx, {
+    get(t, prop) {
+      const v = Reflect.get(t, prop, t) as unknown;
+      if (prop === 'select' && !usado)
+        return (...a: unknown[]) => {
+          usado = true;
+          return envolver((v as (...x: unknown[]) => object).apply(t, a));
+        };
+      return typeof v === 'function' ? v.bind(t) : v;
+    },
+  });
 }
 const fichaPedido = (id: string) =>
   app(async (db) => (await db.select().from(vPedido).where(eq(vPedido.id, id)))[0]!);
@@ -303,6 +337,38 @@ describe('crearPedido', () => {
       'Este formulario ya se envió con otros datos. Recarga la página.',
     );
     expect((await app((db) => obtenerPiezaPorCodigo(db, b!)))!.estado).toBe('disponible');
+  });
+
+  it('pasar del tope de piezas usa su propio código de error (no sin_piezas)', async () => {
+    const codigos = Array.from({ length: 101 }, (_, i) => `TOPE${i}`);
+    await expect(crear({ codigos })).rejects.toMatchObject({
+      name: 'ErrorNegocio',
+      codigo: 'demasiadas_piezas',
+      campo: 'codigos',
+    });
+    await expect(crear({ codigos: [] })).rejects.toMatchObject({ codigo: 'sin_piezas' });
+  });
+
+  it('SAVEPOINT: si la pieza entra a un exhibidor entre la lectura y el bloqueo, se reintenta en orden', async () => {
+    const [a] = await piezas('PX', 1);
+    const exhibidorId = await app((db) =>
+      crearExhibidor(db, { vendedorId: ctx.vendedorId, nombre: 'Carrera', fechaEnvio: '2026-10-01' }),
+    );
+    let enviada = 0;
+    const r = await app((db) =>
+      db.transaction((tx) => {
+        // Tras la PRIMERA lectura sin bloqueo (la de exhibidores), otra conexión envía la pieza al exhibidor.
+        const conCarrera = intercalar(tx, async () => {
+          enviada++;
+          await app((otra) => enviarPiezas(otra, { exhibidorId, codigos: [a!] }));
+        });
+        return bloquearPiezasParaApartar(conCarrera, [a!]);
+      }),
+    );
+    expect(enviada).toBe(1);
+    expect(r.faltantes).toEqual([]);
+    expect(r.piezas).toMatchObject([{ codigo: a, estado: 'en_exhibidor', exhibidorId }]);
+    expect(r.abiertos.has(exhibidorId)).toBe(true);
   });
 
   it('un código vacío se rechaza en vez de ignorarse', async () => {

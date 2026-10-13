@@ -39,7 +39,7 @@ export function validarCodigos(codigos: readonly string[], { minimo = 1 } = {}):
   if (lista.some((c) => !c)) throw new ErrorNegocio('codigo_vacio', 'Hay un código vacío.', 'codigos');
   if (lista.length < minimo) throw new ErrorNegocio('sin_piezas', 'Agrega al menos una pieza.', 'codigos');
   if (lista.length > MAX_PIEZAS_PEDIDO)
-    throw new ErrorNegocio('sin_piezas', `Máximo ${MAX_PIEZAS_PEDIDO} piezas por pedido.`, 'codigos');
+    throw new ErrorNegocio('demasiadas_piezas', `Máximo ${MAX_PIEZAS_PEDIDO} piezas por pedido.`, 'codigos');
   const vistos = new Set<string>();
   const repetidos = new Set<string>();
   for (const c of lista) (vistos.has(c) ? repetidos : vistos).add(c);
@@ -227,11 +227,8 @@ export async function liberarPiezas(
   d: { pedidoId: string; piezas: PiezaBloqueada[]; abiertos: Set<string>; nota: string; adminId: string },
 ): Promise<{ alExhibidor: number; aDisponible: number }> {
   if (!d.piezas.length) return { alExhibidor: 0, aDisponible: 0 };
-  if (d.piezas.some((p) => p.estado !== 'apartada'))
-    throw new ErrorNegocio(
-      'inconsistente',
-      'Las piezas del pedido ya no están apartadas. Recarga la página.',
-    );
+  const noApartadas = d.piezas.filter((p) => p.estado !== 'apartada');
+  if (noApartadas.length) throw inconsistente(noApartadas);
   const vuelve = (p: PiezaBloqueada) => p.exhibidorId !== null && d.abiertos.has(p.exhibidorId);
   const alExhibidor = d.piezas.filter(vuelve).map((p) => p.id);
   const aDisponible = d.piezas.filter((p) => !vuelve(p)).map((p) => p.id);
@@ -258,6 +255,14 @@ export async function liberarPiezas(
     })),
   );
   return { alExhibidor: alExhibidor.length, aDisponible: aDisponible.length };
+}
+
+/** Piezas de un pedido que ya no están apartadas (datos alterados fuera de los servicios): nombra cuáles. */
+function inconsistente(piezas: PiezaBloqueada[]): ErrorNegocio {
+  return new ErrorNegocio(
+    'inconsistente',
+    `Las piezas del pedido ya no están apartadas: ${piezas.map((p) => `${p.codigo} (${p.estado})`).join(', ')}. Recarga la página.`,
+  );
 }
 
 export async function pagadoCentavos(tx: Ejecutor, pedidoId: string): Promise<number> {
@@ -332,11 +337,8 @@ export async function liquidarSiSaldoCero(
     return p.estado;
   // D-10: exhibidores → piezas, siempre, aunque quien llama ya los haya bloqueado (volver a bloquear es inocuo).
   const { piezas } = await bloquearPiezasDelPedido(tx, pedidoId);
-  if (piezas.some((x) => x.estado !== 'apartada'))
-    throw new ErrorNegocio(
-      'inconsistente',
-      'Las piezas del pedido ya no están apartadas. Recarga la página.',
-    );
+  const noApartadas = piezas.filter((x) => x.estado !== 'apartada');
+  if (noApartadas.length) throw inconsistente(noApartadas);
   if (piezas.length) {
     await tx
       .update(pieza)
@@ -361,7 +363,7 @@ export async function liquidarSiSaldoCero(
   }
   await tx
     .update(pedido)
-    .set({ estado: 'liquidado', liquidadoAt: new Date(), version: sql`${pedido.version} + 1` })
+    .set({ estado: 'liquidado', liquidadoAt: sql`now()`, version: sql`${pedido.version} + 1` })
     .where(eq(pedido.id, pedidoId));
   return 'liquidado';
 }

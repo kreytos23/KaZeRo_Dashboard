@@ -273,3 +273,80 @@ describe('editarPedido: concurrencia', () => {
     expect(vigentes.rows[0]).toEqual({ n: 1 });
   });
 });
+
+describe('editarPedido: casos de revisión', () => {
+  it('quitar una pieza cuyo exhibidor ya cerró (dato viejo) la deja disponible sin exhibidor', async () => {
+    const a = await alta('ER01');
+    const b = await alta('ER02');
+    const exhibidorId = await app((db) =>
+      crearExhibidor(db, { vendedorId: ctx.vendedorId, nombre: 'Cerrado', fechaEnvio: '2026-10-01' }),
+    );
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: [b] }));
+    const p = await crear([a, b]);
+    // cerrarExhibidor lo impediría (tiene una apartada): se fuerza como dueño para simular datos viejos.
+    await conDbUrl(urlOwner(), (db) =>
+      db.execute(sql`UPDATE exhibidor SET estado = 'cerrado', cerrado_at = now() WHERE id = ${exhibidorId}`),
+    );
+    await editar(p.id, { quitar: [b], motivo: 'No le quedó' });
+    expect((await app((db) => obtenerPiezaPorCodigo(db, b)))!).toMatchObject({
+      estado: 'disponible',
+      exhibidorId: null,
+    });
+  });
+
+  it('agregar y quitar en la misma edición: cada línea conserva su precio final (R-11, R-27)', async () => {
+    for (const c of ['ES1', 'ES2', 'ES3', 'ES4']) await crear([await alta(c, 0)]);
+    const p = await crear([await alta('ES10', 10000), await alta('ES11', 20000)]);
+    expect(p).toMatchObject({ posicion: { ciclo: 1, posicion: 5 }, total: '270.00' });
+    expect(
+      await editar(p.id, { quitar: ['ES11'], agregar: [await alta('ES12', 30000)], motivo: 'Cambio' }),
+    ).toMatchObject({ total: '360.00', cambios: true });
+    const items = await app((db) => db.select().from(vPedidoItem).where(eq(vPedidoItem.pedidoId, p.id)));
+    const por = (codigo: string) => items.find((i) => i.codigo === codigo)!;
+    expect(por('ES10')).toMatchObject({ vigente: true, precioLista: '100.00', precioFinal: '90.00' });
+    expect(por('ES11')).toMatchObject({ vigente: false, precioLista: '200.00', precioFinal: '180.00' });
+    expect(por('ES12')).toMatchObject({ vigente: true, precioLista: '300.00', precioFinal: '270.00' });
+    expect(await ficha(p.id)).toMatchObject({ total: '360.00', piezas: 2 });
+  });
+
+  it('R-05: si varias piezas a agregar no están disponibles, el error las lista todas con su folio', async () => {
+    const p = await crear([await alta('ET01')]);
+    const o1 = await crear([await alta('ET02')]);
+    const o2 = await crear([await alta('ET03')]);
+    await expect(editar(p.id, { agregar: ['ET03', 'ET02', 'NOEXISTE'], motivo: 'x' })).rejects.toThrow(
+      `No se guardó el cambio. No existen: NOEXISTE. No están disponibles: ET03 (apartada en KZR-${o2.folio}), ET02 (apartada en KZR-${o1.folio}).`,
+    );
+  });
+
+  it('R-37: repetir la misma key devuelve el mismo resultado y la edición se aplica una sola vez', async () => {
+    const p = await crear([await alta('EU01'), await alta('EU02', 5000)]);
+    const f = await ficha(p.id);
+    const datos: DatosEdicion = {
+      key: randomUUID(),
+      adminId,
+      pedidoId: p.id,
+      version: f.version,
+      vendedorId: f.vendedorId,
+      fecha: f.fecha,
+      descuentoManualCentavos: 0,
+      notas: f.notas,
+      agregar: [],
+      quitar: ['EU02'],
+      motivo: 'Quitó una',
+    };
+    const r1 = await app((db) => editarPedido(db, datos));
+    const r2 = await app((db) => editarPedido(db, datos)); // misma key y datos, aunque la versión ya cambió
+    expect(r2).toEqual(r1);
+    expect((await ficha(p.id)).version).toBe(f.version + 1);
+  });
+
+  it('inconsistente: si una pieza dejó de estar apartada, el error nombra cuál', async () => {
+    const p = await crear([await alta('EV01'), await alta('EV02')]);
+    await conDbUrl(urlOwner(), (db) =>
+      db.execute(sql`UPDATE pieza SET estado = 'disponible', exhibidor_id = NULL WHERE codigo = 'EV02'`),
+    );
+    await expect(editar(p.id, { quitar: ['EV02'], motivo: 'x' })).rejects.toThrow(
+      'Las piezas del pedido ya no están apartadas: EV02 (disponible). Recarga la página.',
+    );
+  });
+});
