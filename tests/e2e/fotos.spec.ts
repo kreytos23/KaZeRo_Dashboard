@@ -36,7 +36,7 @@ async function abrirFoto(page: Page, resumen: string) {
 async function altaPieza(page: Page, codigo: string, descripcion: string, conFoto: boolean) {
   await irA(page, '/panel/inventario/nueva');
   await page.getByLabel('Código', { exact: true }).fill(codigo);
-  await page.getByLabel('Categoría').fill('Anillos');
+  await page.getByLabel('Categoría', { exact: true }).fill('Anillos');
   await page.getByLabel('Descripción').fill(descripcion);
   await page.getByLabel('Precio').fill('149');
   if (conFoto) {
@@ -47,59 +47,60 @@ async function altaPieza(page: Page, codigo: string, descripcion: string, conFot
   await expect(page).toHaveURL(new RegExp(`/panel/inventario/${codigo}$`));
 }
 
-test('alta con foto: se ve en la ficha, limpia (sin EXIF/GPS/ICC), WebP, privada y de caché acotada', async ({
-  page,
-  playwright,
-}, info) => {
-  const m = marca(info.project.name);
-  const codigo = `FO${m}01`;
-  const descripcion = `Anillo con foto ${m}`;
-  await altaPieza(page, codigo, descripcion, true);
+test(
+  'alta con foto: se ve en la ficha, limpia (sin EXIF/GPS/ICC), WebP, privada y de caché acotada',
+  { tag: '@escritorio' },
+  async ({ page, playwright }, info) => {
+    const m = marca(info.project.name);
+    const codigo = `FO${m}01`;
+    const descripcion = `Anillo con foto ${m}`;
+    await altaPieza(page, codigo, descripcion, true);
 
-  const foto = page.getByRole('region', { name: 'Foto' }).getByRole('img', { name: descripcion });
-  await expect(foto).toBeVisible();
-  // Enderezada: la fuente es 640x480 con orientación 6, así que sale vertical.
-  await expect
-    .poll(() =>
-      foto.evaluate((img: HTMLImageElement) =>
-        img.naturalWidth ? img.naturalHeight > img.naturalWidth : null,
-      ),
-    )
-    .toBe(true);
+    const foto = page.getByRole('region', { name: 'Foto' }).getByRole('img', { name: descripcion });
+    await expect(foto).toBeVisible();
+    // Enderezada: la fuente es 640x480 con orientación 6, así que sale vertical.
+    await expect
+      .poll(() =>
+        foto.evaluate((img: HTMLImageElement) =>
+          img.naturalWidth ? img.naturalHeight > img.naturalWidth : null,
+        ),
+      )
+      .toBe(true);
 
-  const src = (await foto.getAttribute('src'))!;
-  expect(src).toMatch(/^\/api\/piezas\/[0-9a-f-]{36}\/imagen\?v=[0-9a-f-]{36}&t=grande$/);
-  const r = await page.request.get(src);
-  expect(r.status()).toBe(200);
-  expect(r.headers()['content-type']).toBe('image/webp');
-  expect(r.headers()['cache-control']).toBe('private, max-age=86400');
-  expect(r.headers()['x-content-type-options']).toBe('nosniff');
-  const cuerpo = new Uint8Array(await r.body());
-  const chunks = chunksWebp(cuerpo);
-  expect(chunks.every((c) => SOLO_PIXELES.includes(c))).toBe(true);
-  expect(chunks).not.toContain('EXIF');
-  expect(chunks).not.toContain('ICCP');
-  const bytes = Buffer.from(cuerpo);
-  for (const rastro of ['Exif', 'GPS', 'Kazero-Prueba']) expect(bytes.includes(rastro)).toBe(false);
+    const src = (await foto.getAttribute('src'))!;
+    expect(src).toMatch(/^\/api\/piezas\/[0-9a-f-]{36}\/imagen\?v=[0-9a-f-]{36}&t=grande$/);
+    const r = await page.request.get(src);
+    expect(r.status()).toBe(200);
+    expect(r.headers()['content-type']).toBe('image/webp');
+    expect(r.headers()['cache-control']).toBe('private, max-age=86400');
+    expect(r.headers()['x-content-type-options']).toBe('nosniff');
+    const cuerpo = new Uint8Array(await r.body());
+    const chunks = chunksWebp(cuerpo);
+    expect(chunks.every((c) => SOLO_PIXELES.includes(c))).toBe(true);
+    expect(chunks).not.toContain('EXIF');
+    expect(chunks).not.toContain('ICCP');
+    const bytes = Buffer.from(cuerpo);
+    for (const rastro of ['Exif', 'GPS', 'Kazero-Prueba']) expect(bytes.includes(rastro)).toBe(false);
 
-  // Sin sesión (contexto nuevo, sin cookies): 401 JSON, nunca la imagen ni un redirect.
-  const anonimo = await playwright.request.newContext({
-    baseURL: info.project.use.baseURL,
-    storageState: { cookies: [], origins: [] },
-  });
-  const sinSesion = await anonimo.get(src, { maxRedirects: 0 });
-  expect(sinSesion.status()).toBe(401);
-  expect(await sinSesion.json()).toEqual({ error: 'no_autenticado' });
-  // La tarea programada pasa el proxy sin cookie, pero sin bearer válido responde 401.
-  const sinBearer = await anonimo.get('/api/tareas/limpiar-imagenes', { maxRedirects: 0 });
-  expect(sinBearer.status()).toBe(401);
-  const bearerMalo = await anonimo.get('/api/tareas/limpiar-imagenes', {
-    headers: { authorization: 'Bearer x' },
-    maxRedirects: 0,
-  });
-  expect(bearerMalo.status()).toBe(401);
-  await anonimo.dispose();
-});
+    // Sin sesión (contexto nuevo, sin cookies): 401 JSON, nunca la imagen ni un redirect.
+    const anonimo = await playwright.request.newContext({
+      baseURL: info.project.use.baseURL,
+      storageState: { cookies: [], origins: [] },
+    });
+    const sinSesion = await anonimo.get(src, { maxRedirects: 0 });
+    expect(sinSesion.status()).toBe(401);
+    expect(await sinSesion.json()).toEqual({ error: 'no_autenticado' });
+    // La tarea programada pasa el proxy sin cookie, pero sin bearer válido responde 401.
+    const sinBearer = await anonimo.get('/api/tareas/limpiar-imagenes', { maxRedirects: 0 });
+    expect(sinBearer.status()).toBe(401);
+    const bearerMalo = await anonimo.get('/api/tareas/limpiar-imagenes', {
+      headers: { authorization: 'Bearer x' },
+      maxRedirects: 0,
+    });
+    expect(bearerMalo.status()).toBe(401);
+    await anonimo.dispose();
+  },
+);
 
 test('la miniatura aparece en el listado y en el buscador global', async ({ page }, info) => {
   const m = marca(info.project.name);
@@ -162,13 +163,17 @@ test('agregar, cambiar y quitar la foto desde la ficha quedan en el historial; q
   expect((await page.request.get(srcAntes, { maxRedirects: 0 })).status()).toBe(404);
 });
 
-test('un archivo que no es foto se rechaza junto al campo (aunque diga image/jpeg)', async ({ page }) => {
-  await irA(page, '/panel/inventario/nueva');
-  await page.getByLabel('Elegir foto').setInputFiles({
-    name: 'nota.jpg',
-    mimeType: 'image/jpeg',
-    buffer: Buffer.from('no soy una foto'),
-  });
-  await expect(page.getByText(/No se pudo leer la foto/)).toBeVisible();
-  await expect(page.getByRole('img', { name: 'Vista previa de la foto' })).toHaveCount(0);
-});
+test(
+  'un archivo que no es foto se rechaza junto al campo (aunque diga image/jpeg)',
+  { tag: '@escritorio' },
+  async ({ page }) => {
+    await irA(page, '/panel/inventario/nueva');
+    await page.getByLabel('Elegir foto').setInputFiles({
+      name: 'nota.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from('no soy una foto'),
+    });
+    await expect(page.getByText(/No se pudo leer la foto/)).toBeVisible();
+    await expect(page.getByRole('img', { name: 'Vista previa de la foto' })).toHaveCount(0);
+  },
+);

@@ -38,7 +38,21 @@ const CAMPOS: Record<string, string> = {
   auditoria_motivo_dinero: 'motivo',
   auditoria_motivo_largo: 'motivo',
   movimiento_correccion_completa: 'motivo',
+  // Plan 3: pedidos y pagos.
+  pedido_item_pieza_activa_uq: 'codigos',
+  pedido_descuento_manual: 'descuentoMotivo',
+  pedido_total_no_negativo: 'descuentoManual',
+  pedido_notas_largo: 'notas',
+  pedido_cancelado_coherente: 'motivo',
+  pago_monto_positivo: 'monto',
+  aplicacion_pago_monto_positivo: 'monto',
+  pago_nota_largo: 'nota',
+  aplicacion_pago_excede_pago: 'monto',
+  saldo_favor_insuficiente: 'monto',
 };
+
+/** CHECK de coherencia interna de pedidos y pagos: la app nunca debería violarlos (son la última barrera). */
+const PEDIDO_INCONSISTENTE = 'Los datos del pedido son inconsistentes. Recarga la página.';
 
 const MENSAJES: Record<string, string> = {
   pieza_codigo_uq: 'Ya existe una pieza con ese código.',
@@ -76,6 +90,37 @@ const MENSAJES: Record<string, string> = {
   auditoria_sin_admin: 'No se pudo registrar quién hizo el cambio. Recarga la página.',
   movimiento_correccion_completa: 'La corrección necesita un motivo.',
   movimiento_coherente: 'El movimiento no coincide con el historial de la pieza.',
+  // Plan 3: pedidos y pagos.
+  pedido_item_pieza_activa_uq: 'Una de las piezas ya está en otro pedido.',
+  pedido_tarjeta_posicion_uq: 'Otra operación tomó esa posición de la tarjeta. Intenta de nuevo.',
+  pedido_transicion: 'Ese cambio de estado no está permitido para el pedido.',
+  pedido_descuento_manual: 'El descuento manual necesita un motivo (hasta 200 caracteres).',
+  pedido_total_no_negativo: 'El total no puede ser negativo.',
+  pedido_notas_largo: 'Las notas admiten hasta 500 caracteres.',
+  pedido_cancelado_coherente: 'La cancelación necesita un motivo (hasta 200 caracteres).',
+  pedido_folio_positivo: PEDIDO_INCONSISTENTE,
+  pedido_tarjeta_coherente: PEDIDO_INCONSISTENTE,
+  pedido_posicion_rango: PEDIDO_INCONSISTENTE,
+  pedido_lealtad_pct_rango: PEDIDO_INCONSISTENTE,
+  pedido_sin_lealtad_coherente: PEDIDO_INCONSISTENTE,
+  pedido_liquidado_coherente: PEDIDO_INCONSISTENTE,
+  pedido_item_precios: PEDIDO_INCONSISTENTE,
+  pedido_item_quitado_coherente: PEDIDO_INCONSISTENTE,
+  saldo_favor_un_titular: PEDIDO_INCONSISTENTE,
+  saldo_favor_signo: PEDIDO_INCONSISTENTE,
+  pago_un_pagador: PEDIDO_INCONSISTENTE,
+  pago_monto_positivo: 'El monto debe ser mayor que cero.',
+  aplicacion_pago_monto_positivo: 'El monto debe ser mayor que cero.',
+  pago_nota_largo: 'La nota admite hasta 200 caracteres.',
+  pago_idempotency_key_uq: 'Este pago ya se registró.',
+  // Libro de pagos y columnas de solo avance (triggers de 0013).
+  aplicacion_pago_excede_pago: 'Lo aplicado supera el monto del pago.',
+  aplicacion_pago_pedido_cancelado: 'No se pueden aplicar pagos a un pedido cancelado.',
+  aplicacion_pago_anulada_final: 'Una aplicación de pago anulada no puede cambiar.',
+  pedido_item_vigente_final: 'Una pieza que salió del pedido no puede volver a esa línea.',
+  pedido_item_quitado_final: 'Una pieza que salió del pedido no puede volver a esa línea.',
+  saldo_favor_insuficiente: 'El saldo a favor no alcanza para ese monto.',
+  saldo_favor_pedido_requerido: PEDIDO_INCONSISTENTE,
 };
 
 function mensajesPg(err: unknown): string[] {

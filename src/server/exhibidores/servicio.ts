@@ -6,6 +6,7 @@ import { calcularCambios } from '@/domain/auditoria';
 import { parsearFechaISO } from '@/domain/fechas';
 import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
+import { apartadasDeExhibidor } from '@/server/pedidos/lecturas';
 
 const MAX_CODIGOS = 500;
 
@@ -19,6 +20,7 @@ export type ExhibidorResumen = {
   vendedorId: string;
   vendedorNombre: string;
   piezasActuales: number;
+  piezasApartadas: number;
 };
 
 function datosValidos(d: { nombre: string; fechaEnvio: string }) {
@@ -295,20 +297,23 @@ export function listarExhibidores(db: Ejecutor, o: { vendedorId?: string }): Pro
     .orderBy(asc(vExhibidor.estado), desc(vExhibidor.fechaEnvio));
 }
 
-/** Dos consultas fijas (resumen + piezas), sin importar cuántas piezas tenga. */
+/** Tres consultas fijas (resumen, piezas y apartadas), sin importar cuántas piezas tenga. */
 export async function obtenerExhibidor(db: Ejecutor, id: string) {
   const [e] = await db.select().from(vExhibidor).where(eq(vExhibidor.id, id)).limit(1);
   if (!e) return null;
-  const piezas = await db
-    .select({
-      id: vPieza.id,
-      codigo: vPieza.codigo,
-      descripcion: vPieza.descripcion,
-      precio: vPieza.precio,
-    })
-    .from(vPieza)
-    .where(and(eq(vPieza.exhibidorId, id), eq(vPieza.estado, 'en_exhibidor')))
-    .orderBy(asc(vPieza.codigo));
-  return { ...e, piezas };
+  const [piezas, apartadas] = await Promise.all([
+    db
+      .select({
+        id: vPieza.id,
+        codigo: vPieza.codigo,
+        descripcion: vPieza.descripcion,
+        precio: vPieza.precio,
+      })
+      .from(vPieza)
+      .where(and(eq(vPieza.exhibidorId, id), eq(vPieza.estado, 'en_exhibidor')))
+      .orderBy(asc(vPieza.codigo)),
+    apartadasDeExhibidor(db, id),
+  ]);
+  return { ...e, piezas, apartadas };
 }
 export type PiezaEnExhibidor = NonNullable<Awaited<ReturnType<typeof obtenerExhibidor>>>['piezas'][number];

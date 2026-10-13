@@ -49,7 +49,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await page.getByLabel('Prefijo').fill(prefijo);
   await page.getByRole('button', { name: 'Sugerir código' }).click();
   await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
-  await page.getByLabel('Categoría').fill('Anillos');
+  await page.getByLabel('Categoría', { exact: true }).fill('Anillos');
   await page.getByLabel('Descripción').fill(`Anillo serpiente ${m}`);
   await page.getByLabel('Precio').fill('149');
   await page.getByRole('button', { name: 'Guardar pieza' }).click();
@@ -95,7 +95,7 @@ test('alta individual, ficha de pieza con destinos válidos y estados', async ({
   await page.getByLabel('Prefijo').fill(`Y${m}`);
   await page.getByRole('button', { name: 'Sugerir código' }).click();
   await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
-  await page.getByLabel('Categoría').fill('Collares');
+  await page.getByLabel('Categoría', { exact: true }).fill('Collares');
   await page.getByLabel('Descripción').fill(`Collar luna ${m}`);
   await page.getByLabel('Precio').fill('200');
   await page.getByRole('button', { name: 'Guardar pieza' }).click();
@@ -117,7 +117,7 @@ test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async
   await page.getByLabel('Prefijo').fill(`W${m}`);
   await page.getByRole('button', { name: 'Sugerir código' }).click();
   await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
-  await page.getByLabel('Categoría').fill('Pulseras');
+  await page.getByLabel('Categoría', { exact: true }).fill('Pulseras');
   await page.getByLabel('Descripción').fill(`Pulsera mar ${m}`);
   await page.getByLabel('Precio').fill('200');
   await page.getByRole('button', { name: 'Guardar pieza' }).click();
@@ -321,26 +321,30 @@ test.describe('regenerar TOTP (admin y sesión aparte)', () => {
 
 test.describe('sin sesión', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
-  test('la API privada responde 401 JSON, no un redirect', async ({ request }) => {
+  test('la API privada responde 401 JSON, no un redirect', { tag: '@escritorio' }, async ({ request }) => {
     const r = await request.get('/api/busqueda/indice', { maxRedirects: 0 });
     expect(r.status()).toBe(401);
     expect(await r.json()).toEqual({ error: 'no_autenticado' });
   });
 });
 
-test('un envío antes de hidratar no pone ningún campo en la URL', async ({ page }) => {
-  // Sin JavaScript el formulario nunca se hidrata: el botón sigue deshabilitado y Enter no envía.
-  await page.route('**/_next/static/**', (r) => r.abort());
-  await page.goto('/panel/administradores');
-  const form = page
-    .locator('form')
-    .filter({ has: page.getByRole('button', { name: 'Agregar administrador' }) });
-  await expect(form).toHaveAttribute('data-hidratado', 'no');
-  await expect(form.getByRole('button', { name: 'Agregar administrador' })).toBeDisabled();
-  await expect(form).toHaveAttribute('method', /post/i);
-  await form.getByLabel('Tu contraseña actual').fill('secreto-que-no-debe-salir');
-  await form.getByLabel('Tu contraseña actual').press('Enter');
-  await form.evaluate((f) => (f as HTMLFormElement).requestSubmit());
-  await page.waitForTimeout(800);
-  expect(page.url()).not.toMatch(/passwordActual|secreto-que-no-debe-salir|\?/);
-});
+test(
+  'un envío antes de hidratar no pone ningún campo en la URL',
+  { tag: '@escritorio' },
+  async ({ page }) => {
+    // Sin JavaScript el formulario nunca se hidrata: el botón sigue deshabilitado y Enter no envía.
+    await page.route('**/_next/static/**', (r) => r.abort());
+    await page.goto('/panel/administradores');
+    const form = page
+      .locator('form')
+      .filter({ has: page.getByRole('button', { name: 'Agregar administrador' }) });
+    await expect(form).toHaveAttribute('data-hidratado', 'no');
+    await expect(form.getByRole('button', { name: 'Agregar administrador' })).toBeDisabled();
+    await expect(form).toHaveAttribute('method', /post/i);
+    await form.getByLabel('Tu contraseña actual').fill('secreto-que-no-debe-salir');
+    await form.getByLabel('Tu contraseña actual').press('Enter');
+    await form.evaluate((f) => (f as HTMLFormElement).requestSubmit());
+    await page.waitForTimeout(800);
+    expect(page.url()).not.toMatch(/passwordActual|secreto-que-no-debe-salir|\?/);
+  },
+);

@@ -20,7 +20,9 @@ export default defineConfig({
           name: 'integration',
           include: ['tests/integration/**/*.test.ts'],
           setupFiles: ['tests/integration/setup.ts'],
-          fileParallelism: false,
+          // Un worker por rama Neon temporal (scripts/test-neon.ts fija KAZERO_TEST_WORKERS = ramas creadas).
+          fileParallelism: true,
+          maxWorkers: Number(process.env.KAZERO_TEST_WORKERS) || 1,
           testTimeout: 30_000,
           hookTimeout: 60_000,
         },

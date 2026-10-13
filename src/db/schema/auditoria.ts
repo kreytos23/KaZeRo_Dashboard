@@ -22,6 +22,8 @@ export const entidadAuditoria = pgEnum('entidad_auditoria', [
   'categoria',
   'material',
   'proveedor',
+  // Plan 3 (ADD VALUE al final; 0013 no lo usa como literal: corre en la misma transacción).
+  'pedido',
 ]);
 
 /**

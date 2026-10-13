@@ -19,6 +19,13 @@ describe('formato del historial de cambios', () => {
     expect(formatearValor('costo', '-5.00')).toBe('-5.00');
     expect(formatearValor('precio', '99999999999999999999')).toBe('99999999999999999999');
   });
+  it('campos de pedido: total y descuento manual en pesos, con etiqueta', () => {
+    expect(formatearValor('total', '1490.00')).toBe('$1,490.00');
+    expect(formatearValor('descuento_manual_monto', '10.00')).toBe('$10.00');
+    for (const c of ['fecha', 'estado', 'vendedor', 'descuento_manual_motivo', 'total', 'cancelacion_motivo'])
+      expect(ETIQUETA_CAMPO[c]).toBeTruthy();
+    expect(CAMPOS_DINERO.pedido).toEqual(['total', 'descuento_manual_monto']);
+  });
   it('todo campo de dinero tiene etiqueta', () => {
     for (const campos of Object.values(CAMPOS_DINERO))
       for (const c of campos) expect(ETIQUETA_CAMPO[c]).toBeTruthy();

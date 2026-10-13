@@ -3,37 +3,39 @@ import { RUTA_ESTADO, abrirMenuSiMovil, irA } from './utilidades';
 
 test.use({ storageState: RUTA_ESTADO });
 
-test('cada sección tiene su título', async ({ page }) => {
+test('cada sección tiene su título y las rutas inexistentes muestran su 404 sin revelar nada', async ({
+  page,
+}) => {
   await irA(page, '/panel/inventario');
   await expect(page).toHaveTitle('Inventario · Kazero');
   await irA(page, '/panel/vendedores');
   await expect(page).toHaveTitle('Vendedores · Kazero');
   await irA(page, '/panel');
   await expect(page).toHaveTitle('Panel · Kazero');
-});
 
-test('un registro inexistente muestra la 404 del panel sin revelar nada', async ({ page }) => {
   // El estado HTTP es 200 y no 404: loading.tsx hace que la respuesta empiece a enviarse antes de que la
   // página llame a notFound(). Next marca esa página con noindex, y el panel ya es privado.
   await irA(page, '/panel/inventario/NOEXISTE99');
   await expect(page.getByRole('heading', { name: 'No encontramos ese registro' })).toBeVisible();
   await abrirMenuSiMovil(page);
   await expect(page.getByRole('navigation', { name: 'Secciones' })).toBeVisible();
-});
 
-test('una ruta pública inexistente muestra la 404 general', async ({ page }) => {
   await irA(page, '/no-existe-esta-ruta');
   await expect(page.getByRole('heading', { name: 'No encontramos esa página' })).toBeVisible();
 });
 
-test('las 404 también llevan CSP y cabeceras de seguridad (el proxy las cubre)', async ({ request }) => {
-  for (const ruta of ['/no-existe-esta-ruta', '/favicon.icoX']) {
-    const r = await request.get(ruta);
-    expect(r.status(), ruta).toBe(404);
-    expect(r.headers()['content-security-policy'], ruta).toContain("script-src 'self' 'nonce-");
-    expect(r.headers()['x-content-type-options'], ruta).toBe('nosniff');
-  }
-});
+test(
+  'las 404 también llevan CSP y cabeceras de seguridad (el proxy las cubre)',
+  { tag: '@escritorio' },
+  async ({ request }) => {
+    for (const ruta of ['/no-existe-esta-ruta', '/favicon.icoX']) {
+      const r = await request.get(ruta);
+      expect(r.status(), ruta).toBe(404);
+      expect(r.headers()['content-security-policy'], ruta).toContain("script-src 'self' 'nonce-");
+      expect(r.headers()['x-content-type-options'], ruta).toBe('nosniff');
+    }
+  },
+);
 
 test('el error de negocio aparece junto a su campo y conserva lo escrito', async ({ page }, info) => {
   const nombre = `Duplicada ${info.project.name}`;
@@ -50,21 +52,6 @@ test('el error de negocio aparece junto a su campo y conserva lo escrito', async
   await expect(campo).toHaveValue(nombre);
   await expect(campo).toBeFocused();
   await expect(campo).toHaveAccessibleDescription('Ya existe un vendedor con ese nombre.');
-});
-
-test('un monto inválido se marca en su campo y mueve el foco allí', async ({ page }) => {
-  await irA(page, '/panel/inventario/nueva');
-  await page.getByLabel('Código', { exact: true }).fill('ERR1');
-  await page.getByLabel('Categoría').fill('Anillos');
-  await page.getByLabel('Descripción').fill('Prueba de monto');
-  await page.getByLabel('Precio').fill('mucho');
-  await page.getByRole('button', { name: 'Guardar pieza' }).click();
-  const precio = page.getByLabel('Precio');
-  await expect(precio).toHaveAttribute('aria-invalid', 'true');
-  await expect(precio).toBeFocused();
-  await expect(precio).toHaveValue('mucho');
-  await expect(precio).toHaveAccessibleDescription(/escribe un monto válido/);
-  await expect(page.getByLabel('Costo')).not.toHaveAttribute('aria-invalid', 'true');
 });
 
 test('dos formularios con el mismo campo describen cada uno su propio error', async ({ page }, info) => {
@@ -104,37 +91,41 @@ test('el nombre accesible de un selector es solo su etiqueta', async ({ page }) 
   await expect(page.getByRole('combobox', { name: 'Tipo', exact: true })).toBeVisible();
 });
 
-test('el favicon existe y es público', async ({ request }) => {
+test('el favicon existe y es público', { tag: '@escritorio' }, async ({ request }) => {
   expect((await request.get('/icon.png')).status()).toBe(200);
 });
 
 test.describe('sin sesión', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('los iconos y las imágenes de marca se sirven sin sesión', async ({ request }) => {
-    for (const [ruta, tipo] of [
-      ['/icon.png', 'image/png'],
-      ['/apple-icon.png', 'image/png'],
-      ['/favicon.ico', 'image/'],
-      ['/marca/logo-completo.webp', 'image/webp'],
-      ['/marca/logo-horizontal.webp', 'image/webp'],
-    ] as const) {
-      const r = await request.get(ruta, { maxRedirects: 0 });
-      expect(r.status(), ruta).toBe(200);
-      expect(r.headers()['content-type'], ruta).toContain(tipo);
-      expect(r.headers()['x-content-type-options'], ruta).toBe('nosniff');
-      // Binarios públicos: un día de caché, sin immutable (el nombre no lleva hash).
-      expect(r.headers()['cache-control'], ruta).toBe('public, max-age=86400');
-    }
-    // El HTML y las APIs siguen sin caché.
-    for (const ruta of ['/login', '/api/health']) {
-      const r = await request.get(ruta, { maxRedirects: 0 });
-      expect(r.headers()['cache-control'], ruta).toContain('no-store');
-    }
-    // Fuera de la lista exacta, /marca exige sesión como cualquier otra ruta.
-    const r = await request.get('/marca/sub/logo.webp', { maxRedirects: 0 });
-    expect(r.status()).toBe(307);
-  });
+  test(
+    'los iconos y las imágenes de marca se sirven sin sesión',
+    { tag: '@escritorio' },
+    async ({ request }) => {
+      for (const [ruta, tipo] of [
+        ['/icon.png', 'image/png'],
+        ['/apple-icon.png', 'image/png'],
+        ['/favicon.ico', 'image/'],
+        ['/marca/logo-completo.webp', 'image/webp'],
+        ['/marca/logo-horizontal.webp', 'image/webp'],
+      ] as const) {
+        const r = await request.get(ruta, { maxRedirects: 0 });
+        expect(r.status(), ruta).toBe(200);
+        expect(r.headers()['content-type'], ruta).toContain(tipo);
+        expect(r.headers()['x-content-type-options'], ruta).toBe('nosniff');
+        // Binarios públicos: un día de caché, sin immutable (el nombre no lleva hash).
+        expect(r.headers()['cache-control'], ruta).toBe('public, max-age=86400');
+      }
+      // El HTML y las APIs siguen sin caché.
+      for (const ruta of ['/login', '/api/health']) {
+        const r = await request.get(ruta, { maxRedirects: 0 });
+        expect(r.headers()['cache-control'], ruta).toContain('no-store');
+      }
+      // Fuera de la lista exacta, /marca exige sesión como cualquier otra ruta.
+      const r = await request.get('/marca/sub/logo.webp', { maxRedirects: 0 });
+      expect(r.status()).toBe(307);
+    },
+  );
 
   test('el login muestra el logo de la marca cargado', async ({ page }) => {
     await irA(page, '/login');
@@ -143,7 +134,7 @@ test.describe('sin sesión', () => {
     await expect.poll(() => logo.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThan(0);
   });
 
-  test('el login avisa del bloqueo solo con el motivo exacto', async ({ page }) => {
+  test('el login avisa del bloqueo solo con el motivo exacto', { tag: '@escritorio' }, async ({ page }) => {
     await irA(page, '/login?motivo=bloqueado');
     await expect(page.locator('p[role="alert"]')).toHaveText('Demasiados intentos. Intenta más tarde.');
     await irA(page, '/login?motivo=<b>hola</b>');

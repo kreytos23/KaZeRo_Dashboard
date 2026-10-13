@@ -22,6 +22,14 @@ export const ETIQUETA_CAMPO: Readonly<Record<string, string>> = {
   notas: 'Notas',
   fecha_envio: 'Fecha de envío',
   imagen_clave: 'Foto',
+  // Pedido (Plan 3). vendedor_id se guarda como 'vendedor' (llave foránea).
+  vendedor: 'Vendedor',
+  fecha: 'Fecha',
+  estado: 'Estado',
+  descuento_manual_monto: 'Descuento manual',
+  descuento_manual_motivo: 'Motivo del descuento',
+  total: 'Total',
+  cancelacion_motivo: 'Motivo de cancelación',
 };
 
 const TIPO_VENDEDOR: Readonly<Record<string, string>> = {
@@ -45,6 +53,8 @@ export function formatearValor(campo: string, valor: Valor): string {
   switch (campo) {
     case 'costo':
     case 'precio':
+    case 'total':
+    case 'descuento_manual_monto':
       return montoLegible(valor);
     case 'comision_pct':
       return `${porcentajeLegible(valor)} %`;

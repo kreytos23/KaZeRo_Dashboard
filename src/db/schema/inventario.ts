@@ -13,8 +13,10 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { admin } from './auth';
+import { pedido } from './pedidos';
 
 const ts = (nombre: string) => timestamp(nombre, { withTimezone: true });
 // updated_at lo mantiene el trigger kz_tocar_updated_at (0003); el default cubre el INSERT.
@@ -45,6 +47,9 @@ export const tipoMovimiento = pgEnum('tipo_movimiento', [
   'cancelacion_venta',
   'cambio_estado',
   'correccion',
+  // Plan 3: al entrar a un pedido y al salir de él (cancelar o quitar). 'venta' ya existía.
+  'apartado',
+  'liberacion',
 ]);
 export const estadoExhibidor = pgEnum('estado_exhibidor', ['abierto', 'cerrado']);
 
@@ -211,8 +216,8 @@ export const movimientoPieza = pgTable(
     deEstado: estadoPieza('de_estado'),
     aEstado: estadoPieza('a_estado').notNull(),
     exhibidorId: uuid('exhibidor_id').references(() => exhibidor.id),
-    // Sin FK todavía: la tabla pedido nace en el Plan 3 (expand/contract).
-    pedidoId: uuid('pedido_id'),
+    // Plan 3: FK con índice. La importación circular es segura: references() se evalúa perezosamente.
+    pedidoId: uuid('pedido_id').references((): AnyPgColumn => pedido.id),
     nota: text('nota'),
     // Quién hizo el movimiento (Plan 2.1). Nullable: las filas anteriores no lo tienen.
     adminId: uuid('admin_id').references(() => admin.id),
@@ -223,6 +228,7 @@ export const movimientoPieza = pgTable(
     index('movimiento_pieza_exhibidor_idx').on(t.exhibidorId),
     check('movimiento_nota_largo', sql`${t.nota} IS NULL OR char_length(${t.nota}) <= 200`),
     index('movimiento_pieza_admin_idx').on(t.adminId),
+    index('movimiento_pieza_pedido_idx').on(t.pedidoId),
     // `tipo::text` y no el literal del enum: 'correccion' se agrega en esta misma tanda de migraciones (55P04).
     check(
       'movimiento_correccion_completa',

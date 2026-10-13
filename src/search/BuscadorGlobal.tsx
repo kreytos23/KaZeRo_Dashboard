@@ -1,22 +1,19 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { EVENTO_INDICE_SUCIO } from './eventos';
+import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCombobox } from '@/features/ui/useCombobox';
 import { crearMotor, type Resultado } from './motor';
-import type { IndiceBusqueda } from './tipos';
+import { useIndiceBusqueda } from './useIndiceBusqueda';
 
 const CLAVE_RECIENTES = 'kazero:recientes';
 const MAX_RECIENTES = 20;
-// Red de seguridad por si algún formulario olvida llamar a marcarIndiceSucio().
-const TTL_INDICE_MS = 5 * 60 * 1000;
 const ETIQUETA_TIPO: Record<Resultado['tipo'], string> = {
   pieza: 'Pieza',
   cliente: 'Cliente',
   vendedor: 'Vendedor',
+  pedido: 'Nota',
 };
-
-type Estado = 'inactivo' | 'cargando' | 'listo' | 'sin_sesion' | 'error';
 
 // localStorage puede no existir o lanzar (modo privado): solo es una comodidad.
 // Se guardan únicamente claves (`pieza:<id>`), nunca nombres ni descripciones.
@@ -37,12 +34,6 @@ function guardarReciente(clave: string) {
   }
 }
 
-function esIndice(v: unknown): v is IndiceBusqueda {
-  if (typeof v !== 'object' || v === null) return false;
-  const i = v as Partial<IndiceBusqueda>;
-  return i.v === 2 && Array.isArray(i.piezas) && Array.isArray(i.clientes) && Array.isArray(i.vendedores);
-}
-
 function esCampoDeTexto(t: EventTarget | null): boolean {
   if (!(t instanceof HTMLElement)) return false;
   return ['INPUT', 'TEXTAREA', 'SELECT'].includes(t.tagName) || t.isContentEditable;
@@ -52,66 +43,10 @@ export function BuscadorGlobal() {
   const router = useRouter();
   const id = useId();
   const entrada = useRef<HTMLInputElement>(null);
-  const estadoRef = useRef<Estado>('inactivo');
-  const peticion = useRef(0);
-  const cargadoEn = useRef(0);
-  const [estado, setEstado] = useState<Estado>('inactivo');
-  const [indice, setIndice] = useState<IndiceBusqueda | null>(null);
+  const { indice, estado, asegurarCarga } = useIndiceBusqueda();
   const [recientes, setRecientes] = useState<string[]>([]);
   const [q, setQ] = useState('');
-  const [activo, setActivo] = useState(0);
   const [abierto, setAbierto] = useState(false);
-
-  const cambiarEstado = useCallback((e: Estado) => {
-    estadoRef.current = e;
-    setEstado(e);
-  }, []);
-
-  const cargar = useCallback(async () => {
-    const mia = ++peticion.current;
-    cambiarEstado('cargando');
-    try {
-      const r = await fetch('/api/busqueda/indice', { cache: 'no-store' });
-      if (mia !== peticion.current) return; // llegó una carga más reciente
-      if (r.status === 401) {
-        setIndice(null);
-        cambiarEstado('sin_sesion');
-        router.replace('/login');
-        return;
-      }
-      if (!r.ok) {
-        cambiarEstado('error');
-        return;
-      }
-      const datos: unknown = await r.json();
-      if (mia !== peticion.current) return;
-      if (!esIndice(datos)) {
-        cambiarEstado('error');
-        return;
-      }
-      setIndice(datos);
-      cargadoEn.current = Date.now();
-      cambiarEstado('listo');
-    } catch {
-      if (mia === peticion.current) cambiarEstado('error');
-    }
-  }, [cambiarEstado, router]);
-
-  // Carga perezosa: al enfocar el campo o al pulsar `/` por primera vez; después, solo si el índice caducó.
-  const asegurarCarga = useCallback(() => {
-    const e = estadoRef.current;
-    if (e === 'inactivo' || e === 'error') void cargar();
-    else if (e === 'listo' && Date.now() - cargadoEn.current > TTL_INDICE_MS) void cargar();
-  }, [cargar]);
-
-  // Un formulario avisó que guardó: si ya se había cargado, se recarga; si no, la próxima carga ya lo trae.
-  useEffect(() => {
-    const sucio = () => {
-      if (estadoRef.current !== 'inactivo') void cargar();
-    };
-    window.addEventListener(EVENTO_INDICE_SUCIO, sucio);
-    return () => window.removeEventListener(EVENTO_INDICE_SUCIO, sucio);
-  }, [cargar]);
 
   useEffect(() => {
     const atajo = (e: KeyboardEvent) => {
@@ -132,10 +67,13 @@ export function BuscadorGlobal() {
     () => (motor ? motor.buscar(consulta, recientes) : []),
     [motor, consulta, recientes],
   );
-  const visible = abierto && resultados.length > 0;
-  // Siempre dentro de rango aunque los resultados cambien (p. ej. 0 resultados).
-  const sel = Math.max(0, Math.min(activo, resultados.length - 1));
-  const idActivo = visible ? `${id}-op-${sel}` : undefined;
+  const { sel, setActivo, reiniciar, visible, idLista, idOpcion, idActivo, onKeyDown } = useCombobox({
+    id,
+    cantidad: resultados.length,
+    abierto,
+    setAbierto,
+    alElegir: (i) => abrir(resultados[i]!),
+  });
 
   function abrir(r: Resultado) {
     guardarReciente(r.clave);
@@ -165,7 +103,7 @@ export function BuscadorGlobal() {
         type="search"
         role="combobox"
         aria-expanded={visible}
-        aria-controls={`${id}-lista`}
+        aria-controls={idLista}
         aria-activedescendant={idActivo}
         aria-autocomplete="list"
         autoComplete="off"
@@ -178,26 +116,11 @@ export function BuscadorGlobal() {
         }}
         onChange={(e) => {
           setQ(e.target.value);
-          setActivo(0);
+          reiniciar();
           setAbierto(true);
         }}
         onClick={() => setAbierto(true)}
-        onKeyDown={(e) => {
-          if (e.nativeEvent.isComposing) return;
-          if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (!abierto) setAbierto(true);
-            else setActivo(Math.min(sel + 1, resultados.length - 1));
-          } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setActivo(Math.max(sel - 1, 0));
-          } else if (e.key === 'Enter' && visible && resultados[sel]) {
-            e.preventDefault();
-            abrir(resultados[sel]);
-          } else if (e.key === 'Escape') {
-            setAbierto(false);
-          }
-        }}
+        onKeyDown={onKeyDown}
         onBlur={() => setAbierto(false)}
         className="min-h-11 w-full rounded-lg border border-borde-campo bg-white px-3"
       />
@@ -209,7 +132,7 @@ export function BuscadorGlobal() {
         {aviso}
       </div>
       <ul
-        id={`${id}-lista`}
+        id={idLista}
         role="listbox"
         aria-label="Resultados"
         hidden={!visible}
@@ -219,7 +142,7 @@ export function BuscadorGlobal() {
           resultados.map((r, i) => (
             <li
               key={r.clave}
-              id={`${id}-op-${i}`}
+              id={idOpcion(i)}
               role="option"
               aria-selected={i === sel}
               onMouseMove={() => setActivo(i)}

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
+import { formatoFolio } from '@/domain/pedidos';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { AreaTexto, Campo } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
@@ -113,6 +114,29 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
         ))}
       </ul>
       {e.piezas.length === 0 && <p className="text-sm text-tinta-suave">No hay piezas en este exhibidor.</p>}
+      <section aria-labelledby="apartadas-exhibidor" className="flex flex-col gap-2">
+        <h2 id="apartadas-exhibidor" className="text-lg font-semibold">
+          Apartadas ({e.apartadas.length})
+        </h2>
+        {e.apartadas.length === 0 ? (
+          <p className="text-sm text-tinta-suave">No hay piezas apartadas de este exhibidor.</p>
+        ) : (
+          <ul className="tarjeta flex flex-col divide-y divide-borde px-4 text-sm">
+            {e.apartadas.map((a) => (
+              <li key={a.codigo} className="py-2">
+                <Link href={`/panel/inventario/${encodeURIComponent(a.codigo)}`} className="font-mono enlace">
+                  {a.codigo}
+                </Link>{' '}
+                · {a.descripcion} ·{' '}
+                <Link href={`/panel/pedidos/${a.folio}`} className="enlace">
+                  {formatoFolio(a.folio)}
+                </Link>{' '}
+                · {a.clienteNombre}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       {abierto && e.piezasActuales === 0 && (
         <FormAccion accion={accionCerrar} textoBoton="Cerrar exhibidor">
           {/* key por versión en los campos (no en el formulario): refresca sin perder el estado de la acción. */}
@@ -125,7 +149,8 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
             </label>
           </Fragment>
           <p className="text-sm text-tinta-suave">
-            Si hay piezas apartadas ligadas a este exhibidor, no se podrá cerrar hasta resolver sus pedidos.
+            Las piezas apartadas (listadas arriba) impiden cerrar el exhibidor: hay que resolver sus pedidos
+            primero.
           </p>
         </FormAccion>
       )}

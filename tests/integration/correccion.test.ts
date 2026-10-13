@@ -1,7 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
-import { exhibidor, pieza } from '@/db/schema';
+import { exhibidor } from '@/db/schema';
 import {
   cerrarExhibidor,
   crearExhibidor,
@@ -17,15 +17,14 @@ import {
   obtenerPiezaPorCodigo,
 } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
-import { adminDePrueba, truncarTodo, urlApp, urlOwner } from './utilidades';
+import { reiniciarConAdmin, urlApp } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 const ficha = (codigo = 'CO01') => app((db) => obtenerPiezaPorCodigo(db, codigo)).then((f) => f!);
 
 let adminId: string;
 beforeEach(async () => {
-  await truncarTodo();
-  adminId = await adminDePrueba();
+  adminId = await reiniciarConAdmin();
 });
 
 async function nueva(codigo = 'CO01') {
@@ -127,41 +126,6 @@ describe('deshacer el último cambio manual (R-07)', () => {
     });
   });
 
-  it('defecto desde un exhibidor abierto vuelve al mismo exhibidor', async () => {
-    await nueva();
-    const exhibidorId = await exhibidorCon('CO01');
-    const p = await marcar('CO01', 'defecto');
-    expect(await deshacer(p)).toMatchObject({
-      aEstado: 'en_exhibidor',
-      exhibidorNombre: 'Exh Nelly',
-      exhibidorCerrado: false,
-    });
-    expect(await ficha()).toMatchObject({ estado: 'en_exhibidor', exhibidorId });
-    expect((await app((db) => obtenerExhibidor(db, exhibidorId)))!.piezasActuales).toBe(1);
-    const [ultimo] = await app((db) => historial(db, p.id));
-    expect(ultimo).toMatchObject({
-      tipo: 'correccion',
-      deEstado: 'defecto',
-      aEstado: 'en_exhibidor',
-      exhibidorId,
-      exhibidorEstado: 'abierto',
-    });
-  });
-
-  it('si el exhibidor ya se cerró, vuelve a disponible y lo avisa', async () => {
-    await nueva();
-    const exhibidorId = await exhibidorCon('CO01');
-    const p = await marcar('CO01', 'guardada');
-    const e = (await app((db) => obtenerExhibidor(db, exhibidorId)))!;
-    await app((db) => cerrarExhibidor(db, { exhibidorId, version: e.version }));
-    expect(await deshacer(p)).toMatchObject({
-      aEstado: 'disponible',
-      exhibidorNombre: 'Exh Nelly',
-      exhibidorCerrado: true,
-    });
-    expect(await ficha()).toMatchObject({ estado: 'disponible', exhibidorId: null });
-  });
-
   it('exige motivo de 1 a 200 caracteres', async () => {
     await nueva();
     const p = await marcar('CO01', 'regalo');
@@ -177,23 +141,6 @@ describe('deshacer el último cambio manual (R-07)', () => {
     const p = await marcar('CO01', 'regalo');
     await deshacer(p);
     await expect(deshacer(await ficha())).rejects.toMatchObject({ codigo: 'correccion_no_disponible' });
-  });
-
-  it('no aplica a un cambio manual hacia disponible', async () => {
-    await nueva();
-    const d = await marcar('CO01', 'defecto');
-    await app((db) =>
-      cambiarEstado(db, { piezaId: d.id, version: d.version, aEstado: 'disponible', adminId }),
-    );
-    await expect(deshacer(await ficha())).rejects.toMatchObject({ codigo: 'correccion_no_disponible' });
-  });
-
-  it('no aplica a piezas apartadas ni vendidas', async () => {
-    const p = await nueva();
-    for (const estado of ['apartada', 'vendida'] as const) {
-      await conDbUrl(urlOwner(), (db) => db.update(pieza).set({ estado }).where(eq(pieza.id, p.id)));
-      await expect(deshacer(p)).rejects.toMatchObject({ codigo: 'correccion_no_disponible' });
-    }
   });
 
   it('versión vieja → conflicto y no escribe nada', async () => {

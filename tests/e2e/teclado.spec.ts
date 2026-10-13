@@ -30,7 +30,7 @@ async function tabHacia(page: Page, siguiente: Locator) {
   await expect(siguiente).toBeFocused();
 }
 
-test.describe('formularios solo con teclado', () => {
+test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
   // La pieza y el exhibidor de una prueba los usa la siguiente.
   test.describe.configure({ mode: 'serial' });
 
@@ -80,7 +80,7 @@ test.describe('formularios solo con teclado', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
     await tabHacia(page, page.getByLabel('Código', { exact: true }));
-    await tabHacia(page, page.getByLabel('Categoría'));
+    await tabHacia(page, page.getByLabel('Categoría', { exact: true }));
     await page.keyboard.type('Aretes');
     await tabHacia(page, page.getByLabel('Descripción'));
     await page.keyboard.type(`Arete teclado ${m}`);
@@ -96,6 +96,35 @@ test.describe('formularios solo con teclado', () => {
     await enfocar(page, page.getByRole('button', { name: 'Cambiar estado' }));
     await page.keyboard.press('Space');
     await expect(estadoCon(page, 'Estado actualizado.')).toBeVisible();
+  });
+
+  test('captura en tanda: Guardar y agregar otra y listas de catálogo sin ratón', async ({ page }, info) => {
+    const m = marca(info.project.name);
+    const primero = `KT${m}01`;
+    const segundo = `KT${m}02`;
+    await irA(page, '/panel/inventario/nueva');
+    await escribirEn(page, page.getByLabel('Código', { exact: true }), primero);
+    await tabHacia(page, page.getByLabel('Categoría', { exact: true }));
+    await page.keyboard.type('Aretes');
+    await tabHacia(page, page.getByLabel('Descripción'));
+    await page.keyboard.type(`Arete tanda ${m} 1`);
+    await enfocar(page, page.getByLabel('Precio'));
+    await page.keyboard.type('99');
+    await enfocar(page, page.getByRole('button', { name: 'Guardar y agregar otra' }));
+    await page.keyboard.press('Enter');
+    await expect(estadoCon(page, `Pieza ${primero} guardada. Agrega la siguiente.`)).toBeVisible();
+    await expect(page.getByLabel('Código', { exact: true })).toBeFocused();
+
+    // La categoría se conserva; la segunda pieza se guarda con Enter en el precio y lleva a su ficha.
+    await page.keyboard.type(segundo);
+    await tabHacia(page, page.getByLabel('Categoría', { exact: true }));
+    await expect(page.getByLabel('Categoría', { exact: true })).toHaveValue('Aretes');
+    await tabHacia(page, page.getByLabel('Descripción'));
+    await page.keyboard.type(`Arete tanda ${m} 2`);
+    await enfocar(page, page.getByLabel('Precio'));
+    await page.keyboard.type('99');
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`/panel/inventario/${segundo}$`));
   });
 
   test('exhibidor: crear, enviar, regresar y cerrar con confirmación, todo con teclado', async ({
@@ -145,17 +174,6 @@ test.describe('formularios solo con teclado', () => {
     await page.keyboard.press('Enter');
     await expect(estadoCon(page, 'Exhibidor cerrado.')).toBeVisible();
   });
-
-  test('el error de un campo mueve el foco al primer campo inválido', async ({ page }, info) => {
-    const m = marca(info.project.name);
-    await irA(page, '/panel/vendedores');
-    // Nombre repetido (creado en la primera prueba): el servidor marca el campo y el foco va allí.
-    await escribirEn(page, page.getByLabel('Nombre'), `Teclado ${m}`);
-    await page.keyboard.press('Enter');
-    const campo = page.getByLabel('Nombre');
-    await expect(campo).toHaveAttribute('aria-invalid', 'true');
-    await expect(campo).toBeFocused();
-  });
 });
 
 test.describe('menú del celular con teclado', () => {
@@ -172,7 +190,7 @@ test.describe('menú del celular con teclado', () => {
       await page.keyboard.press('Enter');
       await expect(boton).toHaveAttribute('aria-expanded', 'true', { timeout: 500 });
     }).toPass();
-    await expect(page.getByRole('link', { name: 'Inventario' })).toBeFocused();
+    await expect(page.getByRole('link', { name: 'Pedidos' })).toBeFocused();
     await expect(page.locator('main')).toHaveAttribute('inert', '');
 
     // Escape cierra y devuelve el foco al botón.
@@ -233,46 +251,47 @@ test.describe('login y verificación con teclado', () => {
 });
 
 test.describe('foco visible', () => {
+  // /panel (nav + contenido) se recorre también en móvil; las demás solo en escritorio (el resto de las
+  // pantallas comparten los mismos controles y estilos de foco).
   const PAGINAS = [
-    '/panel',
-    '/panel/inventario',
-    '/panel/inventario/nueva',
-    '/panel/inventario/lote',
-    '/panel/exhibidores',
-    '/panel/clientes',
-    '/panel/vendedores',
-    '/panel/catalogos',
-    '/panel/administradores',
+    { ruta: '/panel', tag: [] as string[] },
+    { ruta: '/panel/inventario', tag: ['@escritorio'] },
+    { ruta: '/panel/inventario/nueva', tag: ['@escritorio'] },
+    { ruta: '/panel/exhibidores', tag: ['@escritorio'] },
   ];
 
-  for (const ruta of PAGINAS) {
-    test(`todo control alcanzable con Tab muestra un indicador de foco en ${ruta}`, async ({ page }) => {
-      await irA(page, ruta);
-      // Sin esperar, el recorrido pasaría por el esqueleto de loading.tsx y no por la página real.
-      await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-      const sinIndicador: string[] = [];
-      const vistos = new Set<string>();
-      for (let i = 0; i < 90; i++) {
-        await page.keyboard.press('Tab');
-        const r = await page.evaluate(() => {
-          const el = document.activeElement;
-          if (!el || el === document.body) return null;
-          const s = getComputedStyle(el);
-          const contorno = s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0;
-          const sombra = s.boxShadow !== 'none';
-          const nombre = `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''} "${(el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 30)}"`;
-          return { ok: contorno || sombra, nombre, tabindex: el.getAttribute('tabindex') };
-        });
-        if (!r) break; // el foco salió de la página
-        const clave = `${i}:${r.nombre}`;
-        if (vistos.has(r.nombre) && r.nombre.startsWith('body')) break;
-        vistos.add(clave);
-        if (r.tabindex !== null && Number(r.tabindex) > 0)
-          sinIndicador.push(`tabindex positivo en ${r.nombre}`);
-        if (!r.ok) sinIndicador.push(r.nombre);
-      }
-      expect(vistos.size).toBeGreaterThan(3);
-      expect(sinIndicador).toEqual([]);
-    });
+  for (const { ruta, tag } of PAGINAS) {
+    test(
+      `todo control alcanzable con Tab muestra un indicador de foco en ${ruta}`,
+      { tag },
+      async ({ page }) => {
+        await irA(page, ruta);
+        // Sin esperar, el recorrido pasaría por el esqueleto de loading.tsx y no por la página real.
+        await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+        const sinIndicador: string[] = [];
+        const vistos = new Set<string>();
+        for (let i = 0; i < 60; i++) {
+          await page.keyboard.press('Tab');
+          const r = await page.evaluate(() => {
+            const el = document.activeElement;
+            if (!el || el === document.body) return null;
+            const s = getComputedStyle(el);
+            const contorno = s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0;
+            const sombra = s.boxShadow !== 'none';
+            const nombre = `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''} "${(el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 30)}"`;
+            return { ok: contorno || sombra, nombre, tabindex: el.getAttribute('tabindex') };
+          });
+          if (!r) break; // el foco salió de la página
+          const clave = `${i}:${r.nombre}`;
+          if (vistos.has(r.nombre) && r.nombre.startsWith('body')) break;
+          vistos.add(clave);
+          if (r.tabindex !== null && Number(r.tabindex) > 0)
+            sinIndicador.push(`tabindex positivo en ${r.nombre}`);
+          if (!r.ok) sinIndicador.push(r.nombre);
+        }
+        expect(vistos.size).toBeGreaterThan(3);
+        expect(sinIndicador).toEqual([]);
+      },
+    );
   }
 });

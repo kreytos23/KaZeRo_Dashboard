@@ -48,3 +48,9 @@ export function cadenaConexion(rama: string, opciones: { pooled?: boolean } = {}
   if (opciones.pooled) args.push('--pooled');
   return neon(args).trim();
 }
+
+/** Cuántas ramas tiene el proyecto ahora (para respetar el límite del plan antes de crear más). */
+export function contarRamas(): number {
+  const lista = JSON.parse(neon(['branches', 'list', '--output', 'json'])) as unknown;
+  return Array.isArray(lista) ? lista.length : 0;
+}

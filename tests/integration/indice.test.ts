@@ -1,14 +1,17 @@
+import { randomUUID } from 'node:crypto';
+import { eq, sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { conDbUrl } from '@/db/pool';
-import { sesion } from '@/db/schema';
+import { pieza, sesion } from '@/db/schema';
 import { crearAdmin } from '@/server/auth/admin';
 import { iniciarLogin, verificarSegundoFactor } from '@/server/auth/servicio';
 import { generarCodigoTotp } from '@/server/auth/totp';
 import { construirIndice } from '@/server/busqueda/indice';
 import { crearCliente } from '@/server/clientes/servicio';
+import { crearPedido } from '@/server/pedidos/servicio';
 import { altaPieza } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
-import { llaveTotp, truncarTodo, urlApp, urlOwner } from './utilidades';
+import { adminDePrueba, llaveTotp, truncarTodo, urlApp, urlOwner } from './utilidades';
 
 let cookieActual: string | undefined;
 vi.mock('next/headers', () => ({
@@ -39,11 +42,53 @@ describe('índice de búsqueda', () => {
       crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
     );
     expect(await app((db) => construirIndice(db))).toEqual({
-      v: 2,
+      v: 3,
       piezas: [[pid.id, 'IX01', 'Anillo luna', 'disponible', null]],
       clientes: [[cid, 'Danya', '5to norte']],
       vendedores: [[vid, 'Nelly']],
+      pedidos: [],
     });
+  });
+
+  it('v3: conserva la miniatura de la pieza y trae pedidos [id, folio, cliente, estado] sin montos', async () => {
+    const pid = await app((db) =>
+      altaPieza(db, {
+        codigo: 'IX03',
+        categoria: 'Anillos',
+        descripcion: 'Aro',
+        costoCentavos: 0,
+        precioCentavos: 77700,
+      }),
+    );
+    const adminId = await adminDePrueba();
+    const clave = randomUUID();
+    await app((db) =>
+      db.transaction(async (tx) => {
+        await tx.execute(sql`SELECT set_config('kazero.admin_id', ${adminId}, true)`);
+        await tx.update(pieza).set({ imagenClave: clave }).where(eq(pieza.id, pid.id));
+      }),
+    );
+    const clienteId = await app((db) => crearCliente(db, { nombre: 'Gloria' }));
+    const vendedorId = await app((db) =>
+      crearVendedor(db, { nombre: 'Kazero', tipo: 'casa', comisionPct: '0.00' }),
+    );
+    const p = await app((db) =>
+      crearPedido(db, {
+        key: randomUUID(),
+        adminId,
+        clienteId,
+        vendedorId,
+        codigos: ['IX03'],
+        cuentaTarjeta: true,
+        descuentoManualCentavos: 0,
+      }),
+    );
+    const idx = await app((db) => construirIndice(db));
+    expect(idx.v).toBe(3);
+    expect(idx.piezas[0]).toHaveLength(5);
+    expect(idx.piezas[0]![4]).toBe(clave);
+    expect(idx.pedidos).toEqual([[p.id, p.folio, 'Gloria', 'abierto']]);
+    expect(JSON.stringify(idx)).not.toMatch(/777\.00|77700/);
   });
 
   it('solo expone las columnas de la interfaz (sin costo, precio ni teléfono)', async () => {

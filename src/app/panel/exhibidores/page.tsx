@@ -77,6 +77,8 @@ export default async function PaginaExhibidores({
               {' '}
               · {e.vendedorNombre} · {e.fechaEnvio} · {e.estado === 'abierto' ? 'Abierto' : 'Cerrado'} ·{' '}
               {e.piezasActuales} {e.piezasActuales === 1 ? 'pieza' : 'piezas'}
+              {e.piezasApartadas > 0 &&
+                ` · ${e.piezasApartadas} ${e.piezasApartadas === 1 ? 'apartada' : 'apartadas'}`}
             </span>
           </li>
         ))}

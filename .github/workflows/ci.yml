@@ -60,6 +60,8 @@ jobs:
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          # Una rama Neon temporal por worker (se borran todas al terminar); baja sola si el plan no alcanza.
+          KAZERO_TEST_WORKERS: '3'
 
   build:
     needs: [calidad, unit]

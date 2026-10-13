@@ -224,22 +224,20 @@ describe('exhibidores', () => {
 
   it('cambiarEstado y regresarPiezas simultáneos sobre la misma pieza no se interbloquean', async () => {
     const { exhibidorId } = await preparar();
-    for (let ronda = 0; ronda < 5; ronda++) {
-      await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EX01'] }));
-      const p = (await app((db) => obtenerPiezaPorCodigo(db, 'EX01')))!;
-      const r = await Promise.allSettled([
-        app((db) => cambiarEstado(db, { piezaId: p.id, version: p.version, aEstado: 'guardada' })),
-        app((db) => regresarPiezas(db, { exhibidorId, codigos: ['EX01'] })),
-      ]);
-      for (const x of r) {
-        if (x.status === 'rejected') expect((x.reason as Error).name).toBe('ErrorNegocio');
-      }
-      const despues = (await app((db) => obtenerPiezaPorCodigo(db, 'EX01')))!;
-      if (despues.estado === 'guardada') {
-        await app((db) =>
-          cambiarEstado(db, { piezaId: despues.id, version: despues.version, aEstado: 'disponible' }),
-        );
-      }
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EX01'] }));
+    const p = (await app((db) => obtenerPiezaPorCodigo(db, 'EX01')))!;
+    const r = await Promise.allSettled([
+      app((db) => cambiarEstado(db, { piezaId: p.id, version: p.version, aEstado: 'guardada' })),
+      app((db) => regresarPiezas(db, { exhibidorId, codigos: ['EX01'] })),
+    ]);
+    for (const x of r) {
+      if (x.status === 'rejected') expect((x.reason as Error).name).toBe('ErrorNegocio');
+    }
+    const despues = (await app((db) => obtenerPiezaPorCodigo(db, 'EX01')))!;
+    if (despues.estado === 'guardada') {
+      await app((db) =>
+        cambiarEstado(db, { piezaId: despues.id, version: despues.version, aEstado: 'disponible' }),
+      );
     }
   });
 

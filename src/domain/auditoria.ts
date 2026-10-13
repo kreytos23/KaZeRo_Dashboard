@@ -1,7 +1,7 @@
 import { pesosACentavos, porcentajeANumeric } from './dinero';
 
 export type EntidadAuditada =
-  'pieza' | 'vendedor' | 'cliente' | 'exhibidor' | 'categoria' | 'material' | 'proveedor';
+  'pieza' | 'vendedor' | 'cliente' | 'exhibidor' | 'categoria' | 'material' | 'proveedor' | 'pedido';
 export type Valor = string | null;
 export interface Cambio {
   campo: string;
@@ -13,7 +13,7 @@ export const MAX_MOTIVO = 200;
 
 /**
  * Campos de dinero por entidad (R-09): cambiarlos exige motivo.
- * DEBE coincidir con la lista de kz_auditar (drizzle/0009_auditoria_reglas.sql).
+ * DEBE coincidir con la lista de kz_auditar (redefinida por última vez en drizzle/0013_pedidos_reglas.sql).
  */
 export const CAMPOS_DINERO: Readonly<Record<EntidadAuditada, readonly string[]>> = {
   pieza: ['costo', 'precio'],
@@ -23,6 +23,7 @@ export const CAMPOS_DINERO: Readonly<Record<EntidadAuditada, readonly string[]>>
   categoria: [],
   material: [],
   proveedor: [],
+  pedido: ['total', 'descuento_manual_monto'],
 };
 
 /** Campos que cambian, en el orden de `despues`. Los valores llegan ya canónicos ('149.00', uuid, 'true'). */

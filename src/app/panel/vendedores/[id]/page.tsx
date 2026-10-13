@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
-import { porcentajeLegible } from '@/domain/dinero';
+import { formatoMXN, numericACentavos, porcentajeLegible } from '@/domain/dinero';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
@@ -12,6 +12,7 @@ import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarExhibidores } from '@/server/exhibidores/servicio';
+import { saldoFavorDeVendedor } from '@/server/pedidos/lecturas';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
 import { accionEditarVendedor } from '../acciones';
 import { TIPOS } from '../tipos';
@@ -22,11 +23,12 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [v, exhibidores, cambios] = await conDbLectura((db) =>
+  const [v, exhibidores, cambios, saldoFavor] = await conDbLectura((db) =>
     Promise.all([
       obtenerVendedor(db, id.data),
       listarExhibidores(db, { vendedorId: id.data }),
       historialDeCambios(db, 'vendedor', id.data),
+      saldoFavorDeVendedor(db, id.data),
     ]),
   );
   if (!v) notFound();
@@ -54,6 +56,7 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
           <CampoMotivo montos={[{ name: 'comision', tipo: 'porcentaje' }]} />
         </Fragment>
       </FormAccion>
+      {numericACentavos(saldoFavor) > 0 && <p>Saldo a favor: {formatoMXN(numericACentavos(saldoFavor))}</p>}
       <h2 className="text-lg font-semibold">Exhibidores</h2>
       <ul className="flex flex-col gap-1">
         {exhibidores.map((e) => (

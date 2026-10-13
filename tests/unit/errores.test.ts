@@ -47,6 +47,63 @@ describe('traducción de errores de Postgres', () => {
       'pieza_transicion',
     );
   });
+  it.each([
+    ['pedido_item_pieza_activa_uq', 'Una de las piezas ya está en otro pedido.', 'codigos'],
+    [
+      'pedido_tarjeta_posicion_uq',
+      'Otra operación tomó esa posición de la tarjeta. Intenta de nuevo.',
+      undefined,
+    ],
+    ['pedido_transicion', 'Ese cambio de estado no está permitido para el pedido.', undefined],
+    [
+      'pedido_descuento_manual',
+      'El descuento manual necesita un motivo (hasta 200 caracteres).',
+      'descuentoMotivo',
+    ],
+    ['pedido_total_no_negativo', 'El total no puede ser negativo.', 'descuentoManual'],
+    ['pedido_notas_largo', 'Las notas admiten hasta 500 caracteres.', 'notas'],
+    ['pedido_cancelado_coherente', 'La cancelación necesita un motivo (hasta 200 caracteres).', 'motivo'],
+    ['pedido_tarjeta_coherente', 'Los datos del pedido son inconsistentes. Recarga la página.', undefined],
+    ['saldo_favor_signo', 'Los datos del pedido son inconsistentes. Recarga la página.', undefined],
+    ['pago_un_pagador', 'Los datos del pedido son inconsistentes. Recarga la página.', undefined],
+    ['pago_monto_positivo', 'El monto debe ser mayor que cero.', 'monto'],
+    ['aplicacion_pago_monto_positivo', 'El monto debe ser mayor que cero.', 'monto'],
+    ['pago_nota_largo', 'La nota admite hasta 200 caracteres.', 'nota'],
+    ['pago_idempotency_key_uq', 'Este pago ya se registró.', undefined],
+    ['aplicacion_pago_excede_pago', 'Lo aplicado supera el monto del pago.', 'monto'],
+    ['aplicacion_pago_pedido_cancelado', 'No se pueden aplicar pagos a un pedido cancelado.', undefined],
+    ['aplicacion_pago_anulada_final', 'Una aplicación de pago anulada no puede cambiar.', undefined],
+    ['pedido_item_vigente_final', 'Una pieza que salió del pedido no puede volver a esa línea.', undefined],
+    ['pedido_item_quitado_final', 'Una pieza que salió del pedido no puede volver a esa línea.', undefined],
+    ['saldo_favor_insuficiente', 'El saldo a favor no alcanza para ese monto.', 'monto'],
+    [
+      'saldo_favor_pedido_requerido',
+      'Los datos del pedido son inconsistentes. Recarga la página.',
+      undefined,
+    ],
+  ])('traduce la regla de pedidos/pagos %s', (constraint, mensaje, campo) => {
+    const e = traducirErrorPg(envuelto({ code: 'P0001', constraint }));
+    expect(e).toMatchObject({ codigo: constraint, message: mensaje });
+    expect(e?.campo).toBe(campo);
+  });
+  it('toda restricción de datos inconsistentes del pedido tiene mensaje', () => {
+    for (const constraint of [
+      'pedido_folio_positivo',
+      'pedido_tarjeta_coherente',
+      'pedido_posicion_rango',
+      'pedido_lealtad_pct_rango',
+      'pedido_sin_lealtad_coherente',
+      'pedido_liquidado_coherente',
+      'pedido_item_precios',
+      'pedido_item_quitado_coherente',
+      'saldo_favor_un_titular',
+      'saldo_favor_signo',
+      'pago_un_pagador',
+    ])
+      expect(traducirErrorPg(envuelto({ code: '23514', constraint }))?.message).toBe(
+        'Los datos del pedido son inconsistentes. Recarga la página.',
+      );
+  });
   it('traduce interbloqueos y fallos de serialización', () => {
     for (const code of ['40P01', '40001']) {
       const e = traducirErrorPg(envuelto({ code }));

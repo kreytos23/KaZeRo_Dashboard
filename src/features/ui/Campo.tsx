@@ -3,12 +3,12 @@
 import { useContext, useId, type InputHTMLAttributes } from 'react';
 import { ErroresCampo } from './errores-campo';
 
-const ESTILO =
+export const ESTILO =
   'min-h-11 rounded-lg border border-borde-campo bg-white px-3 aria-invalid:border-2 aria-invalid:border-error';
-const ESTILO_ETIQUETA = 'text-sm font-medium';
+export const ESTILO_ETIQUETA = 'text-sm font-medium';
 
 /** Error de un campo: fuera del `<label>` para que no forme parte del nombre accesible del control. */
-function MensajeError({ idControl, error }: { idControl: string; error?: string }) {
+export function MensajeError({ idControl, error }: { idControl: string; error?: string }) {
   if (!error) return null;
   return (
     <span id={`${idControl}-error`} className="text-sm font-normal text-error">
@@ -18,7 +18,7 @@ function MensajeError({ idControl, error }: { idControl: string; error?: string 
 }
 
 /** El id del mensaje deriva del id del control (único por useId), no del name: dos formularios pueden repetir name. */
-function useErrorDe(name: string, idControl: string) {
+export function useErrorDe(name: string, idControl: string) {
   const error = useContext(ErroresCampo)[name];
   return {
     error,
@@ -54,12 +54,17 @@ export function Selector({
   opciones,
   defaultValue,
   required,
+  value,
+  onChange,
 }: {
   etiqueta: string;
   name: string;
   opciones: readonly { valor: string; texto: string }[];
   defaultValue?: string;
   required?: boolean;
+  /** Controlado (opcional): úsalo con `onChange`, no con `defaultValue`. */
+  value?: string;
+  onChange?: (valor: string) => void;
 }) {
   const id = useId();
   const { error, aria } = useErrorDe(name, id);
@@ -73,6 +78,8 @@ export function Selector({
         id={id}
         name={name}
         defaultValue={defaultValue}
+        value={value}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         required={required}
         className={ESTILO}
         {...aria}

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const NAVEGACION = [
+  ['/panel/pedidos', 'Pedidos'],
   ['/panel/inventario', 'Inventario'],
   ['/panel/exhibidores', 'Exhibidores'],
   ['/panel/clientes', 'Clientes'],

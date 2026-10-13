@@ -54,11 +54,13 @@ function largoMax(fd: FormData, campo: string, etiqueta: string, max: number): s
 
 /**
  * Devuelve el código creado en `ok`; el cliente navega a la ficha y avisa al buscador (ver FormNuevaPieza).
+ * Con `siguiente=otra` ("Guardar y agregar otra") devuelve además `siguiente: 'otra'` y el cliente se queda.
  * La foto es opcional y viaja en el mismo envío (D9).
  */
 export async function accionAltaPieza(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   await requerirSesion();
-  return ejecutarAccion(async () => {
+  const otra = fd.get('siguiente') === 'otra';
+  const r = await ejecutarAccion(async () => {
     const datos = {
       codigo: largoMax(fd, 'codigo', 'Código', 40),
       categoria: largoMax(fd, 'categoria', 'Categoría', 80),
@@ -76,8 +78,11 @@ export async function accionAltaPieza(_: EstadoAccion, fd: FormData): Promise<Es
       imagen ? altaPiezaConFoto(db, almacenImagenes(), datos, imagen) : altaPieza(db, datos),
     );
     revalidatePath('/panel/inventario');
+    // Refresca las listas de categorías, materiales y proveedores de esta pantalla (uno nuevo aparece sin recargar).
+    revalidatePath('/panel/inventario/nueva');
     return p.codigo;
   });
+  return r.ok && otra ? { ...r, siguiente: 'otra' } : r;
 }
 
 export async function accionAltaLote(_: EstadoLote, fd: FormData): Promise<EstadoLote> {
