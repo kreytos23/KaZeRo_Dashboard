@@ -298,6 +298,21 @@ describe('crearPedido', () => {
     expect(n.rows[0]!.n).toBe(1);
   });
 
+  it('R-37: la misma key con otros datos se rechaza y no crea otro pedido', async () => {
+    const [a, b] = await piezas('PK', 2);
+    const key = randomUUID();
+    await crear({ key, codigos: [a!] });
+    await expect(crear({ key, codigos: [b!] })).rejects.toThrow(
+      'Este formulario ya se envió con otros datos. Recarga la página.',
+    );
+    expect((await app((db) => obtenerPiezaPorCodigo(db, b!)))!.estado).toBe('disponible');
+  });
+
+  it('un código vacío se rechaza en vez de ignorarse', async () => {
+    const [a] = await piezas('PV', 1);
+    await expect(crear({ codigos: [a!, '  '] })).rejects.toThrow('Hay un código vacío.');
+  });
+
   it('valida vendedor activo, cliente, fecha, notas y lista de códigos antes de escribir', async () => {
     const [a] = await piezas('PO', 1);
     await expect(crear({ codigos: [] })).rejects.toThrow('Agrega al menos una pieza.');

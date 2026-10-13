@@ -35,7 +35,8 @@ const columnasPieza = {
 
 /** Normaliza y valida antes de tocar la BD: sin vacíos ni repetidos, con tope. */
 export function validarCodigos(codigos: readonly string[], { minimo = 1 } = {}): string[] {
-  const lista = codigos.map(normalizarCodigo).filter(Boolean);
+  const lista = codigos.map(normalizarCodigo);
+  if (lista.some((c) => !c)) throw new ErrorNegocio('codigo_vacio', 'Hay un código vacío.', 'codigos');
   if (lista.length < minimo) throw new ErrorNegocio('sin_piezas', 'Agrega al menos una pieza.', 'codigos');
   if (lista.length > MAX_PIEZAS_PEDIDO)
     throw new ErrorNegocio('sin_piezas', `Máximo ${MAX_PIEZAS_PEDIDO} piezas por pedido.`, 'codigos');
@@ -297,18 +298,19 @@ export type PedidoBloqueado = Awaited<ReturnType<typeof bloquearPedido>>;
 /**
  * Piezas vigentes del pedido, bloqueadas en el orden D-10 (exhibidores NO KEY UPDATE por id → piezas FOR UPDATE por id).
  * Las piezas apartadas no cambian de exhibidor (trigger, D-11): leerlo antes de bloquear es seguro.
+ * Devuelve también los exhibidores abiertos y las líneas vigentes (para liberar al cancelar).
  */
 export async function bloquearPiezasDelPedido(
   tx: Ejecutor,
   pedidoId: string,
-): Promise<{ id: string; exhibidorId: string | null }[]> {
+): Promise<{ piezas: PiezaBloqueada[]; abiertos: Set<string>; itemIds: string[] }> {
   const items = await tx
-    .select({ piezaId: pedidoItem.piezaId })
+    .select({ id: pedidoItem.id, piezaId: pedidoItem.piezaId })
     .from(pedidoItem)
     .where(and(eq(pedidoItem.pedidoId, pedidoId), eq(pedidoItem.vigente, true)));
   const ids = items.map((i) => i.piezaId);
-  await bloquearExhibidoresDe(tx, ids);
-  return bloquearPiezasPorId(tx, ids);
+  const abiertos = await bloquearExhibidoresDe(tx, ids);
+  return { piezas: await bloquearPiezasPorId(tx, ids), abiertos, itemIds: items.map((i) => i.id) };
 }
 
 /**
@@ -329,7 +331,12 @@ export async function liquidarSiSaldoCero(
   if (p.estado !== 'abierto' || numericACentavos(p.total) > (await pagadoCentavos(tx, pedidoId)))
     return p.estado;
   // D-10: exhibidores → piezas, siempre, aunque quien llama ya los haya bloqueado (volver a bloquear es inocuo).
-  const piezas = await bloquearPiezasDelPedido(tx, pedidoId);
+  const { piezas } = await bloquearPiezasDelPedido(tx, pedidoId);
+  if (piezas.some((x) => x.estado !== 'apartada'))
+    throw new ErrorNegocio(
+      'inconsistente',
+      'Las piezas del pedido ya no están apartadas. Recarga la página.',
+    );
   if (piezas.length) {
     await tx
       .update(pieza)

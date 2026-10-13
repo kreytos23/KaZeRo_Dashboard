@@ -1,18 +1,21 @@
-import { and, eq, ne } from 'drizzle-orm';
+import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { cliente, pedido, pedidoItem, vendedor } from '@/db/schema';
+import { aplicacionPago, cliente, pago, pedido, pedidoItem, saldoFavorMov, vendedor } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
 import { descuentoLealtad, siguientePosicion, type Posicion, type SinLealtad } from '@/domain/lealtad';
-import { calcularTotales, pctBpsANumeric } from '@/domain/pedidos';
+import { calcularTotales, formatoFolio, pctBpsANumeric } from '@/domain/pedidos';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
-import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
+import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 import { conIdempotencia } from '@/server/idempotencia';
 import {
   apartarPiezas,
+  bloquearPedido,
+  bloquearPiezasDelPedido,
   bloquearPiezasParaApartar,
   exigirDisponibles,
   foliosConSaldo,
+  liberarPiezas,
   liquidarSiSaldoCero,
   validarCodigos,
 } from './comun';
@@ -74,10 +77,12 @@ export function validarNotas(notas: string | undefined): string {
 
 function validarPedido(d: DatosPedido) {
   const descuento = validarDescuentoManual(d.descuentoManualCentavos, d.descuentoManualMotivo);
+  // Una fecha omitida se resuelve dentro de la transacción: el payload de idempotencia guarda lo que se pidió.
+  if (d.fecha?.trim()) validarFecha(d.fecha);
   return {
     clienteId: d.clienteId,
     vendedorId: d.vendedorId,
-    fecha: validarFecha(d.fecha),
+    fecha: d.fecha?.trim() || null,
     codigos: validarCodigos(d.codigos),
     cuentaTarjeta: d.cuentaTarjeta,
     descuentoManual: descuento.monto,
@@ -108,6 +113,7 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
           // Contexto de auditoría (Plan 2.1) antes de cualquier escritura: si el pedido se liquida al crearse,
           // kz_auditar registra el cambio de estado.
           await fijarContextoAuditoria(tx, { adminId: d.adminId, motivo: null });
+          const fecha = validarFecha(v.fecha ?? undefined);
           // 1) Cliente: serializa la asignación de posición (R-23) y la lectura de saldos de R-29.
           const [c] = await tx
             .select({ id: cliente.id })
@@ -165,7 +171,7 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
             .values({
               clienteId: v.clienteId,
               vendedorId: v.vendedorId,
-              fecha: v.fecha,
+              fecha,
               cuentaTarjeta: v.cuentaTarjeta,
               cicloTarjeta: posicion?.ciclo ?? null,
               posicionTarjeta: posicion?.posicion ?? null,
@@ -200,6 +206,115 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
             pctBps: lealtad.pctBps,
             sinLealtad: lealtad.sinLealtad,
             foliosConSaldo: lealtad.sinLealtad ? otras : [],
+          };
+        },
+      ),
+    ),
+  );
+}
+
+export interface PedidoCancelado {
+  liberadas: number;
+  alExhibidor: number;
+  saldoFavor: string;
+}
+
+/**
+ * R-17: cancela un pedido abierto. Orden de bloqueo (D-10): cliente → pedido → exhibidores → piezas (helper
+ * compartido) → pagos. Las piezas vuelven al exhibidor si sigue abierto o a disponible (D-12); lo abonado pasa a
+ * saldo a favor de quien pagó y las aplicaciones se anulan (no se borran). El índice parcial de la tarjeta excluye
+ * cancelados: la posición queda libre (R-24).
+ */
+export async function cancelarPedido(
+  db: Ejecutor,
+  d: { key: string; adminId: string; pedidoId: string; version: number; motivo: string },
+): Promise<PedidoCancelado> {
+  const motivo = d.motivo.trim();
+  if (!motivo || motivo.length > 200)
+    throw new ErrorNegocio(
+      'motivo_invalido',
+      'Escribe el motivo de la cancelación (hasta 200 caracteres).',
+      'motivo',
+    );
+  const payload = { pedidoId: d.pedidoId, version: d.version, motivo };
+  return conErroresDeNegocio(() =>
+    db.transaction((tx) =>
+      conIdempotencia(
+        tx,
+        { key: d.key, operacion: 'cancelarPedido', adminId: d.adminId, payload },
+        async (): Promise<PedidoCancelado> => {
+          await fijarContextoAuditoria(tx, { adminId: d.adminId, motivo });
+          const p = await bloquearPedido(tx, d.pedidoId); // cliente → pedido
+          if (p.estado === 'liquidado')
+            throw new ErrorNegocio(
+              'pedido_liquidado',
+              'Un pedido liquidado no se cancela: primero revierte sus pagos.',
+            );
+          if (p.estado === 'cancelado')
+            throw new ErrorNegocio('pedido_cancelado', 'El pedido ya está cancelado.');
+          if (p.version !== d.version) throw conflictoVersion();
+          const { piezas, abiertos, itemIds } = await bloquearPiezasDelPedido(tx, p.id);
+          const r = await liberarPiezas(tx, {
+            pedidoId: p.id,
+            piezas,
+            abiertos,
+            nota: `Cancelación de ${formatoFolio(p.folio)}.`,
+            adminId: d.adminId,
+          });
+          if (itemIds.length)
+            await tx
+              .update(pedidoItem)
+              .set({ vigente: false, quitadoAt: new Date() })
+              .where(inArray(pedidoItem.id, itemIds));
+          // R-17 + P2: lo abonado pasa a saldo a favor de quien pagó; las aplicaciones se anulan.
+          const aplicaciones = await tx
+            .select({
+              id: aplicacionPago.id,
+              monto: aplicacionPago.monto,
+              clienteId: pago.pagadorClienteId,
+              vendedorId: pago.pagadorVendedorId,
+            })
+            .from(aplicacionPago)
+            .innerJoin(pago, eq(pago.id, aplicacionPago.pagoId))
+            .where(and(eq(aplicacionPago.pedidoId, p.id), isNull(aplicacionPago.anuladaAt)));
+          let saldoFavor = 0;
+          if (aplicaciones.length) {
+            await tx
+              .update(aplicacionPago)
+              .set({ anuladaAt: new Date() })
+              .where(
+                inArray(
+                  aplicacionPago.id,
+                  aplicaciones.map((a) => a.id),
+                ),
+              );
+            await tx.insert(saldoFavorMov).values(
+              aplicaciones.map((a) => ({
+                clienteId: a.clienteId,
+                vendedorId: a.vendedorId,
+                tipo: 'cancelacion' as const,
+                monto: a.monto,
+                pedidoId: p.id,
+                fecha: hoyMX(),
+              })),
+            );
+            saldoFavor = aplicaciones.reduce((s, a) => s + numericACentavos(a.monto), 0);
+          }
+          const filas = await tx
+            .update(pedido)
+            .set({
+              estado: 'cancelado',
+              canceladoAt: new Date(),
+              cancelacionMotivo: motivo,
+              version: sql`${pedido.version} + 1`,
+            })
+            .where(and(eq(pedido.id, p.id), eq(pedido.version, d.version)))
+            .returning({ id: pedido.id });
+          if (!filas.length) throw conflictoVersion();
+          return {
+            liberadas: piezas.length,
+            alExhibidor: r.alExhibidor,
+            saldoFavor: centavosANumeric(saldoFavor),
           };
         },
       ),

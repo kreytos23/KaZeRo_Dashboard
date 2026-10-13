@@ -12,7 +12,7 @@ import {
   regresarPiezas,
 } from '@/server/exhibidores/servicio';
 import { registrarPagoDePedido, type DatosPagoPedido } from '@/server/pagos/servicio';
-import { crearPedido } from '@/server/pedidos/servicio';
+import { cancelarPedido, crearPedido } from '@/server/pedidos/servicio';
 import { altaPieza, historial, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { adminDePrueba, truncarTodo, urlApp } from './utilidades';
@@ -21,7 +21,7 @@ const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn)
 let adminId = '';
 let ctx: { clienteId: string; vendedorId: string };
 
-async function pedidoCon(codigo: string, precioCentavos = 14900) {
+async function pedidoCon(codigo: string, precioCentavos = 14900, fecha?: string) {
   await app((db) =>
     altaPieza(db, {
       codigo,
@@ -37,6 +37,7 @@ async function pedidoCon(codigo: string, precioCentavos = 14900) {
       adminId,
       ...ctx,
       codigos: [codigo],
+      fecha,
       cuentaTarjeta: true,
       descuentoManualCentavos: 0,
     }),
@@ -70,7 +71,7 @@ beforeEach(async () => {
 
 describe('registrarPagoDePedido', () => {
   it('R-14/R-35: un abono baja el saldo y la aplicación lleva la fecha del pago', async () => {
-    const p = await pedidoCon('PG01');
+    const p = await pedidoCon('PG01', 14900, '2026-09-30');
     expect(await pagar(p.id, 5000, { fecha: '2026-10-01' })).toMatchObject({
       estado: 'abierto',
       saldo: '99.00',
@@ -240,5 +241,32 @@ describe('registrarPagoDePedido', () => {
     expect(await ficha(p.id)).toMatchObject({ estado: 'liquidado', cuentaTarjeta: true, posicionTarjeta: 1 });
     const q = await pedidoCon('PG11');
     expect((await ficha(q.id)).posicionTarjeta).toBe(2);
+  });
+
+  it('rechaza un pago con fecha anterior a la del pedido', async () => {
+    const p = await pedidoCon('PG12', 14900, '2026-10-05');
+    await expect(pagar(p.id, 100, { fecha: '2026-10-04' })).rejects.toThrow(
+      'La fecha del pago no puede ser anterior a la del pedido.',
+    );
+    await pagar(p.id, 100, { fecha: '2026-10-05' });
+  });
+
+  it('rechaza el pago de un pedido cancelado', async () => {
+    const p = await pedidoCon('PG13');
+    const { version } = await ficha(p.id);
+    await app((db) =>
+      cancelarPedido(db, { key: randomUUID(), adminId, pedidoId: p.id, version, motivo: 'x' }),
+    );
+    await expect(pagar(p.id, 100)).rejects.toThrow('El pedido está cancelado.');
+  });
+
+  it('R-37: la misma key con otros datos se rechaza', async () => {
+    const p = await pedidoCon('PG14');
+    const key = randomUUID();
+    await pagar(p.id, 1000, { key });
+    await expect(pagar(p.id, 2000, { key })).rejects.toThrow(
+      'Este formulario ya se envió con otros datos. Recarga la página.',
+    );
+    expect(await ficha(p.id)).toMatchObject({ pagado: '10.00' });
   });
 });

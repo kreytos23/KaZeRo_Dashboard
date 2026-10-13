@@ -38,12 +38,13 @@ function validar(d: DatosPagoPedido) {
     throw new ErrorNegocio('metodo_invalido', 'Elige un método de pago válido.', 'metodo');
   if (d.pagador !== 'cliente' && d.pagador !== 'vendedor')
     throw new ErrorNegocio('pagador_invalido', 'Elige quién paga.', 'pagador');
+  if (d.fecha?.trim()) validarFecha(d.fecha);
   const nota = d.nota?.trim() || null;
   if (nota && nota.length > 200)
     throw new ErrorNegocio('nota_invalida', 'La nota admite hasta 200 caracteres.', 'nota');
   return {
     pedidoId: d.pedidoId,
-    fecha: validarFecha(d.fecha),
+    fecha: d.fecha?.trim() || null, // una fecha omitida se resuelve dentro de la transacción
     monto: d.montoCentavos,
     metodo: d.metodo,
     pagador: d.pagador,
@@ -65,11 +66,18 @@ export async function registrarPagoDePedido(db: Ejecutor, d: DatosPagoPedido): P
         { key: d.key, adminId: d.adminId, operacion: 'registrarPagoDePedido', payload: v },
         async (): Promise<PagoRegistrado> => {
           await fijarContextoAuditoria(tx, { adminId: d.adminId, motivo: null }); // la liquidación cambia `estado`
+          const fecha = validarFecha(v.fecha ?? undefined);
           const p = await bloquearPedido(tx, v.pedidoId);
           if (p.estado === 'liquidado')
             throw new ErrorNegocio('pedido_liquidado', 'El pedido ya está liquidado.');
           if (p.estado === 'cancelado')
             throw new ErrorNegocio('pedido_cancelado', 'El pedido está cancelado.');
+          if (fecha < p.fecha)
+            throw new ErrorNegocio(
+              'fecha_invalida',
+              'La fecha del pago no puede ser anterior a la del pedido.',
+              'fecha',
+            );
           const saldo = numericACentavos(p.total) - (await pagadoCentavos(tx, p.id));
           if (v.monto > saldo)
             throw new ErrorNegocio(
@@ -84,7 +92,7 @@ export async function registrarPagoDePedido(db: Ejecutor, d: DatosPagoPedido): P
             .insert(pago)
             .values({
               idempotencyKey: d.key,
-              fecha: v.fecha,
+              fecha,
               monto,
               metodo: v.metodo,
               pagadorClienteId: v.pagador === 'cliente' ? p.clienteId : null,
@@ -94,7 +102,7 @@ export async function registrarPagoDePedido(db: Ejecutor, d: DatosPagoPedido): P
             })
             .returning({ id: pago.id });
           // R-35: la fecha de cobro de la aplicación es la fecha del pago.
-          await tx.insert(aplicacionPago).values({ pagoId: pg!.id, pedidoId: p.id, monto, fecha: v.fecha });
+          await tx.insert(aplicacionPago).values({ pagoId: pg!.id, pedidoId: p.id, monto, fecha });
           const estado = (await liquidarSiSaldoCero(tx, p.id, d.adminId)) as 'abierto' | 'liquidado';
           return { pagoId: pg!.id, estado, saldo: centavosANumeric(saldo - v.monto) };
         },
