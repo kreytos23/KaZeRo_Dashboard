@@ -3,7 +3,7 @@ import { crearMotor } from '@/search/motor';
 import type { IndiceBusqueda } from '@/search/tipos';
 
 const indice: IndiceBusqueda = {
-  v: 2,
+  v: 3,
   piezas: [
     ['p1', 'AF12', 'Anillo serpiente con circonitas', 'disponible', '9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d'],
     ['p2', 'AF120', 'Pulsera hilo rosa', 'vendida', null],
@@ -18,6 +18,7 @@ const indice: IndiceBusqueda = {
     ['v1', 'Nelly'],
     ['v2', 'Ana'],
   ],
+  pedidos: [['p1', 34, 'Gloria Roldán', 'abierto']],
 };
 const motor = crearMotor(indice);
 const claves = (q: string, recientes?: string[]) => motor.buscar(q, recientes).map((r) => r.clave);
@@ -72,7 +73,13 @@ describe('búsqueda global (diseño §8)', () => {
     expect(r.titulo).toContain('<img');
   });
   it('los href de cliente y vendedor codifican el id', () => {
-    const m = crearMotor({ v: 2, piezas: [], clientes: [['a/b?c', 'Zoe', null]], vendedores: [] });
+    const m = crearMotor({
+      v: 3,
+      piezas: [],
+      clientes: [['a/b?c', 'Zoe', null]],
+      vendedores: [],
+      pedidos: [],
+    });
     expect(m.buscar('zoe')[0]!.href).toBe('/panel/clientes/a%2Fb%3Fc');
   });
 });
@@ -96,5 +103,33 @@ describe('código escrito con guion o espacios', () => {
   it('"af-12" y "af 12" encuentran AF12 primero', () => {
     expect(claves('af-12')[0]).toBe('pieza:p1');
     expect(claves('af 12')[0]).toBe('pieza:p1');
+  });
+});
+
+const motorConPieza34 = crearMotor({
+  ...indice,
+  piezas: [...indice.piezas, ['p34', '34', 'Dije', 'disponible', null]],
+});
+describe('folios de pedido', () => {
+  it('D-16: "KZR-34", "kzr34" y "kzr 34" abren el pedido 34', () => {
+    for (const q of ['KZR-34', 'kzr34', 'kzr 34'])
+      expect(motor.buscar(q)[0]).toMatchObject({
+        tipo: 'pedido',
+        href: '/panel/pedidos/34',
+        titulo: 'KZR-34 · Gloria Roldán',
+      });
+  });
+  it('D-16: "34" abre la pieza 34 si existe; si no, el pedido 34', () => {
+    expect(motorConPieza34.buscar('34')[0]).toMatchObject({ tipo: 'pieza' });
+    expect(motor.buscar('34')[0]).toMatchObject({ tipo: 'pedido' });
+  });
+  it('opción tipos: solo clientes (selector de cliente del pedido)', () => {
+    expect(motor.buscar('gloria', [], 8, { tipos: ['cliente'] }).every((r) => r.tipo === 'cliente')).toBe(
+      true,
+    );
+    expect(motor.buscar('kzr-34', [], 8, { tipos: ['cliente'] })).toEqual([]);
+  });
+  it('el estado del pedido se muestra con etiqueta', () => {
+    expect(motor.buscar('kzr-34')[0]!.subtitulo).toBe('Abierto');
   });
 });

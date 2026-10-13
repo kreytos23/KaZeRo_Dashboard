@@ -14,6 +14,7 @@ const ETIQUETA_TIPO: Record<Resultado['tipo'], string> = {
   pieza: 'Pieza',
   cliente: 'Cliente',
   vendedor: 'Vendedor',
+  pedido: 'Nota',
 };
 
 type Estado = 'inactivo' | 'cargando' | 'listo' | 'sin_sesion' | 'error';
@@ -40,7 +41,13 @@ function guardarReciente(clave: string) {
 function esIndice(v: unknown): v is IndiceBusqueda {
   if (typeof v !== 'object' || v === null) return false;
   const i = v as Partial<IndiceBusqueda>;
-  return i.v === 2 && Array.isArray(i.piezas) && Array.isArray(i.clientes) && Array.isArray(i.vendedores);
+  return (
+    i.v === 3 &&
+    Array.isArray(i.piezas) &&
+    Array.isArray(i.clientes) &&
+    Array.isArray(i.vendedores) &&
+    Array.isArray(i.pedidos)
+  );
 }
 
 function esCampoDeTexto(t: EventTarget | null): boolean {

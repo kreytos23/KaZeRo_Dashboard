@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { exhibidor, movimientoPieza, pieza, vMovimientoPieza, vPieza } from '@/db/schema';
+import { exhibidor, movimientoPieza, pieza, vMovimientoPieza, vPedidoItem, vPieza } from '@/db/schema';
 import { esCodigoValido, esPrefijoValido, normalizarCodigo, siguienteCodigo } from '@/domain/codigos';
 import { calcularCambios, validarMotivo } from '@/domain/auditoria';
 import { destinoCorreccion } from '@/domain/correccion';
@@ -11,6 +11,7 @@ import { escaparLike, normalizar } from '@/domain/texto';
 import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
 import { obtenerOCrearCatalogo, resolverCatalogos } from '@/server/catalogos/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
+import type { EstadoPedido } from '@/server/pedidos/comun';
 
 export type EstadoPieza = (typeof pieza.$inferSelect)['estado'];
 export const ESTADOS_MANUALES = ['regalo', 'defecto', 'guardada', 'disponible'] as const;
@@ -477,11 +478,25 @@ export function historial(db: Ejecutor, piezaId: string) {
       exhibidorId: vMovimientoPieza.exhibidorId,
       exhibidorEstado: vMovimientoPieza.exhibidorEstado,
       adminEmail: vMovimientoPieza.adminEmail,
+      pedidoFolio: vMovimientoPieza.pedidoFolio,
     })
     .from(vMovimientoPieza)
     .where(eq(vMovimientoPieza.piezaId, piezaId))
     .orderBy(desc(vMovimientoPieza.orden));
 }
+/** Pedido en que está la pieza ahora (línea vigente), si lo hay. Una consulta por la vista. */
+export async function pedidoVigenteDePieza(
+  db: Ejecutor,
+  piezaId: string,
+): Promise<{ folio: number; estado: EstadoPedido } | null> {
+  const [f] = await db
+    .select({ folio: vPedidoItem.folio, estado: vPedidoItem.pedidoEstado })
+    .from(vPedidoItem)
+    .where(and(eq(vPedidoItem.piezaId, piezaId), eq(vPedidoItem.vigente, true)))
+    .limit(1);
+  return f ?? null;
+}
+
 export type MovimientoFila = Awaited<ReturnType<typeof historial>>[number];
 
 export function listarPiezas(

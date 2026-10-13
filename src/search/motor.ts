@@ -1,12 +1,13 @@
 import MiniSearch from 'minisearch';
 import { normalizarCodigo } from '@/domain/codigos';
+import { esFolioExplicito, formatoFolio, parsearFolio } from '@/domain/pedidos';
 import { urlImagenPieza } from '@/domain/imagenes';
 import { normalizar } from '@/domain/texto';
 import type { IndiceBusqueda } from './tipos';
 
 export interface Resultado {
   clave: string;
-  tipo: 'pieza' | 'cliente' | 'vendedor';
+  tipo: 'pieza' | 'cliente' | 'vendedor' | 'pedido';
   titulo: string;
   subtitulo: string;
   href: string;
@@ -27,6 +28,11 @@ const ESTADOS: Record<string, string> = {
   defecto: 'Defecto',
   guardada: 'Guardada',
 };
+const ESTADOS_PEDIDO: Record<string, string> = {
+  abierto: 'Abierto',
+  liquidado: 'Liquidado',
+  cancelado: 'Cancelado',
+};
 
 /** "af-12" debe encontrar AF12: se compara también sin guiones. */
 function compactar(c: string): string {
@@ -43,6 +49,8 @@ export function crearMotor(indice: IndiceBusqueda) {
   const porCodigo = new Map<string, Resultado>();
   const porCodigoCompacto = new Map<string, Resultado>();
   const porClave = new Map<string, Resultado>();
+  // Los pedidos NO entran a MiniSearch (el token "kzr" emparejaría con todos): solo se resuelven por folio.
+  const porFolio = new Map<number, Resultado>();
 
   for (const [id, codigo, descripcion, estado, imagen] of indice.piezas) {
     const r: Resultado = {
@@ -83,6 +91,19 @@ export function crearMotor(indice: IndiceBusqueda) {
     docs.push({ ...r, texto: nombre });
   }
 
+  for (const [id, folio, cliente, estado] of indice.pedidos) {
+    const r: Resultado = {
+      clave: `pedido:${id}`,
+      tipo: 'pedido',
+      titulo: `${formatoFolio(folio)} · ${cliente}`,
+      subtitulo: ESTADOS_PEDIDO[estado] ?? estado,
+      href: `/panel/pedidos/${folio}`,
+      miniatura: null,
+    };
+    porFolio.set(folio, r);
+    porClave.set(r.clave, r);
+  }
+
   const ms = new MiniSearch<Doc>({
     idField: 'clave',
     fields: ['texto'],
@@ -100,21 +121,35 @@ export function crearMotor(indice: IndiceBusqueda) {
 
   return {
     /** Consulta vacía: devuelve los recientes que sigan existiendo (o nada). */
-    buscar(consulta: string, recientes: readonly string[] = [], limite = LIMITE_DEFECTO): Resultado[] {
+    buscar(
+      consulta: string,
+      recientes: readonly string[] = [],
+      limite = LIMITE_DEFECTO,
+      opciones: { tipos?: readonly Resultado['tipo'][] } = {},
+    ): Resultado[] {
+      const permitido = (r: Resultado) => !opciones.tipos || opciones.tipos.includes(r.tipo);
       const max = acotarLimite(limite);
       if (!consulta.trim()) {
         const lista: Resultado[] = [];
         for (const c of recientes) {
           const r = porClave.get(c);
-          if (r) lista.push(r);
+          if (r && permitido(r)) lista.push(r);
         }
         return lista.slice(0, max);
       }
-      const exacto = porCodigo.get(normalizarCodigo(consulta)) ?? porCodigoCompacto.get(compactar(consulta));
+      const folio = parsearFolio(consulta);
+      const pedido = folio === null ? undefined : porFolio.get(folio);
+      const pieza = porCodigo.get(normalizarCodigo(consulta)) ?? porCodigoCompacto.get(compactar(consulta));
+      // D-16: "KZR-34" es siempre el pedido; "34" es la pieza 34 si existe y si no, el pedido 34.
+      const candidato = esFolioExplicito(consulta) ? (pedido ?? pieza) : (pieza ?? pedido);
+      const exacto = candidato && permitido(candidato) ? candidato : undefined;
       const impulso = new Map(
         recientes.map((c, i) => [c, 1 + (recientes.length - i) / recientes.length] as const),
       );
-      const hits = ms.search(consulta, { boostDocument: (id) => impulso.get(String(id)) ?? 1 });
+      const hits = ms.search(consulta, {
+        boostDocument: (id) => impulso.get(String(id)) ?? 1,
+        filter: opciones.tipos ? (r) => opciones.tipos!.includes(r.tipo) : undefined,
+      });
       const lista: Resultado[] = hits.map((h) => ({
         clave: h.clave,
         tipo: h.tipo,
