@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import sharp from 'sharp';
-import { RUTA_ESTADO, irA } from './utilidades';
+import { RUTA_ESTADO, irA, sembrarPiezas } from './utilidades';
 
 /**
  * Captura de inventario pieza por pieza: "Guardar y agregar otra" y los combobox de catálogo (CampoConLista).
@@ -101,6 +101,20 @@ test.describe('captura de piezas', () => {
 
     await irA(page, `/panel/inventario/${c1}`);
     await expect(page.getByRole('region', { name: 'Foto' }).getByRole('img')).toBeVisible();
+  });
+
+  test('con muchas categorías (lista con scroll), Tab sigue de Categoría a Descripción', async ({
+    page,
+  }, info) => {
+    const m = marca(info.project.name);
+    // Más opciones de las que caben en la lista (max-h-60): Chrome la volvería una parada de Tab.
+    const codigos = Array.from({ length: 9 }, (_, i) => `CT${m}${i + 1}`);
+    await sembrarPiezas(codigos, 100, (c) => `Familia ${c}`);
+    await irA(page, '/panel/inventario/nueva');
+    await campo(page, 'Categoría').focus();
+    await expect(page.getByRole('listbox', { name: 'Opciones de Categoría' })).toBeVisible();
+    await page.keyboard.press('Tab');
+    await expect(campo(page, 'Descripción')).toBeFocused();
   });
 
   test('CampoConLista: lista existentes, elige con teclado, ofrece Agregar «…» y expone aria', async ({

@@ -131,6 +131,9 @@ export function CampoConLista({
         <ul
           id={cb.idLista}
           role="listbox"
+          // Con muchas opciones la lista hace scroll y Chrome la volvería una parada de Tab: al salir del campo
+          // se cierra y el foco se perdería. El teclado la maneja desde el campo (aria-activedescendant).
+          tabIndex={-1}
           aria-label={`Opciones de ${etiqueta}`}
           hidden={!cb.visible}
           className="absolute inset-x-0 top-full z-10 mt-1 max-h-60 overflow-auto rounded-lg border border-borde bg-white shadow"
