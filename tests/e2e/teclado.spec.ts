@@ -161,7 +161,7 @@ test.describe('menú del celular con teclado', () => {
       await page.keyboard.press('Enter');
       await expect(boton).toHaveAttribute('aria-expanded', 'true', { timeout: 500 });
     }).toPass();
-    await expect(page.getByRole('link', { name: 'Inventario' })).toBeFocused();
+    await expect(page.getByRole('link', { name: 'Pedidos' })).toBeFocused();
     await expect(page.locator('main')).toHaveAttribute('inert', '');
 
     // Escape cierra y devuelve el foco al botón.

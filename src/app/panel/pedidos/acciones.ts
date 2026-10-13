@@ -3,13 +3,15 @@
 import { redirect } from 'next/navigation';
 import { conDb } from '@/db/client';
 import { pesosACentavos } from '@/domain/dinero';
-import { MAX_PIEZAS_PEDIDO } from '@/domain/pedidos';
+import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
+import { partirCodigos } from '@/features/exhibidores/codigos';
 import type { EstadoAccion } from '@/features/ui/estado';
-import { ejecutarAccion, texto, uuidDe } from '@/server/acciones';
+import { ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { crearCliente } from '@/server/clientes/servicio';
 import { ErrorNegocio } from '@/server/errores';
-import { crearPedido } from '@/server/pedidos/servicio';
+import { registrarPagoDePedido, type MetodoPago } from '@/server/pagos/servicio';
+import { cancelarPedido, crearPedido, editarPedido } from '@/server/pedidos/servicio';
 import { revalidarPedido } from './revalidar';
 
 function centavosDe(fd: FormData, campo: string): number {
@@ -19,6 +21,12 @@ function centavosDe(fd: FormData, campo: string): number {
   if (c === null)
     throw new ErrorNegocio('monto_invalido', 'Escribe un monto válido, por ejemplo 149 o 149.50.', campo);
   return c;
+}
+
+function folioDe(fd: FormData): number {
+  const f = parsearFolio(texto(fd, 'folio'));
+  if (f === null) throw new ErrorNegocio('no_encontrado', 'Registro no encontrado.');
+  return f;
 }
 
 export async function accionCrearPedido(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
@@ -60,4 +68,76 @@ export async function accionClienteRapido(
   });
   if (r.error) return { error: r.error };
   return { id: r.ok, nombre: String(nombre).trim().replace(/\s+/g, ' ') };
+}
+
+export async function accionRegistrarPago(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const folio = folioDe(fd);
+    const pagador = texto(fd, 'pagador') === 'vendedor' ? 'vendedor' : 'cliente';
+    const r = await conDb((db) =>
+      registrarPagoDePedido(db, {
+        key: uuidDe(fd, 'key'),
+        adminId,
+        pedidoId: uuidDe(fd, 'pedidoId'),
+        fecha: texto(fd, 'fecha').slice(0, 20),
+        montoCentavos: centavosDe(fd, 'monto'),
+        metodo: texto(fd, 'metodo') as MetodoPago, // el servicio valida contra METODOS_PAGO
+        pagador,
+        nota: texto(fd, 'nota').slice(0, 400),
+      }),
+    );
+    revalidarPedido(folio);
+    return r.estado === 'liquidado' ? 'Pago registrado. El pedido quedó liquidado.' : 'Pago registrado.';
+  });
+}
+
+export async function accionCancelarPedido(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const folio = folioDe(fd);
+    // Acción irreversible: la casilla `required` del formulario no basta, un POST directo la saltaría.
+    if (texto(fd, 'confirmo') !== 'on')
+      throw new ErrorNegocio(
+        'confirmacion',
+        'Marca la casilla para confirmar que entiendes que no se puede deshacer.',
+      );
+    await conDb((db) =>
+      cancelarPedido(db, {
+        key: uuidDe(fd, 'key'),
+        adminId,
+        pedidoId: uuidDe(fd, 'pedidoId'),
+        version: versionDe(fd),
+        motivo: texto(fd, 'motivo').slice(0, 400),
+      }),
+    );
+    revalidarPedido(folio);
+    return 'Pedido cancelado.';
+  });
+}
+
+export async function accionEditarPedido(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const folio = folioDe(fd);
+    const r = await conDb((db) =>
+      editarPedido(db, {
+        key: uuidDe(fd, 'key'),
+        adminId,
+        pedidoId: uuidDe(fd, 'pedidoId'),
+        version: versionDe(fd),
+        vendedorId: uuidDe(fd, 'vendedorId'),
+        fecha: texto(fd, 'fecha').slice(0, 20),
+        descuentoManualCentavos: centavosDe(fd, 'descuentoManual'),
+        descuentoManualMotivo: texto(fd, 'descuentoMotivo').slice(0, 400),
+        notas: texto(fd, 'notas').slice(0, 1000),
+        agregar: partirCodigos(texto(fd, 'agregar')),
+        quitar: fd.getAll('quitar').filter((c): c is string => typeof c === 'string'),
+        motivo: texto(fd, 'motivo').slice(0, 400),
+      }),
+    );
+    if (!r.cambios) return 'Sin cambios.';
+    revalidarPedido(folio);
+    redirect(`/panel/pedidos/${folio}?editado=1`);
+  });
 }
