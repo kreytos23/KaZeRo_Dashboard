@@ -4,6 +4,7 @@ import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { formatoFolio } from '@/domain/pedidos';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { requerirSesion } from '@/server/auth/sesion-actual';
+import { listarClientes, obtenerCliente } from '@/server/clientes/servicio';
 import { listarPedidos } from '@/server/pedidos/lecturas';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { ETIQUETA_ESTADO_PEDIDO, fechaCorta } from './etiquetas';
@@ -20,24 +21,40 @@ export default async function PaginaPedidos({
 }) {
   await requerirSesion();
   const f = leerFiltrosPedidos(await searchParams);
-  const [pedidos, vendedores] = await conDbLectura((db) =>
+  const [pedidos, vendedores, clientes, elegido] = await conDbLectura((db) =>
     Promise.all([
       listarPedidos(db, {
         q: f.q,
         estado: f.estado,
         vendedorId: f.vendedor,
+        clienteId: f.cliente,
+        desde: f.desde,
+        hasta: f.hasta,
         conSaldo: f.conSaldo,
         limite: POR_PAGINA,
         offset: (f.pagina - 1) * POR_PAGINA,
       }),
       listarVendedores(db),
+      // Hasta 200 clientes en el selector; si el filtrado no está entre ellos se trae aparte.
+      listarClientes(db, { limite: 200 }),
+      f.cliente ? obtenerCliente(db, f.cliente) : Promise.resolve(null),
     ]),
   );
+  const opcionesCliente = [
+    { valor: '', texto: 'Todos' },
+    ...(elegido && !clientes.some((c) => c.id === elegido.id) ? [elegido] : [])
+      .concat(clientes)
+      .map((c) => ({ valor: c.id, texto: c.nombre })),
+  ];
+  const rangoInvertido = Boolean(f.desde && f.hasta && f.desde > f.hasta);
   const conPagina = (p: number) => {
     const qs = new URLSearchParams();
     if (f.q) qs.set('q', f.q);
     if (f.estado) qs.set('estado', f.estado);
     if (f.vendedor) qs.set('vendedor', f.vendedor);
+    if (f.cliente) qs.set('cliente', f.cliente);
+    if (f.desde) qs.set('desde', f.desde);
+    if (f.hasta) qs.set('hasta', f.hasta);
     if (f.conSaldo) qs.set('saldo', '1');
     qs.set('pagina', String(p));
     return `?${qs}`;
@@ -73,6 +90,14 @@ export default async function PaginaPedidos({
             ...vendedores.map((v) => ({ valor: v.id, texto: v.nombre })),
           ]}
         />
+        <Selector
+          etiqueta="Cliente"
+          name="cliente"
+          defaultValue={f.cliente ?? ''}
+          opciones={opcionesCliente}
+        />
+        <Campo etiqueta="Desde" name="desde" type="date" defaultValue={f.desde ?? ''} />
+        <Campo etiqueta="Hasta" name="hasta" type="date" defaultValue={f.hasta ?? ''} />
         <label className="flex min-h-11 items-center gap-2">
           <input type="checkbox" name="saldo" value="1" defaultChecked={f.conSaldo} /> Con saldo pendiente
         </label>
@@ -80,6 +105,10 @@ export default async function PaginaPedidos({
           Filtrar
         </button>
       </form>
+
+      <p role="status" className={rangoInvertido ? 'aviso-atencion' : undefined}>
+        {rangoInvertido ? 'La fecha «Desde» es posterior a «Hasta»: no habrá resultados.' : ''}
+      </p>
 
       {pedidos.length === 0 ? (
         <p className="tarjeta p-4 text-sm text-tinta-suave">No hay pedidos con esos filtros.</p>

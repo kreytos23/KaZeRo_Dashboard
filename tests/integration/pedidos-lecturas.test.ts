@@ -180,4 +180,63 @@ describe('lecturas de pedidos', () => {
       pedidoFolio: p.folio,
     });
   });
+
+  it('listado: filtra por cliente y por rango de fechas (inclusive), valida fechas y acota la paginación', async () => {
+    const otro = await app((db) => crearCliente(db, { nombre: 'Marisol' }));
+    await alta('LJ01');
+    await alta('LJ02');
+    await alta('LJ03');
+    const a = await app((db) =>
+      crearPedido(db, {
+        key: randomUUID(),
+        adminId,
+        ...ctx,
+        codigos: ['LJ01'],
+        cuentaTarjeta: true,
+        descuentoManualCentavos: 0,
+        fecha: '2026-09-01',
+      }),
+    );
+    const b = await app((db) =>
+      crearPedido(db, {
+        key: randomUUID(),
+        adminId,
+        ...ctx,
+        codigos: ['LJ02'],
+        cuentaTarjeta: true,
+        descuentoManualCentavos: 0,
+        fecha: '2026-09-15',
+      }),
+    );
+    const c = await app((db) =>
+      crearPedido(db, {
+        key: randomUUID(),
+        adminId,
+        ...ctx,
+        clienteId: otro,
+        codigos: ['LJ03'],
+        cuentaTarjeta: true,
+        descuentoManualCentavos: 0,
+        fecha: '2026-09-30',
+      }),
+    );
+    const folios = async (f: Parameters<typeof listarPedidos>[1]) =>
+      (await app((db) => listarPedidos(db, f))).map((x) => x.folio);
+
+    expect(await folios({ clienteId: otro })).toEqual([c.folio]);
+    expect(await folios({ clienteId: ctx.clienteId })).toEqual([b.folio, a.folio]);
+    // Los extremos cuentan (inclusive).
+    expect(await folios({ desde: '2026-09-15' })).toEqual([c.folio, b.folio]);
+    expect(await folios({ hasta: '2026-09-15' })).toEqual([b.folio, a.folio]);
+    expect(await folios({ desde: '2026-09-02', hasta: '2026-09-29' })).toEqual([b.folio]);
+    expect(await folios({ desde: '2026-09-16', hasta: '2026-09-29' })).toEqual([]);
+    // Combinados con cliente.
+    expect(await folios({ clienteId: ctx.clienteId, desde: '2026-09-10' })).toEqual([b.folio]);
+    // Fechas imposibles se rechazan en vez de llegar a la BD.
+    await expect(folios({ desde: '2026-02-30' })).rejects.toThrow('La fecha «desde» no es válida');
+    await expect(folios({ hasta: 'ayer' })).rejects.toThrow('La fecha «hasta» no es válida');
+    // Paginación acotada: límite mínimo 1, offset negativo se trata como 0.
+    expect(await folios({ limite: 0, offset: -5 })).toEqual([c.folio]);
+    expect(await folios({ limite: 1, offset: 1 })).toEqual([b.folio]);
+  });
 });

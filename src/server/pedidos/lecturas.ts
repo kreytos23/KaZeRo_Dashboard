@@ -1,11 +1,13 @@
-import { and, asc, desc, eq, gt, inArray, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lte, ne, or, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { vAplicacionPago, vCliente, vPedido, vPedidoItem, vPieza, vSaldoFavor } from '@/db/schema';
 import { normalizarCodigo } from '@/domain/codigos';
 import { armarTarjeta, descuentoLealtad, siguientePosicion, type CicloTarjeta } from '@/domain/lealtad';
+import { parsearFechaISO } from '@/domain/fechas';
 import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
 import { escaparLike, normalizar } from '@/domain/texto';
 import type { PreviaPedido } from '@/features/pedidos/tipos';
+import { ErrorNegocio } from '@/server/errores';
 import { foliosConSaldo, type EstadoPedido } from './comun';
 
 const filaPedido = {
@@ -151,11 +153,23 @@ export interface FiltrosPedidos {
   vendedorId?: string;
   clienteId?: string;
   conSaldo?: boolean;
+  /** Fecha del pedido, inclusive, YYYY-MM-DD (calendario real). */
+  desde?: string;
+  hasta?: string;
   limite?: number;
   offset?: number;
 }
 
-export function listarPedidos(db: Ejecutor, f: FiltrosPedidos = {}): Promise<PedidoFila[]> {
+function fechaFiltro(t: string | undefined, campo: 'desde' | 'hasta'): string | undefined {
+  if (t === undefined || t === '') return undefined;
+  const f = parsearFechaISO(t);
+  if (!f) throw new ErrorNegocio('fecha_invalida', `La fecha «${campo}» no es válida (AAAA-MM-DD).`, campo);
+  return f;
+}
+
+export async function listarPedidos(db: Ejecutor, f: FiltrosPedidos = {}): Promise<PedidoFila[]> {
+  const desde = fechaFiltro(f.desde, 'desde');
+  const hasta = fechaFiltro(f.hasta, 'hasta');
   const q = normalizar(f.q ?? '');
   const folio = f.q ? parsearFolio(f.q) : null;
   const porNombre = q
@@ -173,6 +187,8 @@ export function listarPedidos(db: Ejecutor, f: FiltrosPedidos = {}): Promise<Ped
         f.vendedorId ? eq(vPedido.vendedorId, f.vendedorId) : undefined,
         f.clienteId ? eq(vPedido.clienteId, f.clienteId) : undefined,
         f.conSaldo ? and(eq(vPedido.estado, 'abierto'), gt(vPedido.saldo, '0')) : undefined,
+        desde ? gte(vPedido.fecha, desde) : undefined,
+        hasta ? lte(vPedido.fecha, hasta) : undefined,
       ),
     )
     .orderBy(desc(vPedido.folio))
