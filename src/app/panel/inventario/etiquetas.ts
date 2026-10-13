@@ -14,12 +14,12 @@ export const ETIQUETA_MOVIMIENTO: Record<string, string> = {
   alta: 'Alta',
   envio_exhibidor: 'Enviada a exhibidor',
   regreso: 'Regresó de exhibidor',
-  venta: 'Venta',
+  venta: 'Vendida',
   cancelacion_venta: 'Venta cancelada',
   cambio_estado: 'Cambio de estado',
   correccion: 'Corrección',
   apartado: 'Apartada en pedido',
-  liberacion: 'Liberada de pedido',
+  liberacion: 'Liberada',
 };
 
 type Manual = 'regalo' | 'defecto' | 'guardada' | 'disponible';

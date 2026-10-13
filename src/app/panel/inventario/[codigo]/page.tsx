@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { conDbLectura } from '@/db/client';
 import { codigoDeSegmento, tituloDeCodigo } from '@/domain/codigos';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
+import { formatoFolio } from '@/domain/pedidos';
 import { describirDestino, destinoCorreccion } from '@/domain/correccion';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { FotoPieza } from '@/features/imagenes/FotoPieza';
@@ -15,7 +16,7 @@ import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarCatalogo } from '@/server/catalogos/servicio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
-import { historial, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
+import { historial, obtenerPiezaPorCodigo, pedidoVigenteDePieza } from '@/server/piezas/servicio';
 import { accionCambiarEstado, accionEditarPieza, accionQuitarImagen } from '../acciones';
 import { ETIQUETA_ESTADO, ETIQUETA_MOVIMIENTO, destinosManuales } from '../etiquetas';
 import { FormDeshacerCambio } from './FormDeshacerCambio';
@@ -34,15 +35,16 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
     const p = await obtenerPiezaPorCodigo(db, codigo);
     if (!p) return null;
     // Número fijo de consultas, todas contra vistas (sin N+1).
-    const [movimientos, cambios, categorias] = await Promise.all([
+    const [movimientos, cambios, categorias, pedido] = await Promise.all([
       historial(db, p.id),
       historialDeCambios(db, 'pieza', p.id),
       listarCatalogo(db, 'categoria'),
+      p.estado === 'apartada' ? pedidoVigenteDePieza(db, p.id) : Promise.resolve(null),
     ]);
-    return { p, movimientos, cambios, categorias };
+    return { p, movimientos, cambios, categorias, pedido };
   });
   if (!datos) notFound();
-  const { p, movimientos, cambios, categorias } = datos;
+  const { p, movimientos, cambios, categorias, pedido } = datos;
   const destinos = destinosManuales(p.estado);
   const ultimo = movimientos[0];
   const destino = ultimo ? destinoCorreccion(p.estado, ultimo, ultimo.exhibidorEstado === 'abierto') : null;
@@ -53,6 +55,14 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
       <div>
         <h1 className="font-mono text-2xl font-semibold">{p.codigo}</h1>
         <p className="text-tinta-suave">{p.descripcion}</p>
+        {pedido && (
+          <p>
+            Apartada en{' '}
+            <Link href={`/panel/pedidos/${pedido.folio}`} className="enlace font-semibold">
+              {formatoFolio(pedido.folio)}
+            </Link>
+          </p>
+        )}
       </div>
       <section aria-labelledby="foto-pieza" className="flex flex-col gap-3">
         <h2 id="foto-pieza" className="sr-only">
@@ -210,6 +220,14 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
               {m.deEstado ? `${ETIQUETA_ESTADO[m.deEstado]} → ` : ''}
               {ETIQUETA_ESTADO[m.aEstado]}
               {m.exhibidorNombre && ` · ${m.exhibidorNombre}`}
+              {m.pedidoFolio !== null && (
+                <>
+                  {' · '}
+                  <Link href={`/panel/pedidos/${m.pedidoFolio}`} className="enlace">
+                    {formatoFolio(m.pedidoFolio)}
+                  </Link>
+                </>
+              )}
               {m.nota && ` · ${m.nota}`}
               <span className="block text-tinta-suave">
                 <Fecha fecha={m.fecha} />
