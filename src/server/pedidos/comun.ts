@@ -1,6 +1,15 @@
 import { and, asc, eq, gt, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { aplicacionPago, exhibidor, movimientoPieza, pedido, pedidoItem, pieza, vPedido } from '@/db/schema';
+import {
+  aplicacionPago,
+  cliente,
+  exhibidor,
+  movimientoPieza,
+  pedido,
+  pedidoItem,
+  pieza,
+  vPedido,
+} from '@/db/schema';
 import { normalizarCodigo } from '@/domain/codigos';
 import { numericACentavos } from '@/domain/dinero';
 import { MAX_PIEZAS_PEDIDO, formatoFolio } from '@/domain/pedidos';
@@ -250,6 +259,58 @@ export async function liberarPiezas(
   return { alExhibidor: alExhibidor.length, aDisponible: aDisponible.length };
 }
 
+export async function pagadoCentavos(tx: Ejecutor, pedidoId: string): Promise<number> {
+  const [f] = await tx
+    .select({ pagado: sql<string>`coalesce(sum(${aplicacionPago.monto}), 0)::numeric(12,2)::text` })
+    .from(aplicacionPago)
+    .where(and(eq(aplicacionPago.pedidoId, pedidoId), isNull(aplicacionPago.anuladaAt)));
+  return numericACentavos(f!.pagado);
+}
+
+/** D-10: cliente → pedido, ambos FOR NO KEY UPDATE. cliente_id no es actualizable (R-27), leerlo antes es seguro. */
+export async function bloquearPedido(tx: Ejecutor, pedidoId: string) {
+  const [ref] = await tx.select({ clienteId: pedido.clienteId }).from(pedido).where(eq(pedido.id, pedidoId));
+  if (!ref) throw new ErrorNegocio('no_encontrado', 'El pedido no existe.');
+  await tx.select({ id: cliente.id }).from(cliente).where(eq(cliente.id, ref.clienteId)).for('no key update');
+  const [p] = await tx
+    .select({
+      id: pedido.id,
+      folio: pedido.folio,
+      estado: pedido.estado,
+      version: pedido.version,
+      clienteId: pedido.clienteId,
+      vendedorId: pedido.vendedorId,
+      fecha: pedido.fecha,
+      total: pedido.total,
+      descuentoLealtadPct: pedido.descuentoLealtadPct,
+      descuentoManualMonto: pedido.descuentoManualMonto,
+      descuentoManualMotivo: pedido.descuentoManualMotivo,
+      notas: pedido.notas,
+    })
+    .from(pedido)
+    .where(eq(pedido.id, pedidoId))
+    .for('no key update');
+  return p!;
+}
+export type PedidoBloqueado = Awaited<ReturnType<typeof bloquearPedido>>;
+
+/**
+ * Piezas vigentes del pedido, bloqueadas en el orden D-10 (exhibidores NO KEY UPDATE por id → piezas FOR UPDATE por id).
+ * Las piezas apartadas no cambian de exhibidor (trigger, D-11): leerlo antes de bloquear es seguro.
+ */
+export async function bloquearPiezasDelPedido(
+  tx: Ejecutor,
+  pedidoId: string,
+): Promise<{ id: string; exhibidorId: string | null }[]> {
+  const items = await tx
+    .select({ piezaId: pedidoItem.piezaId })
+    .from(pedidoItem)
+    .where(and(eq(pedidoItem.pedidoId, pedidoId), eq(pedidoItem.vigente, true)));
+  const ids = items.map((i) => i.piezaId);
+  await bloquearExhibidoresDe(tx, ids);
+  return bloquearPiezasPorId(tx, ids);
+}
+
 /**
  * R-15: si el saldo llegó a 0, el pedido se liquida y sus piezas pasan a vendida (exhibidor_id = NULL, D-13).
  * Quien llama ya bloqueó cliente y pedido (y, si las tocó, exhibidores y piezas) y ya fijó el contexto de
@@ -265,21 +326,10 @@ export async function liquidarSiSaldoCero(
     .from(pedido)
     .where(eq(pedido.id, pedidoId));
   if (!p) throw new ErrorNegocio('no_encontrado', 'El pedido no existe.');
-  const [fila] = await tx
-    .select({ pagado: sql<string>`coalesce(sum(${aplicacionPago.monto}), 0)::numeric(12,2)::text` })
-    .from(aplicacionPago)
-    .where(and(eq(aplicacionPago.pedidoId, pedidoId), isNull(aplicacionPago.anuladaAt)));
-  if (p.estado !== 'abierto' || numericACentavos(p.total) > numericACentavos(fila?.pagado ?? '0'))
+  if (p.estado !== 'abierto' || numericACentavos(p.total) > (await pagadoCentavos(tx, pedidoId)))
     return p.estado;
-  const piezas = await tx
-    .select({ id: pieza.id, exhibidorId: pieza.exhibidorId })
-    .from(pieza)
-    .innerJoin(
-      pedidoItem,
-      and(eq(pedidoItem.piezaId, pieza.id), eq(pedidoItem.pedidoId, pedidoId), eq(pedidoItem.vigente, true)),
-    )
-    .orderBy(asc(pieza.id))
-    .for('update', { of: pieza });
+  // D-10: exhibidores → piezas, siempre, aunque quien llama ya los haya bloqueado (volver a bloquear es inocuo).
+  const piezas = await bloquearPiezasDelPedido(tx, pedidoId);
   if (piezas.length) {
     await tx
       .update(pieza)
