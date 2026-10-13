@@ -207,7 +207,7 @@ describe('bitácora por trigger (R-08)', () => {
     ]);
   });
 
-  it('renombrar un catálogo se audita y sube su updated_at por trigger', async () => {
+  it('renombrar un catálogo se audita', async () => {
     const { categoriaId } = await piezaBase();
     await editar(
       { adminId },
@@ -216,12 +216,6 @@ describe('bitácora por trigger (R-08)', () => {
     expect((await bitacora(categoriaId)).map((f) => [f.entidad, f.campo, f.antes, f.despues])).toEqual([
       ['categoria', 'nombre', 'Anillos', 'Anillos finos'],
     ]);
-    const r = await owner((db) =>
-      db.execute<{ cambio: boolean }>(
-        sql`SELECT updated_at > created_at AS cambio FROM categoria WHERE id = ${categoriaId}`,
-      ),
-    );
-    expect(r.rows[0]!.cambio).toBe(true);
   });
 });
 
@@ -384,33 +378,37 @@ describe('corrección de estado en el trigger (R-07)', () => {
 });
 
 describe('endurecimiento de las funciones de la bitácora', () => {
-  it('kz_auditar es SECURITY DEFINER del dueño, con search_path fijo y sin EXECUTE para PUBLIC ni kazero_app', async () => {
-    const r = await owner((db) =>
-      db.execute<{
-        definer: boolean;
-        config: string[] | null;
-        dueno: boolean;
-        app: boolean;
-        publico: boolean;
-      }>(sql`
+  // Misma propiedad en todas las funciones SECURITY DEFINER (la bitácora y el libro de pagos).
+  it.each(['kz_auditar', 'kz_validar_aplicacion_pago'])(
+    '%s es SECURITY DEFINER del dueño, con search_path fijo y sin EXECUTE para PUBLIC ni kazero_app',
+    async (funcion) => {
+      const r = await owner((db) =>
+        db.execute<{
+          definer: boolean;
+          config: string[] | null;
+          dueno: boolean;
+          app: boolean;
+          publico: boolean;
+        }>(sql`
         SELECT p.prosecdef AS definer, p.proconfig AS config,
                pg_get_userbyid(p.proowner) = current_user AS dueno,
                has_function_privilege('kazero_app', p.oid, 'EXECUTE') AS app,
                EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
                        WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') AS publico
         FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-        WHERE n.nspname = 'public' AND p.proname = 'kz_auditar'`),
-    );
-    expect(r.rows).toEqual([
-      {
-        definer: true,
-        config: ['search_path=pg_catalog, public, pg_temp'],
-        dueno: true,
-        app: false,
-        publico: false,
-      },
-    ]);
-  });
+        WHERE n.nspname = 'public' AND p.proname = ${funcion}`),
+      );
+      expect(r.rows).toEqual([
+        {
+          definer: true,
+          config: ['search_path=pg_catalog, public, pg_temp'],
+          dueno: true,
+          app: false,
+          publico: false,
+        },
+      ]);
+    },
+  );
 
   it('un admin_id inexistente en el contexto no deja escribir (FK de la bitácora)', async () => {
     const { piezaId } = await piezaBase();

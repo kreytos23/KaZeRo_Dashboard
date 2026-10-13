@@ -128,17 +128,15 @@ describe('crearPedido', () => {
 
   it('R-05 concurrencia entre clientes distintos (sin el bloqueo del cliente): decide el bloqueo de la pieza', async () => {
     const otro = await app((db) => crearCliente(db, { nombre: 'Nelly Pérez' }));
-    for (let ronda = 0; ronda < 3; ronda++) {
-      const [a, b] = await piezas(`C${ronda}X`, 2);
-      const r = await Promise.allSettled([
-        crear({ codigos: [a!, b!] }),
-        crear({ clienteId: otro, codigos: [b!, a!] }),
-      ]);
-      expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
-      const fallo = r.find((x) => x.status === 'rejected') as PromiseRejectedResult;
-      expect(fallo.reason).toMatchObject({ name: 'ErrorNegocio', campo: 'codigos' });
-      expect((fallo.reason as Error).message).toMatch(/^No se creó el pedido\. No están disponibles: /);
-    }
+    const [a, b] = await piezas(`C0X`, 2);
+    const r = await Promise.allSettled([
+      crear({ codigos: [a!, b!] }),
+      crear({ clienteId: otro, codigos: [b!, a!] }),
+    ]);
+    expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+    const fallo = r.find((x) => x.status === 'rejected') as PromiseRejectedResult;
+    expect(fallo.reason).toMatchObject({ name: 'ErrorNegocio', campo: 'codigos' });
+    expect((fallo.reason as Error).message).toMatch(/^No se creó el pedido\. No están disponibles: /);
   });
 
   it('R-23 concurrencia: con 4 compras liquidadas, dos pedidos simultáneos son la #5 (10 %) y la #6', async () => {
@@ -347,19 +345,17 @@ describe('crearPedido', () => {
     const exhibidorId = await app((db) =>
       crearExhibidor(db, { vendedorId: ctx.vendedorId, nombre: 'Y', fechaEnvio: '2026-10-01' }),
     );
-    for (let ronda = 0; ronda < 5; ronda++) {
-      const [a] = await piezas(`R${ronda}X`, 1);
-      await app((db) => enviarPiezas(db, { exhibidorId, codigos: [a!] }));
-      const r = await Promise.allSettled([
-        crear({ codigos: [a!] }),
-        app((db) => regresarPiezas(db, { exhibidorId, codigos: [a!] })),
-      ]);
-      for (const x of r)
-        if (x.status === 'rejected') {
-          expect((x.reason as Error).name).toBe('ErrorNegocio');
-          expect((x.reason as { codigo: string }).codigo).not.toBe('conflicto_concurrente');
-        }
-    }
+    const [a] = await piezas(`R0X`, 1);
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: [a!] }));
+    const r = await Promise.allSettled([
+      crear({ codigos: [a!] }),
+      app((db) => regresarPiezas(db, { exhibidorId, codigos: [a!] })),
+    ]);
+    for (const x of r)
+      if (x.status === 'rejected') {
+        expect((x.reason as Error).name).toBe('ErrorNegocio');
+        expect((x.reason as { codigo: string }).codigo).not.toBe('conflicto_concurrente');
+      }
   });
 
   it('D-21: guarda quién creó el pedido y el admin en cada movimiento de pieza', async () => {

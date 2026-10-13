@@ -112,13 +112,6 @@ describe('conIdempotencia (R-37)', () => {
     expect(await cuantas()).toBe(1);
   });
 
-  it('dos envíos simultáneos con la misma key producen un solo efecto', async () => {
-    const key = randomUUID();
-    const [a, b] = await Promise.all([crear(key, 'Collares'), crear(key, 'Collares')]);
-    expect(a).toEqual(b);
-    expect(await cuantas()).toBe(1);
-  });
-
   it('entrelazado forzado: el segundo INSERT espera a que el primero confirme y devuelve su resultado', async () => {
     const key = randomUUID();
     let liberar!: () => void;

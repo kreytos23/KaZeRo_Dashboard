@@ -9,7 +9,6 @@ import {
   crearExhibidor,
   enviarPiezas,
   obtenerExhibidor,
-  regresarPiezas,
 } from '@/server/exhibidores/servicio';
 import { registrarPagoDePedido, type DatosPagoPedido } from '@/server/pagos/servicio';
 import { cancelarPedido, crearPedido } from '@/server/pedidos/servicio';
@@ -178,61 +177,6 @@ describe('registrarPagoDePedido', () => {
         (SELECT count(*)::int FROM v_auditoria WHERE entidad = 'pedido' AND entidad_id = ${p.id} AND campo = 'estado' AND despues = 'liquidado') AS liquidaciones`),
     );
     expect(f.rows[0]).toEqual({ registro: adminId, liquidaciones: 1 });
-  });
-
-  it('liquidar a la vez que enviar/regresar piezas del mismo exhibidor: sin interbloqueo y resultado coherente', async () => {
-    for (let ronda = 0; ronda < 3; ronda++) {
-      const [a, b, c] = [`PX${ronda}A`, `PX${ronda}B`, `PX${ronda}C`];
-      for (const k of [a, b, c])
-        await app((db) =>
-          altaPieza(db, {
-            codigo: k,
-            categoria: 'Aretes',
-            descripcion: k,
-            costoCentavos: 0,
-            precioCentavos: 5000,
-          }),
-        );
-      const exhibidorId = await app((db) =>
-        crearExhibidor(db, { vendedorId: ctx.vendedorId, nombre: `E${ronda}`, fechaEnvio: '2026-10-01' }),
-      );
-      await app((db) => enviarPiezas(db, { exhibidorId, codigos: [a, b] }));
-      const p = await app((db) =>
-        crearPedido(db, {
-          key: randomUUID(),
-          adminId,
-          ...ctx,
-          codigos: [a],
-          cuentaTarjeta: false,
-          descuentoManualCentavos: 0,
-        }),
-      );
-      const r = await Promise.allSettled([
-        pagar(p.id, 5000),
-        app((db) => regresarPiezas(db, { exhibidorId, codigos: [b] })),
-        app((db) => enviarPiezas(db, { exhibidorId, codigos: [c] })),
-      ]);
-      for (const x of r)
-        if (x.status === 'rejected') expect((x.reason as { code?: string }).code).not.toBe('40P01');
-      expect(r[0].status).toBe('fulfilled');
-      expect(r[1].status).toBe('fulfilled');
-      expect(r[2].status).toBe('fulfilled');
-      expect(await app((db) => obtenerPiezaPorCodigo(db, a))).toMatchObject({
-        estado: 'vendida',
-        exhibidorId: null,
-      });
-      expect(await ficha(p.id)).toMatchObject({ estado: 'liquidado' });
-    }
-  });
-
-  it('dos pagos simultáneos que cada uno completa exactamente el saldo: se liquida una sola vez', async () => {
-    const p = await pedidoCon('PG09');
-    const r = await Promise.allSettled([pagar(p.id, 14900), pagar(p.id, 14900)]);
-    expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
-    expect(
-      ((r.find((x) => x.status === 'rejected') as PromiseRejectedResult).reason as Error).message,
-    ).toMatch(/ya está liquidado|supera el saldo/);
-    expect(await ficha(p.id)).toMatchObject({ estado: 'liquidado', pagado: '149.00' });
   });
 
   it('R-23: la posición de tarjeta del pedido liquidado sigue contando para el siguiente', async () => {

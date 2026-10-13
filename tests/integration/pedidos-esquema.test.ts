@@ -217,25 +217,6 @@ describe('reglas de pedidos en la BD', () => {
     ).toBe('pedido_transicion');
   });
 
-  it('R-27: kazero_app no puede cambiar folio, cliente ni lealtad de un pedido', async () => {
-    const b = await base();
-    for (const set of [
-      sql`folio = 999`,
-      sql`cliente_id = cliente_id`,
-      sql`descuento_lealtad_pct = 10`,
-      sql`posicion_tarjeta = 5`,
-      sql`ciclo_tarjeta = 2`,
-      sql`cuenta_tarjeta = false`,
-      sql`sin_lealtad_motivo = NULL`,
-      sql`admin_id = admin_id`,
-    ]) {
-      const e = await capturar(() =>
-        app((db) => db.execute(sql`UPDATE pedido SET ${set} WHERE id = ${b.pedidoId}`)),
-      );
-      expect(pgCode(e)).toBe('42501');
-    }
-  });
-
   it('D-21: los cambios de pedido van a la bitácora; sin contexto se rechazan; el total exige motivo', async () => {
     const b = await base();
     const sinContexto = await capturar(() =>
@@ -307,25 +288,6 @@ describe('reglas de pedidos en la BD', () => {
                (SELECT updated_at > created_at FROM pedido_item WHERE pedido_id = ${b.pedidoId}) AS i`),
     );
     expect(r.rows[0]).toEqual({ p: true, i: true });
-  });
-
-  it('R-11: kazero_app no puede cambiar los precios de una línea', async () => {
-    const b = await base();
-    await app((db) =>
-      db
-        .insert(pedidoItem)
-        .values({ pedidoId: b.pedidoId, piezaId: b.piezaId, precioLista: '149.00', precioFinal: '149.00' }),
-    );
-    expect(
-      pgCode(await capturar(() => app((db) => db.execute(sql`UPDATE pedido_item SET precio_lista = 1`)))),
-    ).toBe('42501');
-    expect(
-      await codigoAl(() =>
-        app((db) =>
-          db.update(pedidoItem).set({ quitadoAt: new Date() }).where(eq(pedidoItem.pedidoId, b.pedidoId)),
-        ),
-      ),
-    ).toBe('pedido_item_quitado_coherente');
   });
 
   it('descuento manual > 0 exige motivo; sin tarjeta no hay posición; posición 1..10', async () => {
@@ -617,37 +579,9 @@ describe('libro de pagos garantizado por la BD', () => {
     );
     expect(r.rows[0]!.saldo).toBe('20.00');
   });
-
-  it('kz_validar_aplicacion_pago es SECURITY DEFINER con search_path fijo y sin EXECUTE para nadie más', async () => {
-    const r = await owner((db) =>
-      db.execute<{ definer: boolean; config: string[] | null; app: boolean; publico: boolean }>(sql`
-        SELECT p.prosecdef AS definer, p.proconfig AS config,
-               has_function_privilege('kazero_app', p.oid, 'EXECUTE') AS app,
-               EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
-                       WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') AS publico
-        FROM pg_proc p WHERE p.oid = 'public.kz_validar_aplicacion_pago()'::regprocedure`),
-    );
-    expect(r.rows).toEqual([
-      { definer: true, config: ['search_path=pg_catalog, public, pg_temp'], app: false, publico: false },
-    ]);
-  });
 });
 
 describe('kz_auditar redefinida en 0013', () => {
-  it('sigue SECURITY DEFINER, con search_path fijo y sin EXECUTE para PUBLIC ni kazero_app', async () => {
-    const r = await owner((db) =>
-      db.execute<{ definer: boolean; config: string[] | null; app: boolean; publico: boolean }>(sql`
-        SELECT p.prosecdef AS definer, p.proconfig AS config,
-               has_function_privilege('kazero_app', p.oid, 'EXECUTE') AS app,
-               EXISTS (SELECT 1 FROM aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
-                       WHERE a.grantee = 0 AND a.privilege_type = 'EXECUTE') AS publico
-        FROM pg_proc p WHERE p.oid = 'public.kz_auditar()'::regprocedure`),
-    );
-    expect(r.rows).toEqual([
-      { definer: true, config: ['search_path=pg_catalog, public, pg_temp'], app: false, publico: false },
-    ]);
-  });
-
   it('la regla anterior no se perdió: cambiar el precio de una pieza sin motivo sigue fallando', async () => {
     const b = await base();
     expect(

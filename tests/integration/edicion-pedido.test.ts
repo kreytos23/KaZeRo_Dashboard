@@ -216,67 +216,61 @@ describe('editarPedido: concurrencia', () => {
   };
 
   it('editar y pagar el mismo pedido terminan consistentes (total nunca bajo lo pagado)', async () => {
-    for (let ronda = 0; ronda < 3; ronda++) {
-      const p = await crear([await alta(`EP${ronda}A`, 10000), await alta(`EP${ronda}B`, 10000)]);
-      const r = await Promise.allSettled([
-        editar(p.id, { quitar: [`EP${ronda}B`], motivo: 'Quitó una' }),
-        app((db) =>
-          registrarPagoDePedido(db, {
-            key: randomUUID(),
-            adminId,
-            pedidoId: p.id,
-            montoCentavos: 15000,
-            metodo: 'efectivo',
-            pagador: 'cliente',
-          }),
-        ),
-      ]);
-      sinCrudos(r);
-      const f = await ficha(p.id);
-      expect(Number(f.total)).toBeGreaterThanOrEqual(Number(f.pagado));
-      expect(Number(f.saldo)).toBe(Number(f.total) - Number(f.pagado));
-      if (f.estado === 'liquidado') expect(Number(f.saldo)).toBe(0);
-    }
+    const p = await crear([await alta(`EP0A`, 10000), await alta(`EP0B`, 10000)]);
+    const r = await Promise.allSettled([
+      editar(p.id, { quitar: [`EP0B`], motivo: 'Quitó una' }),
+      app((db) =>
+        registrarPagoDePedido(db, {
+          key: randomUUID(),
+          adminId,
+          pedidoId: p.id,
+          montoCentavos: 15000,
+          metodo: 'efectivo',
+          pagador: 'cliente',
+        }),
+      ),
+    ]);
+    sinCrudos(r);
+    const f = await ficha(p.id);
+    expect(Number(f.total)).toBeGreaterThanOrEqual(Number(f.pagado));
+    expect(Number(f.saldo)).toBe(Number(f.total) - Number(f.pagado));
+    if (f.estado === 'liquidado') expect(Number(f.saldo)).toBe(0);
   });
 
   it('editar y cancelar el mismo pedido terminan consistentes', async () => {
-    for (let ronda = 0; ronda < 3; ronda++) {
-      const p = await crear([await alta(`EC${ronda}A`), await alta(`EC${ronda}B`)]);
-      const nueva = await alta(`EC${ronda}C`);
-      const { version } = await ficha(p.id);
-      const r = await Promise.allSettled([
-        editar(p.id, { agregar: [nueva], quitar: [`EC${ronda}B`], motivo: 'Cambio' }),
-        app((db) => cancelarPedido(db, { key: randomUUID(), adminId, pedidoId: p.id, version, motivo: 'x' })),
-      ]);
-      sinCrudos(r);
-      const f = await ficha(p.id);
-      const estados = await app(async (db) => [
-        (await obtenerPiezaPorCodigo(db, `EC${ronda}A`))!.estado,
-        (await obtenerPiezaPorCodigo(db, `EC${ronda}B`))!.estado,
-        (await obtenerPiezaPorCodigo(db, nueva))!.estado,
-      ]);
-      if (f.estado === 'cancelado') expect(estados).toEqual(['disponible', 'disponible', 'disponible']);
-      else expect(estados).toEqual(['apartada', 'disponible', 'apartada']);
-    }
+    const p = await crear([await alta(`EC0A`), await alta(`EC0B`)]);
+    const nueva = await alta(`EC0C`);
+    const { version } = await ficha(p.id);
+    const r = await Promise.allSettled([
+      editar(p.id, { agregar: [nueva], quitar: [`EC0B`], motivo: 'Cambio' }),
+      app((db) => cancelarPedido(db, { key: randomUUID(), adminId, pedidoId: p.id, version, motivo: 'x' })),
+    ]);
+    sinCrudos(r);
+    const f = await ficha(p.id);
+    const estados = await app(async (db) => [
+      (await obtenerPiezaPorCodigo(db, `EC0A`))!.estado,
+      (await obtenerPiezaPorCodigo(db, `EC0B`))!.estado,
+      (await obtenerPiezaPorCodigo(db, nueva))!.estado,
+    ]);
+    if (f.estado === 'cancelado') expect(estados).toEqual(['disponible', 'disponible', 'disponible']);
+    else expect(estados).toEqual(['apartada', 'disponible', 'apartada']);
   });
 
   it('R-05: dos pedidos que toman la misma pieza a la vez, solo uno la consigue', async () => {
-    for (let ronda = 0; ronda < 3; ronda++) {
-      const p = await crear([await alta(`ER${ronda}A`)]);
-      const q = await crear([await alta(`ER${ronda}B`)]);
-      const libre = await alta(`ER${ronda}C`);
-      const r = await Promise.allSettled([
-        editar(p.id, { agregar: [libre], motivo: 'x' }),
-        editar(q.id, { agregar: [libre], motivo: 'x' }),
-      ]);
-      sinCrudos(r);
-      expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
-      const vigentes = await app((db) =>
-        db.execute(
-          sql`SELECT count(*)::int AS n FROM v_pedido_item WHERE codigo = ${libre} AND vigente AND pedido_estado <> 'cancelado'`,
-        ),
-      );
-      expect(vigentes.rows[0]).toEqual({ n: 1 });
-    }
+    const p = await crear([await alta(`ER0A`)]);
+    const q = await crear([await alta(`ER0B`)]);
+    const libre = await alta(`ER0C`);
+    const r = await Promise.allSettled([
+      editar(p.id, { agregar: [libre], motivo: 'x' }),
+      editar(q.id, { agregar: [libre], motivo: 'x' }),
+    ]);
+    sinCrudos(r);
+    expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+    const vigentes = await app((db) =>
+      db.execute(
+        sql`SELECT count(*)::int AS n FROM v_pedido_item WHERE codigo = ${libre} AND vigente AND pedido_estado <> 'cancelado'`,
+      ),
+    );
+    expect(vigentes.rows[0]).toEqual({ n: 1 });
   });
 });

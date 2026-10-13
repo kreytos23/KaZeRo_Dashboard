@@ -171,11 +171,7 @@ function contrato(
       const solo1 = await a.listar(`piezas/${P1}/`);
       expect(solo1.objetos.map((o) => o.ruta)).toEqual([RUTA_B, RUTA]);
       expect((await a.listar(`piezas/${P1}/${K2}`)).objetos).toEqual([]);
-    });
-    it('pagina con cursor sin repetir ni omitir', async () => {
-      await a.guardar(RUTA_C, Uint8Array.of(1));
-      await a.guardar(RUTA, Uint8Array.of(1));
-      await a.guardar(RUTA_B, Uint8Array.of(1));
+      // Mismo fixture: paginar con cursor sin repetir ni omitir.
       const vistas: string[] = [];
       let cursor: string | undefined;
       let paginas = 0;

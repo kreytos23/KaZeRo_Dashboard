@@ -17,9 +17,6 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
   it('no puede crear tablas (DDL)', async () => {
     expect(await codigoAl(urlApp(), sql`CREATE TABLE intruso (id int)`)).toBe('42501');
   });
-  it('no puede TRUNCATE', async () => {
-    expect(await codigoAl(urlApp(), sql`TRUNCATE acceso_log`)).toBe('42501');
-  });
   it('no puede borrar admins ni cambiar su contraseña, correo o rol', async () => {
     expect(await codigoAl(urlApp(), sql`DELETE FROM admin`)).toBe('42501');
     expect(await codigoAl(urlApp(), sql`UPDATE admin SET password_hash = 'x'`)).toBe('42501');
@@ -54,26 +51,22 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
   it('sí puede leer y escribir sesiones', async () => {
     expect(await codigoAl(urlApp(), sql`SELECT count(*) FROM sesion`)).toBe('ok');
   });
-  it('admin y codigo_recuperacion: el conjunto EXACTO de privilegios de kazero_app (tabla y columna)', async () => {
-    const [tablas, columnas] = await conDbUrl(urlOwner(), (db) =>
+  it('matriz EXACTA de privilegios por columna de kazero_app (admin, codigo_recuperacion y todo UPDATE de columna)', async () => {
+    // La parte de tabla de estas tablas ya la fija la matriz de tabla de abajo; aquí solo columnas.
+    const [adminCodigo, updates] = await conDbUrl(urlOwner(), (db) =>
       Promise.all([
-        db.execute<{ p: string }>(sql`
-          SELECT table_name || ':' || privilege_type AS p FROM information_schema.table_privileges
-          WHERE grantee = 'kazero_app' AND table_schema = 'public'
-            AND table_name IN ('admin', 'codigo_recuperacion')`),
         db.execute<{ p: string }>(sql`
           SELECT table_name || '.' || column_name || ':' || privilege_type AS p
           FROM information_schema.column_privileges
           WHERE grantee = 'kazero_app' AND table_schema = 'public'
             AND table_name IN ('admin', 'codigo_recuperacion')`),
+        db.execute<{ p: string }>(sql`
+          SELECT table_name || '.' || column_name AS p FROM information_schema.column_privileges
+          WHERE grantee = 'kazero_app' AND table_schema = 'public' AND privilege_type = 'UPDATE'
+            AND table_name IN ('auditoria', 'auditoria_campo', 'movimiento_pieza', 'pieza', 'pedido', 'pedido_item', 'aplicacion_pago')`),
       ]),
     );
     const orden = (f: { rows: { p: string }[] }) => f.rows.map((x) => x.p).sort();
-    expect(orden(tablas)).toEqual([
-      'admin:SELECT',
-      'codigo_recuperacion:INSERT',
-      'codigo_recuperacion:SELECT',
-    ]);
     const columnasAdmin = [
       'created_at',
       'email',
@@ -86,60 +79,59 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       'version',
     ];
     const columnasCodigo = ['admin_id', 'created_at', 'hash', 'id', 'usado_at'];
-    const esperado = [
-      // SELECT de tabla: el login lee password_hash y el TOTP.
-      ...columnasAdmin.map((c) => `admin.${c}:SELECT`),
-      // Alta: solo estas tres columnas (no puede elegir `rol`).
-      ...['email', 'password_hash', 'totp_secret_cifrado'].map((c) => `admin.${c}:INSERT`),
-      // Regenerar TOTP y el paso del login; nunca contraseña, correo ni rol.
-      ...['totp_secret_cifrado', 'totp_ultimo_paso', 'updated_at', 'version'].map((c) => `admin.${c}:UPDATE`),
-      ...columnasCodigo.map((c) => `codigo_recuperacion.${c}:SELECT`),
-      ...columnasCodigo.map((c) => `codigo_recuperacion.${c}:INSERT`),
-      // Solo marcar como usado.
-      'codigo_recuperacion.usado_at:UPDATE',
-    ].sort();
-    expect(orden(columnas)).toEqual(esperado);
-  });
-  it('bitácora, historial y pieza: conjunto EXACTO de privilegios de kazero_app', async () => {
-    const objetivo = sql`('auditoria', 'auditoria_campo', 'movimiento_pieza', 'pieza')`;
-    const [tablas, columnas] = await conDbUrl(urlOwner(), (db) =>
-      Promise.all([
-        db.execute<{ p: string }>(sql`
-          SELECT table_name || ':' || privilege_type AS p FROM information_schema.table_privileges
-          WHERE grantee = 'kazero_app' AND table_schema = 'public' AND table_name IN ${objetivo}`),
-        db.execute<{ p: string }>(sql`
-          SELECT table_name || '.' || column_name || ':' || privilege_type AS p
-          FROM information_schema.column_privileges
-          WHERE grantee = 'kazero_app' AND table_schema = 'public' AND table_name IN ${objetivo}
-            AND privilege_type = 'UPDATE'`),
-      ]),
-    );
-    const orden = (f: { rows: { p: string }[] }) => f.rows.map((x) => x.p).sort();
-    // Bitácora: solo lectura (la escribe kz_auditar, SECURITY DEFINER). Historial: solo inserción (R-06).
-    expect(orden(tablas)).toEqual([
-      'auditoria:SELECT',
-      'auditoria_campo:SELECT',
-      'movimiento_pieza:INSERT',
-      'movimiento_pieza:SELECT',
-      'pieza:INSERT',
-      'pieza:SELECT',
-    ]);
-    // UPDATE de pieza por columna: nunca codigo ni fecha_alta.
-    expect(orden(columnas)).toEqual(
+    expect(orden(adminCodigo)).toEqual(
       [
-        'categoria_id',
-        'costo',
-        'descripcion',
-        'estado',
-        'exhibidor_id',
-        'foto_path',
-        'imagen_clave',
-        'material_id',
-        'precio',
-        'proveedor_id',
-        'updated_at',
-        'version',
-      ].map((c) => `pieza.${c}:UPDATE`),
+        // SELECT de tabla: el login lee password_hash y el TOTP.
+        ...columnasAdmin.map((c) => `admin.${c}:SELECT`),
+        // Alta: solo estas tres columnas (no puede elegir `rol`).
+        ...['email', 'password_hash', 'totp_secret_cifrado'].map((c) => `admin.${c}:INSERT`),
+        // Regenerar TOTP y el paso del login; nunca contraseña, correo ni rol.
+        ...['totp_secret_cifrado', 'totp_ultimo_paso', 'updated_at', 'version'].map(
+          (c) => `admin.${c}:UPDATE`,
+        ),
+        ...columnasCodigo.map((c) => `codigo_recuperacion.${c}:SELECT`),
+        ...columnasCodigo.map((c) => `codigo_recuperacion.${c}:INSERT`),
+        // Solo marcar como usado.
+        'codigo_recuperacion.usado_at:UPDATE',
+      ].sort(),
+    );
+    // UPDATE por columna: bitácora e historial no se actualizan (R-06); pieza nunca codigo ni fecha_alta (Plan 2.1);
+    // pedido, pedido_item y aplicacion_pago solo lo permitido (R-11, R-27).
+    const pedidoCols = [
+      'vendedor_id',
+      'fecha',
+      'estado',
+      'descuento_manual_monto',
+      'descuento_manual_motivo',
+      'total',
+      'notas',
+      'liquidado_at',
+      'cancelado_at',
+      'cancelacion_motivo',
+      'version',
+      'updated_at',
+    ];
+    const piezaCols = [
+      'categoria_id',
+      'costo',
+      'descripcion',
+      'estado',
+      'exhibidor_id',
+      'foto_path',
+      'imagen_clave',
+      'material_id',
+      'precio',
+      'proveedor_id',
+      'updated_at',
+      'version',
+    ];
+    expect(orden(updates)).toEqual(
+      [
+        ...piezaCols.map((c) => `pieza.${c}`),
+        ...pedidoCols.map((c) => `pedido.${c}`),
+        ...['vigente', 'quitado_at', 'updated_at'].map((c) => `pedido_item.${c}`),
+        'aplicacion_pago.anulada_at',
+      ].sort(),
     );
   });
   it('matriz EXACTA de privilegios de tabla de kazero_app en todo public', async () => {
@@ -174,46 +166,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       ...t('vendedor', 'INSERT', 'SELECT', 'UPDATE'),
     ].sort();
     expect(r.rows.map((x) => x.p).sort()).toEqual(esperado);
-  });
-  it('UPDATE por columna en pedido, pedido_item y aplicacion_pago (R-11, R-27)', async () => {
-    const r = await conDbUrl(urlOwner(), (db) =>
-      db.execute<{ p: string }>(sql`
-        SELECT table_name || '.' || column_name AS p FROM information_schema.column_privileges
-        WHERE grantee = 'kazero_app' AND table_schema = 'public' AND privilege_type = 'UPDATE'
-          AND table_name IN ('pedido', 'pedido_item', 'aplicacion_pago')`),
-    );
-    const pedidoCols = [
-      'vendedor_id',
-      'fecha',
-      'estado',
-      'descuento_manual_monto',
-      'descuento_manual_motivo',
-      'total',
-      'notas',
-      'liquidado_at',
-      'cancelado_at',
-      'cancelacion_motivo',
-      'version',
-      'updated_at',
-    ];
-    expect(r.rows.map((x) => x.p).sort()).toEqual(
-      [
-        ...pedidoCols.map((c) => `pedido.${c}`),
-        ...['vigente', 'quitado_at', 'updated_at'].map((c) => `pedido_item.${c}`),
-        'aplicacion_pago.anulada_at',
-      ].sort(),
-    );
-  });
-  it('kazero_app no tiene ningún privilegio sobre la secuencia de la bitácora', async () => {
-    const r = await conDbUrl(urlOwner(), (db) =>
-      db.execute<{ p: boolean }>(sql`
-        SELECT has_sequence_privilege('kazero_app', 'public.auditoria_orden_seq', 'USAGE')
-            OR has_sequence_privilege('kazero_app', 'public.auditoria_orden_seq', 'SELECT')
-            OR has_sequence_privilege('kazero_app', 'public.auditoria_orden_seq', 'UPDATE') AS p`),
-    );
-    expect(r.rows[0]!.p).toBe(false);
-  });
-  it('toda tabla de negocio tiene grants explícitos para kazero_app', async () => {
+    // Y ninguna tabla de negocio queda sin grants explícitos (una tabla nueva sin GRANT también se detecta).
     const filas = await conDbUrl(urlOwner(), (db) =>
       // Se consulta por oid (no por nombre): el planner puede evaluar el privilegio antes del filtro de
       // esquema y fallar con tablas de otros esquemas (p. ej. drizzle.__drizzle_migrations).
@@ -225,5 +178,14 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
           AND NOT has_table_privilege('kazero_app', c.oid, 'SELECT')`),
     );
     expect(filas.rows.map((f) => f.tabla)).toEqual([]);
+  });
+  it('kazero_app no tiene ningún privilegio sobre la secuencia de la bitácora', async () => {
+    const r = await conDbUrl(urlOwner(), (db) =>
+      db.execute<{ p: boolean }>(sql`
+        SELECT has_sequence_privilege('kazero_app', 'public.auditoria_orden_seq', 'USAGE')
+            OR has_sequence_privilege('kazero_app', 'public.auditoria_orden_seq', 'SELECT')
+            OR has_sequence_privilege('kazero_app', 'public.auditoria_orden_seq', 'UPDATE') AS p`),
+    );
+    expect(r.rows[0]!.p).toBe(false);
   });
 });

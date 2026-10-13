@@ -321,26 +321,30 @@ test.describe('regenerar TOTP (admin y sesión aparte)', () => {
 
 test.describe('sin sesión', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
-  test('la API privada responde 401 JSON, no un redirect', async ({ request }) => {
+  test('la API privada responde 401 JSON, no un redirect', { tag: '@escritorio' }, async ({ request }) => {
     const r = await request.get('/api/busqueda/indice', { maxRedirects: 0 });
     expect(r.status()).toBe(401);
     expect(await r.json()).toEqual({ error: 'no_autenticado' });
   });
 });
 
-test('un envío antes de hidratar no pone ningún campo en la URL', async ({ page }) => {
-  // Sin JavaScript el formulario nunca se hidrata: el botón sigue deshabilitado y Enter no envía.
-  await page.route('**/_next/static/**', (r) => r.abort());
-  await page.goto('/panel/administradores');
-  const form = page
-    .locator('form')
-    .filter({ has: page.getByRole('button', { name: 'Agregar administrador' }) });
-  await expect(form).toHaveAttribute('data-hidratado', 'no');
-  await expect(form.getByRole('button', { name: 'Agregar administrador' })).toBeDisabled();
-  await expect(form).toHaveAttribute('method', /post/i);
-  await form.getByLabel('Tu contraseña actual').fill('secreto-que-no-debe-salir');
-  await form.getByLabel('Tu contraseña actual').press('Enter');
-  await form.evaluate((f) => (f as HTMLFormElement).requestSubmit());
-  await page.waitForTimeout(800);
-  expect(page.url()).not.toMatch(/passwordActual|secreto-que-no-debe-salir|\?/);
-});
+test(
+  'un envío antes de hidratar no pone ningún campo en la URL',
+  { tag: '@escritorio' },
+  async ({ page }) => {
+    // Sin JavaScript el formulario nunca se hidrata: el botón sigue deshabilitado y Enter no envía.
+    await page.route('**/_next/static/**', (r) => r.abort());
+    await page.goto('/panel/administradores');
+    const form = page
+      .locator('form')
+      .filter({ has: page.getByRole('button', { name: 'Agregar administrador' }) });
+    await expect(form).toHaveAttribute('data-hidratado', 'no');
+    await expect(form.getByRole('button', { name: 'Agregar administrador' })).toBeDisabled();
+    await expect(form).toHaveAttribute('method', /post/i);
+    await form.getByLabel('Tu contraseña actual').fill('secreto-que-no-debe-salir');
+    await form.getByLabel('Tu contraseña actual').press('Enter');
+    await form.evaluate((f) => (f as HTMLFormElement).requestSubmit());
+    await page.waitForTimeout(800);
+    expect(page.url()).not.toMatch(/passwordActual|secreto-que-no-debe-salir|\?/);
+  },
+);

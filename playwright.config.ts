@@ -10,7 +10,8 @@ export default defineConfig({
   use: { baseURL: 'http://localhost:3100', trace: 'retain-on-failure' },
   projects: [
     { name: 'escritorio', use: { ...devices['Desktop Chrome'] } },
-    { name: 'movil', use: { ...devices['Pixel 7'] } },
+    // Las pruebas con @escritorio no dependen del viewport (API, cabeceras, flujos idénticos en ambos): solo corren en escritorio.
+    { name: 'movil', use: { ...devices['Pixel 7'] }, grepInvert: /@escritorio/ },
   ],
   // Requiere `pnpm build` previo. Hereda DATABASE_URL/KAZERO_TOTP_KEY de la rama test-* (scripts/test-neon.ts).
   webServer: {

@@ -40,7 +40,7 @@ describe('verificarDestino', () => {
     expect(d.esProduccion).toBe(false);
   });
 
-  it('falla si la variable de la terminal no coincide con .env.local (variable exportada de antes)', () => {
+  it('falla si la variable de la terminal no coincide con .env.local (variable exportada de antes) sin incluir la contraseña', () => {
     expect(() =>
       verificarDestino({
         variable: 'DATABASE_URL_OWNER',
@@ -49,48 +49,42 @@ describe('verificarDestino', () => {
         hostProduccion: hostProd,
       }),
     ).toThrow(/no coincide con la de \.env\.local/);
+    const e = capturar(() =>
+      verificarDestino({ variable: 'DATABASE_URL_OWNER', efectiva: prod, delArchivo: dev }),
+    );
+    expect(e).toBeInstanceOf(GuardaBdError);
+    expect(String((e as Error).message)).not.toMatch(/:y@|:x@/);
   });
 
-  it('el mensaje no incluye la contraseña', () => {
-    expect.assertions(2);
-    try {
-      verificarDestino({ variable: 'DATABASE_URL_OWNER', efectiva: prod, delArchivo: dev });
-    } catch (e) {
-      expect(e).toBeInstanceOf(GuardaBdError);
-      expect(String((e as Error).message)).not.toMatch(/:y@|:x@/);
-    }
-  });
-
-  it('describirUrl no expone la cadena de conexión si la URL es inválida', () => {
+  it('una URL inválida no expone la cadena de conexión (describirUrl) y verificarDestino nombra la variable sin su valor', () => {
     const err = capturar(() => describirUrl('no es una url :secreto'));
     expect(err).toBeInstanceOf(GuardaBdError);
     expect((err as Error).message).not.toContain('secreto');
     expect(String(err)).not.toContain('secreto');
     expect(JSON.stringify(err)).not.toContain('secreto');
     expect((err as { cause?: unknown }).cause).toBeUndefined();
-  });
 
-  it('verificarDestino nombra la variable inválida sin mostrar su valor', () => {
-    const err = capturar(() =>
+    const err2 = capturar(() =>
       verificarDestino({ variable: 'DATABASE_URL_OWNER', efectiva: 'no es una url :secreto' }),
     );
-    expect(err).toBeInstanceOf(GuardaBdError);
-    expect((err as Error).message).toMatch(/DATABASE_URL_OWNER/);
-    expect((err as Error).message).not.toContain('secreto');
-    expect(String(err)).not.toContain('secreto');
-    expect(JSON.stringify(err)).not.toContain('secreto');
+    expect(err2).toBeInstanceOf(GuardaBdError);
+    expect((err2 as Error).message).toMatch(/DATABASE_URL_OWNER/);
+    expect((err2 as Error).message).not.toContain('secreto');
+    expect(String(err2)).not.toContain('secreto');
+    expect(JSON.stringify(err2)).not.toContain('secreto');
   });
 
-  it('exige confirmación para producción', () => {
+  it('producción (también por el host con -pooler) exige confirmación y con KAZERO_OTRA_BD=confirmo se acepta', () => {
     expect(() => verificarDestino({ variable: 'X', efectiva: prod, hostProduccion: hostProd })).toThrow(
       GuardaBdError,
     );
     expect(() => verificarDestino({ variable: 'X', efectiva: prod, hostProduccion: hostProd })).toThrow(
       /PRODUCCIÓN/,
     );
-  });
-
-  it('acepta producción con KAZERO_OTRA_BD=confirmo', () => {
+    const pooled = prod.replace('ep-prod-9', 'ep-prod-9-pooler');
+    expect(() => verificarDestino({ variable: 'X', efectiva: pooled, hostProduccion: hostProd })).toThrow(
+      /PRODUCCIÓN/,
+    );
     const d = verificarDestino({
       variable: 'X',
       efectiva: prod,
@@ -98,13 +92,6 @@ describe('verificarDestino', () => {
       confirmacion: 'confirmo',
     });
     expect(d.esProduccion).toBe(true);
-  });
-
-  it('detecta producción también por el host con -pooler', () => {
-    const pooled = prod.replace('ep-prod-9', 'ep-prod-9-pooler');
-    expect(() => verificarDestino({ variable: 'X', efectiva: pooled, hostProduccion: hostProd })).toThrow(
-      /PRODUCCIÓN/,
-    );
   });
 
   it('falla si la variable no existe', () => {

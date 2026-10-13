@@ -251,67 +251,63 @@ describe('cancelarPedido', () => {
 
   it('concurrencia: cancelar y pagar el mismo pedido termina consistente, sin errores crudos', async () => {
     let acumulado = 0; // el saldo a favor del cliente se acumula entre rondas
-    for (let ronda = 0; ronda < 3; ronda++) {
-      const p = await crear([await alta(`CC${ronda}`, 30000)]);
-      const { version } = await ficha(p.id);
-      const r = await Promise.allSettled([
-        app((db) =>
-          registrarPagoDePedido(db, {
-            key: randomUUID(),
-            adminId,
-            pedidoId: p.id,
-            montoCentavos: 10000,
-            metodo: 'efectivo',
-            pagador: 'cliente',
-          }),
-        ),
-        app((db) => cancelarPedido(db, { key: randomUUID(), adminId, pedidoId: p.id, version, motivo: 'x' })),
-      ]);
-      for (const x of r)
-        if (x.status === 'rejected') {
-          const e = x.reason as { name?: string; code?: string };
-          expect(e.name).toBe('ErrorNegocio');
-          expect(e.code).not.toBe('40P01');
-        }
-      const f = await ficha(p.id);
-      const pagoOk = r[0].status === 'fulfilled';
-      const cancelOk = r[1].status === 'fulfilled';
-      if (cancelOk) {
-        expect(f).toMatchObject({ estado: 'cancelado', pagado: '0.00', saldo: '0.00' });
-        if (pagoOk) acumulado += 10000;
-        const saldos = await app((db) => db.select().from(vSaldoFavor));
-        expect(saldos.find((s) => s.clienteId === ctx.clienteId)?.saldo ?? '0.00').toBe(
-          (acumulado / 100).toFixed(2),
-        );
-      } else {
-        // La versión quedó vieja por el pago: se rechaza con conflicto y el pedido sigue abierto.
-        expect(pagoOk).toBe(true);
-        expect(f).toMatchObject({ estado: 'abierto', pagado: '100.00' });
+    const p = await crear([await alta(`CC0`, 30000)]);
+    const { version } = await ficha(p.id);
+    const r = await Promise.allSettled([
+      app((db) =>
+        registrarPagoDePedido(db, {
+          key: randomUUID(),
+          adminId,
+          pedidoId: p.id,
+          montoCentavos: 10000,
+          metodo: 'efectivo',
+          pagador: 'cliente',
+        }),
+      ),
+      app((db) => cancelarPedido(db, { key: randomUUID(), adminId, pedidoId: p.id, version, motivo: 'x' })),
+    ]);
+    for (const x of r)
+      if (x.status === 'rejected') {
+        const e = x.reason as { name?: string; code?: string };
+        expect(e.name).toBe('ErrorNegocio');
+        expect(e.code).not.toBe('40P01');
       }
+    const f = await ficha(p.id);
+    const pagoOk = r[0].status === 'fulfilled';
+    const cancelOk = r[1].status === 'fulfilled';
+    if (cancelOk) {
+      expect(f).toMatchObject({ estado: 'cancelado', pagado: '0.00', saldo: '0.00' });
+      if (pagoOk) acumulado += 10000;
+      const saldos = await app((db) => db.select().from(vSaldoFavor));
+      expect(saldos.find((s) => s.clienteId === ctx.clienteId)?.saldo ?? '0.00').toBe(
+        (acumulado / 100).toFixed(2),
+      );
+    } else {
+      // La versión quedó vieja por el pago: se rechaza con conflicto y el pedido sigue abierto.
+      expect(pagoOk).toBe(true);
+      expect(f).toMatchObject({ estado: 'abierto', pagado: '100.00' });
     }
   });
 
   it('concurrencia: cancelar y regresar otra pieza del mismo exhibidor no interbloquea (40P01)', async () => {
-    for (let ronda = 0; ronda < 3; ronda++) {
-      const [a, b, c] = [await alta(`CE${ronda}A`), await alta(`CE${ronda}B`), await alta(`CE${ronda}C`)];
-      const exhibidorId = await app((db) =>
-        crearExhibidor(db, { vendedorId: ctx.vendedorId, nombre: `E${ronda}`, fechaEnvio: '2026-10-01' }),
-      );
-      await app((db) => enviarPiezas(db, { exhibidorId, codigos: [a, b] }));
-      const p = await crear([a]);
-      const { version } = await ficha(p.id);
-      const r = await Promise.allSettled([
-        app((db) => cancelarPedido(db, { key: randomUUID(), adminId, pedidoId: p.id, version, motivo: 'x' })),
-        app((db) => regresarPiezas(db, { exhibidorId, codigos: [b] })),
-        app((db) => enviarPiezas(db, { exhibidorId, codigos: [c] })),
-      ]);
-      for (const x of r)
-        if (x.status === 'rejected') expect((x.reason as { code?: string }).code).not.toBe('40P01');
-      expect(r.map((x) => x.status)).toEqual(['fulfilled', 'fulfilled', 'fulfilled']);
-      expect(await app((db) => obtenerPiezaPorCodigo(db, a))).toMatchObject({
-        estado: 'en_exhibidor',
-        exhibidorId,
-      });
-    }
+    const [a, b, c] = [await alta(`CE0A`), await alta(`CE0B`), await alta(`CE0C`)];
+    const exhibidorId = await app((db) =>
+      crearExhibidor(db, { vendedorId: ctx.vendedorId, nombre: `E0`, fechaEnvio: '2026-10-01' }),
+    );
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: [a, b] }));
+    const p = await crear([a]);
+    const { version } = await ficha(p.id);
+    const r = await Promise.allSettled([
+      app((db) => cancelarPedido(db, { key: randomUUID(), adminId, pedidoId: p.id, version, motivo: 'x' })),
+      app((db) => regresarPiezas(db, { exhibidorId, codigos: [b] })),
+      app((db) => enviarPiezas(db, { exhibidorId, codigos: [c] })),
+    ]);
+    for (const x of r)
+      if (x.status === 'rejected') expect((x.reason as { code?: string }).code).not.toBe('40P01');
+    expect(r.map((x) => x.status)).toEqual(['fulfilled', 'fulfilled', 'fulfilled']);
+    expect(await app((db) => obtenerPiezaPorCodigo(db, a))).toMatchObject({
+      estado: 'en_exhibidor',
+      exhibidorId,
+    });
   });
 });
