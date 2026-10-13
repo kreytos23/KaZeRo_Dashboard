@@ -6,7 +6,7 @@ import {
   textoBotonFoto,
 } from '@/app/panel/inventario/etiquetas';
 import { tipoMovimiento } from '@/db/schema';
-import { POR_PAGINA, leerFiltros } from '@/app/panel/inventario/filtros';
+import { POR_PAGINA, idDeCatalogo, leerFiltros } from '@/app/panel/inventario/filtros';
 
 describe('textoBotonFoto', () => {
   it('el botón de la foto dice Subir o Cambiar según haya foto', () => {
@@ -37,12 +37,18 @@ describe('ETIQUETA_MOVIMIENTO', () => {
 });
 
 describe('leerFiltros', () => {
-  const uuid = '3f2b8c1e-5a4d-4e6f-8a9b-0c1d2e3f4a5b';
   it('valores por defecto', () => {
-    expect(leerFiltros({})).toEqual({ q: '', estado: undefined, categoria: undefined, pagina: 1 });
+    expect(leerFiltros({})).toEqual({
+      q: '',
+      estado: undefined,
+      categoria: undefined,
+      material: undefined,
+      proveedor: undefined,
+      pagina: 1,
+    });
   });
   it('descarta valores inválidos en vez de fallar', () => {
-    const f = leerFiltros({ estado: 'inventado', categoria: 'no-uuid', pagina: '-3' });
+    const f = leerFiltros({ estado: 'inventado', categoria: '   ', pagina: '-3' });
     expect(f.estado).toBeUndefined();
     expect(f.categoria).toBeUndefined();
     expect(f.pagina).toBe(1);
@@ -50,12 +56,16 @@ describe('leerFiltros', () => {
   it('acepta válidos, toma el primero de un arreglo y acota la página y q', () => {
     const f = leerFiltros({
       estado: ['vendida', 'defecto'],
-      categoria: uuid,
+      categoria: ['Anillos', 'Aretes'],
+      material: ' Oro  ',
+      proveedor: 'p'.repeat(200),
       pagina: '2',
       q: 'x'.repeat(500),
     });
     expect(f.estado).toBe('vendida');
-    expect(f.categoria).toBe(uuid);
+    expect(f.categoria).toBe('Anillos');
+    expect(f.material).toBe('Oro');
+    expect(f.proveedor).toHaveLength(80);
     expect(f.pagina).toBe(2);
     expect(f.q).toHaveLength(120);
     expect(leerFiltros({ pagina: '99999999' }).pagina).toBe(1000);
@@ -63,5 +73,22 @@ describe('leerFiltros', () => {
   });
   it('expone el tamaño de página', () => {
     expect(POR_PAGINA).toBe(50);
+  });
+});
+
+describe('idDeCatalogo', () => {
+  const cat = [
+    { id: 'a', nombre: 'Anillos' },
+    { id: 'b', nombre: 'Acero inoxidable' },
+  ];
+  it('sin nombre no filtra', () => {
+    expect(idDeCatalogo(cat, undefined)).toBeUndefined();
+  });
+  it('resuelve sin acentos ni mayúsculas', () => {
+    expect(idDeCatalogo(cat, 'ANILLOS')).toBe('a');
+    expect(idDeCatalogo(cat, 'acero  inoxidable')).toBe('b');
+  });
+  it('un nombre desconocido da un id inexistente (cero resultados, no "todos")', () => {
+    expect(idDeCatalogo(cat, 'Relojes')).toBe('00000000-0000-0000-0000-000000000000');
   });
 });

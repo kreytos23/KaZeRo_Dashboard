@@ -3,12 +3,12 @@
 import { useContext, useId, type InputHTMLAttributes } from 'react';
 import { ErroresCampo } from './errores-campo';
 
-const ESTILO =
+export const ESTILO =
   'min-h-11 rounded-lg border border-borde-campo bg-white px-3 aria-invalid:border-2 aria-invalid:border-error';
-const ESTILO_ETIQUETA = 'text-sm font-medium';
+export const ESTILO_ETIQUETA = 'text-sm font-medium';
 
 /** Error de un campo: fuera del `<label>` para que no forme parte del nombre accesible del control. */
-function MensajeError({ idControl, error }: { idControl: string; error?: string }) {
+export function MensajeError({ idControl, error }: { idControl: string; error?: string }) {
   if (!error) return null;
   return (
     <span id={`${idControl}-error`} className="text-sm font-normal text-error">
@@ -18,7 +18,7 @@ function MensajeError({ idControl, error }: { idControl: string; error?: string 
 }
 
 /** El id del mensaje deriva del id del control (único por useId), no del name: dos formularios pueden repetir name. */
-function useErrorDe(name: string, idControl: string) {
+export function useErrorDe(name: string, idControl: string) {
   const error = useContext(ErroresCampo)[name];
   return {
     error,

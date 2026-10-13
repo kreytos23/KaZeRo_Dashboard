@@ -3,11 +3,12 @@ import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { FotoPieza } from '@/features/imagenes/FotoPieza';
 import { Campo, Selector } from '@/features/ui/Campo';
+import { CampoConLista } from '@/features/ui/CampoConLista';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarCatalogo } from '@/server/catalogos/servicio';
 import { listarPiezas } from '@/server/piezas/servicio';
 import { ETIQUETA_ESTADO } from './etiquetas';
-import { POR_PAGINA, leerFiltros } from './filtros';
+import { POR_PAGINA, idDeCatalogo, leerFiltros } from './filtros';
 
 export const metadata = { title: 'Inventario' };
 
@@ -18,23 +19,32 @@ export default async function PaginaInventario({
 }) {
   await requerirSesion();
   const f = leerFiltros(await searchParams);
-  const [piezas, categorias] = await conDbLectura((db) =>
-    Promise.all([
-      listarPiezas(db, {
-        q: f.q,
-        estado: f.estado,
-        categoriaId: f.categoria,
-        limite: POR_PAGINA,
-        offset: (f.pagina - 1) * POR_PAGINA,
-      }),
+  // Los filtros de catálogo llegan por nombre: se resuelven a id con las listas (que el formulario también usa).
+  const [catalogos, piezas] = await conDbLectura(async (db) => {
+    const cat = await Promise.all([
       listarCatalogo(db, 'categoria'),
-    ]),
-  );
+      listarCatalogo(db, 'material'),
+      listarCatalogo(db, 'proveedor'),
+    ]);
+    const pz = await listarPiezas(db, {
+      q: f.q,
+      estado: f.estado,
+      categoriaId: idDeCatalogo(cat[0], f.categoria),
+      materialId: idDeCatalogo(cat[1], f.material),
+      proveedorId: idDeCatalogo(cat[2], f.proveedor),
+      limite: POR_PAGINA,
+      offset: (f.pagina - 1) * POR_PAGINA,
+    });
+    return [cat, pz] as const;
+  });
+  const [categorias, materiales, proveedores] = catalogos;
   const conPagina = (p: number) => {
     const qs = new URLSearchParams();
     if (f.q) qs.set('q', f.q);
     if (f.estado) qs.set('estado', f.estado);
     if (f.categoria) qs.set('categoria', f.categoria);
+    if (f.material) qs.set('material', f.material);
+    if (f.proveedor) qs.set('proveedor', f.proveedor);
     qs.set('pagina', String(p));
     return `?${qs}`;
   };
@@ -68,14 +78,29 @@ export default async function PaginaInventario({
             ...Object.entries(ETIQUETA_ESTADO).map(([valor, texto]) => ({ valor, texto })),
           ]}
         />
-        <Selector
+        <CampoConLista
           etiqueta="Categoría"
           name="categoria"
-          defaultValue={f.categoria ?? ''}
-          opciones={[
-            { valor: '', texto: 'Todas' },
-            ...categorias.map((c) => ({ valor: c.id, texto: c.nombre })),
-          ]}
+          opciones={categorias.map((c) => c.nombre)}
+          defaultValue={f.categoria}
+          maxLength={80}
+          textoNuevo="Filtrar por"
+        />
+        <CampoConLista
+          etiqueta="Material"
+          name="material"
+          opciones={materiales.map((c) => c.nombre)}
+          defaultValue={f.material}
+          maxLength={80}
+          textoNuevo="Filtrar por"
+        />
+        <CampoConLista
+          etiqueta="Proveedor"
+          name="proveedor"
+          opciones={proveedores.map((c) => c.nombre)}
+          defaultValue={f.proveedor}
+          maxLength={80}
+          textoNuevo="Filtrar por"
         />
         <button className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave">
           Filtrar

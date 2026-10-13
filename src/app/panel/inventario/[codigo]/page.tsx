@@ -9,6 +9,7 @@ import { describirDestino, destinoCorreccion } from '@/domain/correccion';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { FotoPieza } from '@/features/imagenes/FotoPieza';
 import { Campo, Selector } from '@/features/ui/Campo';
+import { CampoConLista } from '@/features/ui/CampoConLista';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { Fecha } from '@/features/ui/Fecha';
@@ -35,16 +36,18 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
     const p = await obtenerPiezaPorCodigo(db, codigo);
     if (!p) return null;
     // Número fijo de consultas, todas contra vistas (sin N+1).
-    const [movimientos, cambios, categorias, pedido] = await Promise.all([
+    const [movimientos, cambios, categorias, materiales, proveedores, pedido] = await Promise.all([
       historial(db, p.id),
       historialDeCambios(db, 'pieza', p.id),
       listarCatalogo(db, 'categoria'),
+      listarCatalogo(db, 'material'),
+      listarCatalogo(db, 'proveedor'),
       p.estado === 'apartada' ? pedidoVigenteDePieza(db, p.id) : Promise.resolve(null),
     ]);
-    return { p, movimientos, cambios, categorias, pedido };
+    return { p, movimientos, cambios, categorias, materiales, proveedores, pedido };
   });
   if (!datos) notFound();
-  const { p, movimientos, cambios, categorias, pedido } = datos;
+  const { p, movimientos, cambios, categorias, materiales, proveedores, pedido } = datos;
   const destinos = destinosManuales(p.estado);
   const ultimo = movimientos[0];
   const destino = ultimo ? destinoCorreccion(p.estado, ultimo, ultimo.exhibidorEstado === 'abierto') : null;
@@ -142,23 +145,25 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
               required
               maxLength={300}
             />
-            <Campo
+            <CampoConLista
               etiqueta="Categoría"
               name="categoria"
-              list="categorias-edicion"
+              opciones={categorias.map((c) => c.nombre)}
               defaultValue={p.categoriaNombre}
               required
               maxLength={80}
             />
-            <datalist id="categorias-edicion">
-              {categorias.map((c) => (
-                <option key={c.id} value={c.nombre} />
-              ))}
-            </datalist>
-            <Campo etiqueta="Material" name="material" defaultValue={p.materialNombre ?? ''} maxLength={80} />
-            <Campo
+            <CampoConLista
+              etiqueta="Material"
+              name="material"
+              opciones={materiales.map((c) => c.nombre)}
+              defaultValue={p.materialNombre ?? ''}
+              maxLength={80}
+            />
+            <CampoConLista
               etiqueta="Proveedor"
               name="proveedor"
+              opciones={proveedores.map((c) => c.nombre)}
               defaultValue={p.proveedorNombre ?? ''}
               maxLength={80}
             />

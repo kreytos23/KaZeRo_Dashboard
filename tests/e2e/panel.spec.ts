@@ -49,7 +49,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await page.getByLabel('Prefijo').fill(prefijo);
   await page.getByRole('button', { name: 'Sugerir código' }).click();
   await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
-  await page.getByLabel('Categoría').fill('Anillos');
+  await page.getByLabel('Categoría', { exact: true }).fill('Anillos');
   await page.getByLabel('Descripción').fill(`Anillo serpiente ${m}`);
   await page.getByLabel('Precio').fill('149');
   await page.getByRole('button', { name: 'Guardar pieza' }).click();
@@ -95,7 +95,7 @@ test('alta individual, ficha de pieza con destinos válidos y estados', async ({
   await page.getByLabel('Prefijo').fill(`Y${m}`);
   await page.getByRole('button', { name: 'Sugerir código' }).click();
   await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
-  await page.getByLabel('Categoría').fill('Collares');
+  await page.getByLabel('Categoría', { exact: true }).fill('Collares');
   await page.getByLabel('Descripción').fill(`Collar luna ${m}`);
   await page.getByLabel('Precio').fill('200');
   await page.getByRole('button', { name: 'Guardar pieza' }).click();
@@ -117,7 +117,7 @@ test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async
   await page.getByLabel('Prefijo').fill(`W${m}`);
   await page.getByRole('button', { name: 'Sugerir código' }).click();
   await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
-  await page.getByLabel('Categoría').fill('Pulseras');
+  await page.getByLabel('Categoría', { exact: true }).fill('Pulseras');
   await page.getByLabel('Descripción').fill(`Pulsera mar ${m}`);
   await page.getByLabel('Precio').fill('200');
   await page.getByRole('button', { name: 'Guardar pieza' }).click();

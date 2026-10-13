@@ -501,7 +501,15 @@ export type MovimientoFila = Awaited<ReturnType<typeof historial>>[number];
 
 export function listarPiezas(
   db: Ejecutor,
-  o: { q?: string; estado?: EstadoPieza; categoriaId?: string; limite?: number; offset?: number } = {},
+  o: {
+    q?: string;
+    estado?: EstadoPieza;
+    categoriaId?: string;
+    materialId?: string;
+    proveedorId?: string;
+    limite?: number;
+    offset?: number;
+  } = {},
 ): Promise<PiezaFila[]> {
   const q = normalizar(o.q ?? '');
   const filtros = [
@@ -513,6 +521,8 @@ export function listarPiezas(
       : undefined,
     o.estado ? eq(vPieza.estado, o.estado) : undefined,
     o.categoriaId ? eq(vPieza.categoriaId, o.categoriaId) : undefined,
+    o.materialId ? eq(vPieza.materialId, o.materialId) : undefined,
+    o.proveedorId ? eq(vPieza.proveedorId, o.proveedorId) : undefined,
   ];
   return db
     .select(filaPieza)

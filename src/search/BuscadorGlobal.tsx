@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useDeferredValue, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useCombobox } from '@/features/ui/useCombobox';
 import { crearMotor, type Resultado } from './motor';
 import { useIndiceBusqueda } from './useIndiceBusqueda';
 
@@ -45,7 +46,6 @@ export function BuscadorGlobal() {
   const { indice, estado, asegurarCarga } = useIndiceBusqueda();
   const [recientes, setRecientes] = useState<string[]>([]);
   const [q, setQ] = useState('');
-  const [activo, setActivo] = useState(0);
   const [abierto, setAbierto] = useState(false);
 
   useEffect(() => {
@@ -67,10 +67,13 @@ export function BuscadorGlobal() {
     () => (motor ? motor.buscar(consulta, recientes) : []),
     [motor, consulta, recientes],
   );
-  const visible = abierto && resultados.length > 0;
-  // Siempre dentro de rango aunque los resultados cambien (p. ej. 0 resultados).
-  const sel = Math.max(0, Math.min(activo, resultados.length - 1));
-  const idActivo = visible ? `${id}-op-${sel}` : undefined;
+  const { sel, setActivo, reiniciar, visible, idLista, idOpcion, idActivo, onKeyDown } = useCombobox({
+    id,
+    cantidad: resultados.length,
+    abierto,
+    setAbierto,
+    alElegir: (i) => abrir(resultados[i]!),
+  });
 
   function abrir(r: Resultado) {
     guardarReciente(r.clave);
@@ -100,7 +103,7 @@ export function BuscadorGlobal() {
         type="search"
         role="combobox"
         aria-expanded={visible}
-        aria-controls={`${id}-lista`}
+        aria-controls={idLista}
         aria-activedescendant={idActivo}
         aria-autocomplete="list"
         autoComplete="off"
@@ -113,26 +116,11 @@ export function BuscadorGlobal() {
         }}
         onChange={(e) => {
           setQ(e.target.value);
-          setActivo(0);
+          reiniciar();
           setAbierto(true);
         }}
         onClick={() => setAbierto(true)}
-        onKeyDown={(e) => {
-          if (e.nativeEvent.isComposing) return;
-          if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            if (!abierto) setAbierto(true);
-            else setActivo(Math.min(sel + 1, resultados.length - 1));
-          } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setActivo(Math.max(sel - 1, 0));
-          } else if (e.key === 'Enter' && visible && resultados[sel]) {
-            e.preventDefault();
-            abrir(resultados[sel]);
-          } else if (e.key === 'Escape') {
-            setAbierto(false);
-          }
-        }}
+        onKeyDown={onKeyDown}
         onBlur={() => setAbierto(false)}
         className="min-h-11 w-full rounded-lg border border-borde-campo bg-white px-3"
       />
@@ -144,7 +132,7 @@ export function BuscadorGlobal() {
         {aviso}
       </div>
       <ul
-        id={`${id}-lista`}
+        id={idLista}
         role="listbox"
         aria-label="Resultados"
         hidden={!visible}
@@ -154,7 +142,7 @@ export function BuscadorGlobal() {
           resultados.map((r, i) => (
             <li
               key={r.clave}
-              id={`${id}-op-${i}`}
+              id={idOpcion(i)}
               role="option"
               aria-selected={i === sel}
               onMouseMove={() => setActivo(i)}

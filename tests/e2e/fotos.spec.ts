@@ -36,7 +36,7 @@ async function abrirFoto(page: Page, resumen: string) {
 async function altaPieza(page: Page, codigo: string, descripcion: string, conFoto: boolean) {
   await irA(page, '/panel/inventario/nueva');
   await page.getByLabel('Código', { exact: true }).fill(codigo);
-  await page.getByLabel('Categoría').fill('Anillos');
+  await page.getByLabel('Categoría', { exact: true }).fill('Anillos');
   await page.getByLabel('Descripción').fill(descripcion);
   await page.getByLabel('Precio').fill('149');
   if (conFoto) {

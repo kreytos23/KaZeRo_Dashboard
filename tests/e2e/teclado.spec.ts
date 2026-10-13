@@ -80,7 +80,7 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await page.keyboard.press('Enter');
     await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
     await tabHacia(page, page.getByLabel('Código', { exact: true }));
-    await tabHacia(page, page.getByLabel('Categoría'));
+    await tabHacia(page, page.getByLabel('Categoría', { exact: true }));
     await page.keyboard.type('Aretes');
     await tabHacia(page, page.getByLabel('Descripción'));
     await page.keyboard.type(`Arete teclado ${m}`);
@@ -96,6 +96,35 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await enfocar(page, page.getByRole('button', { name: 'Cambiar estado' }));
     await page.keyboard.press('Space');
     await expect(estadoCon(page, 'Estado actualizado.')).toBeVisible();
+  });
+
+  test('captura en tanda: Guardar y agregar otra y listas de catálogo sin ratón', async ({ page }, info) => {
+    const m = marca(info.project.name);
+    const primero = `KT${m}01`;
+    const segundo = `KT${m}02`;
+    await irA(page, '/panel/inventario/nueva');
+    await escribirEn(page, page.getByLabel('Código', { exact: true }), primero);
+    await tabHacia(page, page.getByLabel('Categoría', { exact: true }));
+    await page.keyboard.type('Aretes');
+    await tabHacia(page, page.getByLabel('Descripción'));
+    await page.keyboard.type(`Arete tanda ${m} 1`);
+    await enfocar(page, page.getByLabel('Precio'));
+    await page.keyboard.type('99');
+    await enfocar(page, page.getByRole('button', { name: 'Guardar y agregar otra' }));
+    await page.keyboard.press('Enter');
+    await expect(estadoCon(page, `Pieza ${primero} guardada. Agrega la siguiente.`)).toBeVisible();
+    await expect(page.getByLabel('Código', { exact: true })).toBeFocused();
+
+    // La categoría se conserva; la segunda pieza se guarda con Enter en el precio y lleva a su ficha.
+    await page.keyboard.type(segundo);
+    await tabHacia(page, page.getByLabel('Categoría', { exact: true }));
+    await expect(page.getByLabel('Categoría', { exact: true })).toHaveValue('Aretes');
+    await tabHacia(page, page.getByLabel('Descripción'));
+    await page.keyboard.type(`Arete tanda ${m} 2`);
+    await enfocar(page, page.getByLabel('Precio'));
+    await page.keyboard.type('99');
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`/panel/inventario/${segundo}$`));
   });
 
   test('exhibidor: crear, enviar, regresar y cerrar con confirmación, todo con teclado', async ({
