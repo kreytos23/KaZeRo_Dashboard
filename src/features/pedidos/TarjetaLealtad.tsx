@@ -1,4 +1,4 @@
-import { formatoFolio, formatoPct } from '@/domain/pedidos';
+import { formatoPct } from '@/domain/pedidos';
 import type { CicloTarjeta } from '@/domain/lealtad';
 import { etiquetaCasilla } from './texto-lealtad';
 
@@ -11,9 +11,9 @@ function Ciclo({ c }: { c: CicloTarjeta }) {
         {c.casillas.map((k) => (
           <li
             key={k.posicion}
-            aria-label={etiquetaCasilla(k)}
             className="flex min-h-14 flex-col items-center justify-center rounded-lg border border-borde bg-white px-1 py-1 text-center"
           >
+            <span className="sr-only">{etiquetaCasilla(k)}</span>
             <span aria-hidden="true" className="text-xl leading-none text-primario">
               {SIMBOLO[k.estado]}
             </span>
@@ -25,7 +25,6 @@ function Ciclo({ c }: { c: CicloTarjeta }) {
                 −{formatoPct(k.pctBps)}
               </span>
             )}
-            {k.folio !== null && <span className="sr-only">{formatoFolio(k.folio)}</span>}
           </li>
         ))}
       </ol>

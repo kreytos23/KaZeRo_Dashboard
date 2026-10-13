@@ -108,12 +108,18 @@ export default async function FichaPedido({
             </li>
           ))}
         </ul>
-        {vigentes.length === 0 && <p className="text-sm text-tinta-suave">Sin piezas vigentes.</p>}
+        {vigentes.length === 0 && p.estado !== 'cancelado' && (
+          <p className="text-sm text-tinta-suave">Sin piezas vigentes.</p>
+        )}
         {quitadas.length > 0 && (
-          <ul aria-label="Piezas quitadas" className="flex flex-col gap-1 text-sm text-tinta-suave">
+          <ul
+            aria-label={p.estado === 'cancelado' ? 'Piezas liberadas' : 'Piezas quitadas'}
+            className="flex flex-col gap-1 text-sm text-tinta-suave"
+          >
             {quitadas.map((i) => (
               <li key={i.id}>
-                <span className="font-mono">{i.codigo}</span> · {i.descripcion} · Quitada
+                <span className="font-mono">{i.codigo}</span> · {i.descripcion} ·{' '}
+                {p.estado === 'cancelado' ? 'Liberada por cancelación' : 'Quitada'}
               </li>
             ))}
           </ul>

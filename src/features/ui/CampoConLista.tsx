@@ -90,7 +90,9 @@ export function CampoConLista({
           value={texto}
           onFocus={() => {
             setFiltrando(false);
-            setAbierto(true);
+            // En pantallas táctiles la lista abierta taparía el teclado y el formulario: allí se abre al
+            // escribir, con las flechas o con la flecha visible.
+            if (!window.matchMedia('(pointer: coarse)').matches) setAbierto(true);
           }}
           onChange={(e) => {
             setTexto(e.target.value);
@@ -98,7 +100,9 @@ export function CampoConLista({
             cb.reiniciar();
             setAbierto(true);
           }}
-          onClick={() => setAbierto(true)}
+          onClick={() => {
+            if (!window.matchMedia('(pointer: coarse)').matches) setAbierto(true);
+          }}
           onKeyDown={cb.onKeyDown}
           // Tab (o tocar fuera) cierra y acepta lo escrito tal cual.
           onBlur={() => setAbierto(false)}

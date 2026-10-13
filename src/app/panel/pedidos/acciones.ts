@@ -124,7 +124,7 @@ export async function accionEditarPedido(_: EstadoAccion, fd: FormData): Promise
   const { adminId } = await requerirSesion();
   return ejecutarAccion(async () => {
     const folio = folioDe(fd);
-    const r = await conDb((db) =>
+    await conDb((db) =>
       editarPedido(db, {
         key: uuidDe(fd, 'key'),
         adminId,
@@ -140,7 +140,6 @@ export async function accionEditarPedido(_: EstadoAccion, fd: FormData): Promise
         motivo: texto(fd, 'motivo').slice(0, 400),
       }),
     );
-    if (!r.cambios) return 'Sin cambios.';
     revalidarPedido(folio);
     redirect(`/panel/pedidos/${folio}?editado=1`);
   });

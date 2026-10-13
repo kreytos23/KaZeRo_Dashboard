@@ -85,7 +85,9 @@ test('nuevo pedido con alta rápida de cliente, piezas en ráfaga (una de exhibi
   // R-25: la tarjeta del cliente cuenta la compra.
   await page.goto(`/panel/pedidos/${folio}`);
   await page.getByRole('link', { name: `Ana Pedido ${m}` }).click();
-  await expect(page.getByRole('listitem', { name: `Posición 1: contada, KZR-${folio}` })).toBeVisible();
+  await expect(
+    page.getByRole('listitem').filter({ hasText: `Posición 1: contada, KZR-${folio}` }),
+  ).toBeVisible();
 });
 
 test('R-22 y R-29: la quinta compra muestra su descuento o explica por qué no', async ({ page }, info) => {
@@ -171,6 +173,9 @@ test('editar un pedido abierto: agregar y quitar piezas; el descuento manual exi
 
   // Agregar una pieza cambia el total: sin motivo se rechaza, con motivo se guarda.
   await irA(page, `/panel/pedidos/${folio}/editar`);
+  // Guardar sin cambios no consume la llave: la edición real que sigue (misma página) debe aceptarse.
+  await page.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(page.getByText('No hay cambios que guardar.')).toBeVisible();
   await page.getByLabel('Agregar piezas').fill(`ed${m}02`);
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(page.getByText('Escribe el motivo del cambio.')).toBeVisible();

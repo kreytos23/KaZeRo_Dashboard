@@ -112,6 +112,7 @@ test.describe('captura de piezas', () => {
     await sembrarPiezas(codigos, 100, (c) => `Familia ${c}`);
     await irA(page, '/panel/inventario/nueva');
     await campo(page, 'Categoría').focus();
+    await page.keyboard.press('ArrowDown'); // en táctil el foco no abre la lista
     await expect(page.getByRole('listbox', { name: 'Opciones de Categoría' })).toBeVisible();
     await page.keyboard.press('Tab');
     await expect(campo(page, 'Descripción')).toBeFocused();

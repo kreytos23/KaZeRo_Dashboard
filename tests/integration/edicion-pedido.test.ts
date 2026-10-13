@@ -148,8 +148,29 @@ describe('editarPedido', () => {
     );
     expect(await editar(p.id, { notas: 'Entregar el lunes' })).toMatchObject({ cambios: true });
     const antes = (await ficha(p.id)).version;
-    expect(await editar(p.id, {})).toMatchObject({ cambios: false });
+    await expect(editar(p.id, {})).rejects.toMatchObject({ codigo: 'sin_cambios' });
     expect((await ficha(p.id)).version).toBe(antes);
+  });
+
+  it('una edición sin cambios no consume la key: la misma key sirve para la edición real', async () => {
+    const p = await crear([await alta('ED20')]);
+    const f = await ficha(p.id);
+    const base: DatosEdicion = {
+      key: randomUUID(),
+      adminId,
+      pedidoId: p.id,
+      version: f.version,
+      vendedorId: f.vendedorId,
+      fecha: f.fecha,
+      descuentoManualCentavos: 0,
+      notas: f.notas,
+      agregar: [],
+      quitar: [],
+    };
+    await expect(app((db) => editarPedido(db, base))).rejects.toThrow('No hay cambios que guardar.');
+    expect(await app((db) => editarPedido(db, { ...base, notas: 'Ahora sí' }))).toMatchObject({
+      cambios: true,
+    });
   });
 
   it('agregar es todo o nada; código en agregar y quitar a la vez se rechaza', async () => {

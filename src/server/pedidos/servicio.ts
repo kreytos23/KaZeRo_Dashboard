@@ -362,7 +362,7 @@ export interface DatosEdicion {
 export async function editarPedido(
   db: Ejecutor,
   d: DatosEdicion,
-): Promise<{ estado: 'abierto' | 'liquidado'; total: string; cambios: boolean }> {
+): Promise<{ estado: 'abierto' | 'liquidado'; total: string; cambios: true }> {
   const descuento = validarDescuentoManual(d.descuentoManualCentavos, d.descuentoManualMotivo);
   const v = {
     pedidoId: d.pedidoId,
@@ -484,7 +484,8 @@ export async function editarPedido(
             v.notas !== p.notas ||
             v.agregar.length > 0 ||
             v.quitar.length > 0;
-          if (!cambia) return { estado: 'abierto' as const, total: p.total, cambios: false };
+          // Se lanza (revierte la transacción) en vez de devolver: así la llave de idempotencia queda libre para la edición real.
+          if (!cambia) throw new ErrorNegocio('sin_cambios', 'No hay cambios que guardar.');
           if (cambiaDinero && !v.motivo)
             throw new ErrorNegocio('motivo_requerido', 'Escribe el motivo del cambio.', 'motivo');
           if (salen.length) {
@@ -535,7 +536,7 @@ export async function editarPedido(
             .returning({ id: pedido.id });
           if (!filas.length) throw conflictoVersion();
           const estado = (await liquidarSiSaldoCero(tx, p.id, d.adminId)) as 'abierto' | 'liquidado';
-          return { estado, total, cambios: true };
+          return { estado, total, cambios: true as const };
         },
       ),
     ),
