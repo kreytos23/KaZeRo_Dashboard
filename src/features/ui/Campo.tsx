@@ -54,12 +54,17 @@ export function Selector({
   opciones,
   defaultValue,
   required,
+  value,
+  onChange,
 }: {
   etiqueta: string;
   name: string;
   opciones: readonly { valor: string; texto: string }[];
   defaultValue?: string;
   required?: boolean;
+  /** Controlado (opcional): úsalo con `onChange`, no con `defaultValue`. */
+  value?: string;
+  onChange?: (valor: string) => void;
 }) {
   const id = useId();
   const { error, aria } = useErrorDe(name, id);
@@ -73,6 +78,8 @@ export function Selector({
         id={id}
         name={name}
         defaultValue={defaultValue}
+        value={value}
+        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         required={required}
         className={ESTILO}
         {...aria}
