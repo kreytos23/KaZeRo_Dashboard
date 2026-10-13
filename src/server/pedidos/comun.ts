@@ -85,7 +85,7 @@ class ExhibidorCambio extends Error {}
 const INTENTOS_BLOQUEO = 3;
 
 /**
- * Para apartar (crearPedido, agregar en editarPedido): exhibidores de esas piezas → piezas por id (D-10, Plan 2.1),
+ * Para apartar (crearPedido) o agregar y quitar a la vez (editarPedido, con agregar ∪ quitar): exhibidores de esas piezas → piezas por id (D-10, Plan 2.1),
  * igual que enviar/regresar, para que ninguna operación de exhibidor espere a una pieza que espera a su exhibidor.
  *
  * El exhibidor se lee sin bloqueo antes de bloquear la pieza; si entre la lectura y el bloqueo la pieza entró a
@@ -95,8 +95,8 @@ const INTENTOS_BLOQUEO = 3;
 export async function bloquearPiezasParaApartar(
   tx: Ejecutor,
   codigos: string[],
-): Promise<{ piezas: PiezaBloqueada[]; faltantes: string[] }> {
-  if (!codigos.length) return { piezas: [], faltantes: [] };
+): Promise<{ piezas: PiezaBloqueada[]; faltantes: string[]; abiertos: Set<string> }> {
+  if (!codigos.length) return { piezas: [], faltantes: [], abiertos: new Set() };
   for (let intento = 0; intento < INTENTOS_BLOQUEO; intento++) {
     const previas = await tx
       .select({ exhibidorId: pieza.exhibidorId })
@@ -105,11 +105,11 @@ export async function bloquearPiezasParaApartar(
     const exhibidores = [...new Set(previas.flatMap((p) => (p.exhibidorId ? [p.exhibidorId] : [])))];
     try {
       return await tx.transaction(async (sp) => {
-        await bloquearExhibidores(sp, exhibidores);
+        const abiertos = await bloquearExhibidores(sp, exhibidores);
         const r = await bloquearPiezasPorCodigo(sp, codigos);
         if (r.piezas.some((p) => p.exhibidorId !== null && !exhibidores.includes(p.exhibidorId)))
           throw new ExhibidorCambio();
-        return r;
+        return { ...r, abiertos };
       });
     } catch (e) {
       if (!(e instanceof ExhibidorCambio)) throw e;

@@ -1,10 +1,25 @@
 import { and, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { aplicacionPago, cliente, pago, pedido, pedidoItem, saldoFavorMov, vendedor } from '@/db/schema';
+import {
+  aplicacionPago,
+  cliente,
+  pago,
+  pedido,
+  pedidoItem,
+  pieza,
+  saldoFavorMov,
+  vendedor,
+} from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
 import { descuentoLealtad, siguientePosicion, type Posicion, type SinLealtad } from '@/domain/lealtad';
-import { calcularTotales, formatoFolio, pctBpsANumeric } from '@/domain/pedidos';
+import {
+  MAX_PIEZAS_PEDIDO,
+  calcularTotales,
+  formatoFolio,
+  numericAPctBps,
+  pctBpsANumeric,
+} from '@/domain/pedidos';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 import { conIdempotencia } from '@/server/idempotencia';
@@ -17,6 +32,7 @@ import {
   foliosConSaldo,
   liberarPiezas,
   liquidarSiSaldoCero,
+  pagadoCentavos,
   validarCodigos,
 } from './comun';
 
@@ -316,6 +332,209 @@ export async function cancelarPedido(
             alExhibidor: r.alExhibidor,
             saldoFavor: centavosANumeric(saldoFavor),
           };
+        },
+      ),
+    ),
+  );
+}
+
+export interface DatosEdicion {
+  key: string;
+  adminId: string;
+  pedidoId: string;
+  version: number;
+  vendedorId: string;
+  fecha?: string;
+  descuentoManualCentavos: number;
+  descuentoManualMotivo?: string | null;
+  notas?: string;
+  agregar: string[];
+  quitar: string[];
+  motivo?: string;
+}
+
+/**
+ * R-27/R-22/R-11: edita un pedido abierto. La lealtad guardada (posición, %, motivo R-29) no cambia; el % guardado
+ * se aplica a las piezas nuevas y las líneas que quedan conservan sus precios. Orden de bloqueo (D-10): cliente →
+ * pedido → exhibidores (NO KEY UPDATE, de agregar ∪ quitar, por id) → piezas (FOR UPDATE, una consulta por id).
+ * Cambiar el total o el descuento manual exige motivo (D-21); el total no puede bajar de lo ya pagado.
+ */
+export async function editarPedido(
+  db: Ejecutor,
+  d: DatosEdicion,
+): Promise<{ estado: 'abierto' | 'liquidado'; total: string; cambios: boolean }> {
+  const descuento = validarDescuentoManual(d.descuentoManualCentavos, d.descuentoManualMotivo);
+  const v = {
+    pedidoId: d.pedidoId,
+    version: d.version,
+    vendedorId: d.vendedorId,
+    fecha: d.fecha?.trim() || null,
+    descuentoManual: descuento.monto,
+    descuentoMotivo: descuento.motivo,
+    notas: validarNotas(d.notas),
+    agregar: validarCodigos(d.agregar, { minimo: 0 }),
+    quitar: validarCodigos(d.quitar, { minimo: 0 }),
+    motivo: d.motivo?.trim() || null,
+  };
+  if (v.fecha) validarFecha(v.fecha);
+  const ambos = v.agregar.filter((c) => v.quitar.includes(c));
+  if (ambos.length)
+    throw new ErrorNegocio(
+      'edicion_invalida',
+      `Un código no puede agregarse y quitarse a la vez: ${ambos.join(', ')}.`,
+      'agregar',
+    );
+  if (v.motivo && v.motivo.length > 200)
+    throw new ErrorNegocio('motivo_invalido', 'El motivo admite hasta 200 caracteres.', 'motivo');
+  return conErroresDeNegocio(() =>
+    db.transaction((tx) =>
+      conIdempotencia(
+        tx,
+        { key: d.key, adminId: d.adminId, operacion: 'editarPedido', payload: v },
+        async () => {
+          // El motivo va al contexto: kz_auditar exige motivo si cambia `total` o el descuento manual.
+          await fijarContextoAuditoria(tx, { adminId: d.adminId, motivo: v.motivo });
+          const p = await bloquearPedido(tx, v.pedidoId); // cliente → pedido
+          if (p.estado !== 'abierto')
+            throw new ErrorNegocio('pedido_no_abierto', 'Solo se edita un pedido abierto.');
+          if (p.version !== v.version) throw conflictoVersion();
+          const fecha = v.fecha ?? p.fecha;
+          if (v.vendedorId !== p.vendedorId) await exigirVendedorActivo(tx, v.vendedorId);
+          const items = await tx
+            .select({
+              piezaId: pedidoItem.piezaId,
+              codigo: pieza.codigo,
+              precioLista: pedidoItem.precioLista,
+            })
+            .from(pedidoItem)
+            .innerJoin(pieza, eq(pieza.id, pedidoItem.piezaId))
+            .where(and(eq(pedidoItem.pedidoId, p.id), eq(pedidoItem.vigente, true)));
+          const enPedido = new Set(items.map((i) => i.codigo));
+          const ajenas = v.quitar.filter((c) => !enPedido.has(c));
+          if (ajenas.length)
+            throw new ErrorNegocio(
+              'edicion_invalida',
+              `No están en este pedido: ${ajenas.join(', ')}.`,
+              'quitar',
+            );
+          const yaEstan = v.agregar.filter((c) => enPedido.has(c));
+          if (yaEstan.length)
+            throw new ErrorNegocio(
+              'edicion_invalida',
+              `Ya están en este pedido: ${yaEstan.join(', ')}.`,
+              'agregar',
+            );
+          const quedan = items.filter((i) => !v.quitar.includes(i.codigo));
+          if (quedan.length + v.agregar.length === 0)
+            throw new ErrorNegocio(
+              'edicion_invalida',
+              'Un pedido necesita al menos una pieza. Para quitarlas todas, cancélalo.',
+              'quitar',
+            );
+          if (quedan.length + v.agregar.length > MAX_PIEZAS_PEDIDO)
+            throw new ErrorNegocio(
+              'edicion_invalida',
+              `Máximo ${MAX_PIEZAS_PEDIDO} piezas por pedido.`,
+              'agregar',
+            );
+          // D-10: exhibidores de agregar ∪ quitar (por id) → piezas de agregar ∪ quitar (por id), una sola vez.
+          const { piezas, faltantes, abiertos } = await bloquearPiezasParaApartar(tx, [
+            ...v.agregar,
+            ...v.quitar,
+          ]);
+          const nuevas = piezas.filter((x) => v.agregar.includes(x.codigo));
+          const salen = piezas.filter((x) => v.quitar.includes(x.codigo));
+          await exigirDisponibles(tx, {
+            codigos: v.agregar,
+            piezas: nuevas,
+            faltantes: faltantes.filter((c) => v.agregar.includes(c)),
+            prefijo: 'No se guardó el cambio.',
+          });
+          // R-27: el % guardado no cambia y se aplica a las nuevas. R-11: las que quedan conservan sus precios.
+          const t = calcularTotales(
+            [
+              ...quedan.map((i) => numericACentavos(i.precioLista)),
+              ...nuevas.map((x) => numericACentavos(x.precio)),
+            ],
+            numericAPctBps(p.descuentoLealtadPct),
+            v.descuentoManual,
+          );
+          if (t.manualExcede)
+            throw new ErrorNegocio(
+              'descuento_excede',
+              `El descuento manual supera el total después de lealtad (${formatoMXN(t.subtotal - t.descuentoLealtad)}).`,
+              'descuentoManual',
+            );
+          const pagado = await pagadoCentavos(tx, p.id);
+          if (t.total < pagado)
+            throw new ErrorNegocio(
+              'total_bajo_pagado',
+              `El nuevo total (${formatoMXN(t.total)}) quedaría por debajo de lo ya pagado (${formatoMXN(pagado)}).`,
+            );
+          const total = centavosANumeric(t.total);
+          const cambiaDinero =
+            total !== p.total ||
+            v.descuentoManual !== numericACentavos(p.descuentoManualMonto) ||
+            v.descuentoMotivo !== p.descuentoManualMotivo;
+          const cambia =
+            cambiaDinero ||
+            v.vendedorId !== p.vendedorId ||
+            fecha !== p.fecha ||
+            v.notas !== p.notas ||
+            v.agregar.length > 0 ||
+            v.quitar.length > 0;
+          if (!cambia) return { estado: 'abierto' as const, total: p.total, cambios: false };
+          if (cambiaDinero && !v.motivo)
+            throw new ErrorNegocio('motivo_requerido', 'Escribe el motivo del cambio.', 'motivo');
+          if (salen.length) {
+            await liberarPiezas(tx, {
+              pedidoId: p.id,
+              piezas: salen,
+              abiertos,
+              nota: `Se quitó de ${formatoFolio(p.folio)}.`,
+              adminId: d.adminId,
+            });
+            await tx
+              .update(pedidoItem)
+              .set({ vigente: false, quitadoAt: new Date() })
+              .where(
+                and(
+                  eq(pedidoItem.pedidoId, p.id),
+                  eq(pedidoItem.vigente, true),
+                  inArray(
+                    pedidoItem.piezaId,
+                    salen.map((x) => x.id),
+                  ),
+                ),
+              );
+          }
+          if (nuevas.length) {
+            await tx.insert(pedidoItem).values(
+              nuevas.map((x, i) => ({
+                pedidoId: p.id,
+                piezaId: x.id,
+                precioLista: x.precio,
+                precioFinal: centavosANumeric(t.preciosFinales[quedan.length + i]!),
+              })),
+            );
+            await apartarPiezas(tx, { pedidoId: p.id, piezas: nuevas, adminId: d.adminId });
+          }
+          const filas = await tx
+            .update(pedido)
+            .set({
+              vendedorId: v.vendedorId,
+              fecha,
+              descuentoManualMonto: centavosANumeric(v.descuentoManual),
+              descuentoManualMotivo: v.descuentoMotivo,
+              total,
+              notas: v.notas,
+              version: sql`${pedido.version} + 1`,
+            })
+            .where(and(eq(pedido.id, p.id), eq(pedido.version, v.version)))
+            .returning({ id: pedido.id });
+          if (!filas.length) throw conflictoVersion();
+          const estado = (await liquidarSiSaldoCero(tx, p.id, d.adminId)) as 'abierto' | 'liquidado';
+          return { estado, total, cambios: true };
         },
       ),
     ),
