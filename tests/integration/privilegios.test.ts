@@ -156,6 +156,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       ...t('idempotencia', 'DELETE', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('material', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('movimiento_pieza', 'INSERT', 'SELECT'),
+      ...t('origen_excel', 'SELECT'), // Plan 7a: solo la escribe el script de migración (dueño)
       ...t('pago', 'INSERT', 'SELECT'),
       ...t('pedido', 'INSERT', 'SELECT'),
       ...t('pedido_item', 'INSERT', 'SELECT'),
