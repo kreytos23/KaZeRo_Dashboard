@@ -3,6 +3,7 @@ import type { Db, Ejecutor } from '@/db/pool';
 import { admin, codigoRecuperacion, sesion, vAdmin } from '@/db/schema';
 import { conErroresDeNegocio, ErrorNegocio } from '@/server/errores';
 import { crearAdmin } from './admin';
+import { EMAIL_ADMIN_MIGRACION } from './admin-migracion';
 import { cifrar } from './cifrado';
 import { reautenticarAdmin, registrarAcceso } from './servicio';
 import { hashCodigoRecuperacion, nuevosCodigosRecuperacion } from './tokens';
@@ -49,10 +50,12 @@ async function comoResultado(fn: () => Promise<ResultadoEnrolamiento>): Promise<
   }
 }
 
+/** Sin el admin "migración": no es una persona ni puede entrar (Plan 7a). */
 export function listarAdmins(db: Ejecutor) {
   return db
     .select({ id: vAdmin.id, email: vAdmin.email, createdAt: vAdmin.createdAt })
     .from(vAdmin)
+    .where(ne(sql`lower(${vAdmin.email})`, EMAIL_ADMIN_MIGRACION))
     .orderBy(asc(vAdmin.createdAt));
 }
 

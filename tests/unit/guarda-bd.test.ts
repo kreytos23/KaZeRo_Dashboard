@@ -3,6 +3,7 @@ import {
   GuardaBdError,
   describirUrl,
   prepararDestino,
+  prepararDestinoDetallado,
   verificarDestino,
   verificarSecreto,
 } from '../../scripts/lib/guarda-bd';
@@ -119,6 +120,42 @@ describe('prepararDestino en CI', () => {
     vi.spyOn(console, 'log').mockImplementation(() => undefined);
     expect(() => prepararDestino('DATABASE_URL_OWNER', 'prueba', 'no-existe.env')).not.toThrow();
     vi.restoreAllMocks();
+  });
+});
+
+describe('prepararDestinoDetallado con exigirHostProduccion (migrador)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+  it('falla cerrada fuera de CI si no se conoce el host de producción', () => {
+    vi.stubEnv('CI', '');
+    vi.stubEnv('KAZERO_HOST_PROD', '');
+    vi.stubEnv('DATABASE_URL_OWNER', dev);
+    expect(() =>
+      prepararDestinoDetallado('DATABASE_URL_OWNER', 'prueba', 'no-existe.env', {
+        exigirHostProduccion: true,
+      }),
+    ).toThrow(GuardaBdError);
+    // Sin la opción, el comportamiento previo se conserva.
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    expect(() => prepararDestinoDetallado('DATABASE_URL_OWNER', 'prueba', 'no-existe.env')).not.toThrow();
+  });
+  it('con el host conocido devuelve destino, base y si es producción', () => {
+    vi.stubEnv('CI', '');
+    vi.stubEnv('KAZERO_HOST_PROD', hostProd);
+    vi.stubEnv('DATABASE_URL_OWNER', dev);
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    expect(
+      prepararDestinoDetallado('DATABASE_URL_OWNER', 'prueba', 'no-existe.env', {
+        exigirHostProduccion: true,
+      }),
+    ).toEqual({
+      url: dev,
+      esProduccion: false,
+      host: 'ep-dev-1.us-east-2.aws.neon.tech',
+      baseDatos: 'neondb',
+    });
   });
 });
 

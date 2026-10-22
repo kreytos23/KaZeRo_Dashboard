@@ -26,7 +26,9 @@ import {
 } from '../../src/db/schema';
 import { centavosANumeric, numericACentavos } from '../../src/domain/dinero';
 import { fijarContextoAuditoria } from '../../src/server/auditoria/servicio';
+import { EMAIL_ADMIN_MIGRACION } from '../../src/server/auth/admin-migracion';
 import { hashPassword } from '../../src/server/auth/password';
+import { hashPlan } from './ids';
 import type {
   CatalogoPlan,
   Origen,
@@ -41,7 +43,7 @@ import type {
 
 export type { ResultadoBd } from './tipos';
 
-export const EMAIL_ADMIN_MIGRACION = 'migracion@kazero.invalid';
+export { EMAIL_ADMIN_MIGRACION };
 export const MOTIVO_MIGRACION = 'Migración Excel fase 1';
 /** No es un secreto cifrado: `descifrar` falla con él, así que nunca hay segundo factor válido. */
 const TOTP_INSERVIBLE = 'migracion:sin-totp';
@@ -57,6 +59,15 @@ export class ErrorVerificacion extends Error {
   ) {
     super(
       `La verificación de la migración no cuadra (${diferencias.length} diferencia(s)); se hizo ROLLBACK.`,
+    );
+  }
+}
+/** Las decisiones contra la BD ya no son las del ensayo aprobado (la BD cambió o es otro destino): ROLLBACK. */
+export class ErrorEnsayoDistinto extends Error {
+  override name = 'ErrorEnsayoDistinto';
+  constructor() {
+    super(
+      'La BD cambió desde el ensayo aprobado (decisiones distintas). Vuelve a ensayar. ROLLBACK: no quedó nada.',
     );
   }
 }
@@ -590,25 +601,56 @@ async function insertarTodo(
   return n;
 }
 
-/**
- * D-8: la siguiente nota de la app sigue a la última KZR (o a la última de la app, si es mayor). En `ensayo` no se
- * toca la secuencia (setval no se deshace con ROLLBACK): solo se calcula.
- */
-async function fijarSecuenciaFolio(tx: Ejecutor, desde: number, modo: 'ensayo' | 'aplicar') {
+/** D-8: la siguiente nota de la app sigue a la última KZR (o a la última de la app, si es mayor). */
+async function siguienteFolioEsperado(tx: Ejecutor, desde: number): Promise<number> {
   const [x] = await filas<{ m: number }>(
     tx,
     sql`SELECT coalesce(max(folio), 0)::int AS m FROM ${pedido} WHERE folio < ${desde}`,
   );
-  const esperado = x!.m + 1;
-  if (modo === 'ensayo') return { esperado, siguiente: esperado };
+  return x!.m + 1;
+}
+
+/**
+ * setval NO se deshace con ROLLBACK: por eso va al final, solo en `aplicar` y solo con la verificación ya correcta.
+ * Devuelve el siguiente folio que entregará la secuencia.
+ */
+async function fijarSecuenciaFolio(tx: Ejecutor, esperado: number): Promise<number> {
+  const m = esperado - 1;
   await tx.execute(
-    sql`SELECT setval(pg_get_serial_sequence('pedido', 'folio'), GREATEST(${x!.m}::int, 1), ${x!.m}::int >= 1)`,
+    sql`SELECT setval(pg_get_serial_sequence('pedido', 'folio'), GREATEST(${m}::int, 1), ${m}::int >= 1)`,
   );
   const [s] = await filas<{ last_value: string; is_called: boolean }>(
     tx,
     sql`SELECT last_value::text AS last_value, is_called FROM pedido_folio_seq`,
   );
-  return { esperado, siguiente: Number(s!.last_value) + (s!.is_called ? 1 : 0) };
+  return Number(s!.last_value) + (s!.is_called ? 1 : 0);
+}
+
+/**
+ * Huella de las decisiones tomadas contra la BD (reutilizados, folios, rechazos, cambiados, conteos), atada al
+ * destino y al hash del plan: `aplicar` exige la misma huella que dio el `ensayo` contra ese destino.
+ */
+function huellaDecisiones(
+  r: Resolucion,
+  insertados: Record<string, number>,
+  siguienteFolio: number,
+  contexto: ContextoAplicacion | undefined,
+): string {
+  const orden = <T>(xs: [string, T][]) => xs.sort((a, b) => a[0].localeCompare(b[0]));
+  return hashPlan({
+    contexto: contexto ?? null,
+    reutilizados: orden([...r.real]),
+    folios: orden(
+      r.gruposNuevos.filter((g) => g.pedido).map((g) => [g.pedido!.id, r.folio.get(g.pedido!.id)!]),
+    ),
+    notasMovidas: [...r.notas.keys()].sort(),
+    rechazosEnBd: r.rechazosEnBd,
+    cambiados: r.cambiados,
+    yaAplicados: r.yaAplicados,
+    conteoReutilizados: r.reutilizados,
+    insertados,
+    siguienteFolio,
+  });
 }
 
 /** Las cifras de la conciliación del plan, quitando lo que no quedó en la BD como el plan lo describe. */
@@ -695,12 +737,7 @@ function simplesDe(plan: PlanImportacion, k: TipoSimple): { id: string }[] {
 }
 
 /** D-4: consultas agregadas (sin N+1) contra tablas y vistas; cualquier diferencia → ROLLBACK. */
-async function verificar(
-  tx: Ejecutor,
-  plan: PlanImportacion,
-  r: Resolucion,
-  folio: { esperado: number; siguiente: number },
-): Promise<VerificacionBd> {
+async function verificar(tx: Ejecutor, plan: PlanImportacion, r: Resolucion): Promise<VerificacionBd> {
   const e = esperado(plan, r);
   const dif: string[] = [];
   const comparar = (que: string, plan: number, bd: number) => {
@@ -798,14 +835,19 @@ async function verificar(
   for (const id of new Set([...e.exhibidores.keys(), ...exhBd.keys()]))
     comparar(`piezas del exhibidor ${id}`, e.exhibidores.get(id) ?? 0, exhBd.get(id) ?? 0);
 
-  comparar('siguiente folio', folio.esperado, folio.siguiente);
   return { ok: dif.length === 0, diferencias: dif };
+}
+
+export interface ContextoAplicacion {
+  /** `host/base` normalizado del destino (sin credenciales). */
+  destino: string;
+  hashPlan: string;
 }
 
 export async function aplicarPlan(
   urlOwner: string,
   plan: PlanImportacion,
-  o: { modo: 'ensayo' | 'aplicar' },
+  o: { modo: 'ensayo' | 'aplicar'; contexto?: ContextoAplicacion; huellaEsperada?: string },
 ): Promise<ResultadoBd> {
   try {
     return await conDbUrl(urlOwner, (db) =>
@@ -817,8 +859,8 @@ export async function aplicarPlan(
         await fijarContextoAuditoria(tx, { adminId, motivo: MOTIVO_MIGRACION });
         const r = await resolver(tx, plan);
         const insertados = await insertarTodo(tx, plan, r, adminId);
-        const folio = await fijarSecuenciaFolio(tx, r.folioDesde, o.modo);
-        const verificacion = await verificar(tx, plan, r, folio);
+        const siguienteFolio = await siguienteFolioEsperado(tx, r.folioDesde);
+        const verificacion = await verificar(tx, plan, r);
         const resultado: ResultadoBd = {
           modo: o.modo,
           insertados,
@@ -827,10 +869,19 @@ export async function aplicarPlan(
           reutilizados: r.reutilizados,
           rechazosEnBd: r.rechazosEnBd,
           verificacion,
-          siguienteFolio: folio.siguiente,
+          siguienteFolio,
+          huella: huellaDecisiones(r, insertados, siguienteFolio, o.contexto),
         };
         if (!verificacion.ok) throw new ErrorVerificacion(verificacion.diferencias, resultado);
+        if (o.huellaEsperada !== undefined && o.huellaEsperada !== resultado.huella)
+          throw new ErrorEnsayoDistinto();
         if (o.modo === 'ensayo') throw new RollbackIntencional(resultado);
+        const deLaSecuencia = await fijarSecuenciaFolio(tx, siguienteFolio);
+        if (deLaSecuencia !== siguienteFolio)
+          throw new ErrorVerificacion(
+            [`siguiente folio: plan ${siguienteFolio}, secuencia ${deLaSecuencia}`],
+            resultado,
+          );
         return resultado;
       }),
     );

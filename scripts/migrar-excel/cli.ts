@@ -1,15 +1,20 @@
 /**
  * Lógica de la CLI de migración (Plan 7a, Task 7), con dependencias inyectables para probarla sin BD.
- * Códigos de salida: 0 bien · 1 error inesperado · 2 argumentos/mapeo/guarda · 3 el plan cambió desde el reporte
- * aprobado · 4 producción sin --confirmo-produccion · 5 la verificación no cuadró (ROLLBACK).
+ * Códigos de salida: 0 bien · 1 error inesperado · 2 argumentos/mapeo/guarda/ensayo no aprobado o distinto · 3 el
+ * plan cambió desde el reporte aprobado · 4 producción sin --confirmo-produccion · 5 la verificación no cuadró.
+ * `aplicar` exige dos aprobaciones: `--plan=<hash>` (de simular) y `--ensayo=<huella>` (del último ensayo contra el
+ * MISMO destino, guardada en `<salida>/ensayo-<destino>.json`); dentro de la transacción, las decisiones contra la
+ * BD deben dar esa misma huella o se hace ROLLBACK.
  * La consola solo lleva destino (de la guarda), conteos, hash y rutas: nombres y montos por persona van al reporte.
  */
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { GuardaBdError, prepararDestinoDetallado } from '../lib/guarda-bd';
-import { aplicarPlan, ErrorVerificacion } from './aplicar';
+import { GuardaBdError, hostNormalizado, prepararDestinoDetallado } from '../lib/guarda-bd';
+import { aplicarPlan, ErrorEnsayoDistinto, ErrorVerificacion } from './aplicar';
 import { leerArchivos } from './leer';
 import { planificar } from './planificar';
 import { escribirReporte } from './reporte';
@@ -19,6 +24,8 @@ import { esquemaMapeo, type Libro, type Mapeo, type ResultadoBd } from './tipos'
 export const MODOS = ['sugerir', 'simular', 'ensayo', 'aplicar'] as const;
 export type Modo = (typeof MODOS)[number];
 const FECHA_CORTE_SUGERIDA = '2026-10-03';
+/** `.env.local` de la raíz del repositorio (este archivo vive en scripts/migrar-excel/), no del directorio actual. */
+export const RUTA_ENV_LOCAL = resolve(dirname(fileURLToPath(import.meta.url)), '../../.env.local');
 
 export class ErrorCli extends Error {
   override name = 'ErrorCli';
@@ -36,6 +43,7 @@ export interface Argumentos {
   tracking: string;
   mapeo: string;
   plan?: string;
+  ensayo?: string;
   salida: string;
   confirmoProduccion: boolean;
 }
@@ -52,6 +60,7 @@ export function parsearArgumentos(argv: string[]): Argumentos {
         tracking: { type: 'string' },
         mapeo: { type: 'string', default: 'docs/migracion/mapeo.json' },
         plan: { type: 'string' },
+        ensayo: { type: 'string' },
         salida: { type: 'string', default: 'docs/migracion/salida' },
         'confirmo-produccion': { type: 'boolean', default: false },
       },
@@ -63,6 +72,11 @@ export function parsearArgumentos(argv: string[]): Argumentos {
   const modo = MODOS.find((m) => m === values.modo);
   if (!modo) throw new ErrorCli(2, `Falta --modo=${MODOS.join('|')}`);
   if (!values.inventario || !values.tracking) throw new ErrorCli(2, 'Faltan --inventario y --tracking.');
+  if (modo === 'aplicar' && !values.ensayo)
+    throw new ErrorCli(
+      2,
+      'El modo aplicar exige --ensayo=<huella del último ensayo contra este mismo destino> (sale de --modo=ensayo).',
+    );
   if (modo === 'aplicar' && !values.plan)
     throw new ErrorCli(
       2,
@@ -74,15 +88,28 @@ export function parsearArgumentos(argv: string[]): Argumentos {
     tracking: values.tracking,
     mapeo: values.mapeo!,
     plan: values.plan,
+    ensayo: values.ensayo,
     salida: values.salida!,
     confirmoProduccion: values['confirmo-produccion']!,
   };
 }
 
+/** Lo que deja un ensayo correcto para su destino (sin secretos: ni URL ni host en claro). */
+export interface EnsayoGuardado {
+  huella: string;
+  hashPlan: string;
+  fecha: string;
+}
+
 export interface Dependencias {
   leerArchivos: (o: { inventario: string; tracking: string }) => Promise<Libro>;
   cargarMapeo: (ruta: string) => Promise<Mapeo>;
-  prepararDestino: (variable: string, accion: string) => { url: string; esProduccion: boolean };
+  prepararDestino: (
+    variable: string,
+    accion: string,
+  ) => { url: string; esProduccion: boolean; host: string; baseDatos: string };
+  leerEnsayo: (ruta: string) => Promise<EnsayoGuardado | null>;
+  guardarEnsayo: (ruta: string, datos: EnsayoGuardado) => Promise<void>;
   aplicarPlan: typeof aplicarPlan;
   escribirReporte: typeof escribirReporte;
   exigirIgnorado: (ruta: string) => void;
@@ -124,7 +151,27 @@ async function cargarMapeoArchivo(ruta: string): Promise<Mapeo> {
 export const dependenciasReales: Dependencias = {
   leerArchivos,
   cargarMapeo: cargarMapeoArchivo,
-  prepararDestino: (variable, accion) => prepararDestinoDetallado(variable, accion),
+  prepararDestino: (variable, accion) =>
+    prepararDestinoDetallado(variable, accion, RUTA_ENV_LOCAL, { exigirHostProduccion: true }),
+  leerEnsayo: async (ruta) => {
+    try {
+      const x = JSON.parse(await readFile(ruta, 'utf8')) as Partial<EnsayoGuardado>;
+      return typeof x.huella === 'string' && typeof x.hashPlan === 'string'
+        ? { huella: x.huella, hashPlan: x.hashPlan, fecha: String(x.fecha ?? '') }
+        : null;
+    } catch {
+      return null;
+    }
+  },
+  guardarEnsayo: async (ruta, datos) => {
+    await mkdir(dirname(ruta), { recursive: true });
+    await writeFile(
+      ruta,
+      `${JSON.stringify(datos, null, 2)}
+`,
+      'utf8',
+    );
+  },
   aplicarPlan,
   escribirReporte,
   exigirIgnorado: exigirIgnoradoGit,
@@ -215,11 +262,37 @@ async function correr(a: Argumentos, d: Dependencias): Promise<number> {
     return 4;
   }
 
+  // Huella del ensayo por destino: un ensayo contra una copia no sirve para aplicar en producción.
+  const contexto = { destino: `${hostNormalizado(destino.host)}/${destino.baseDatos}`, hashPlan: hash };
+  const rutaEnsayo = resolve(
+    a.salida,
+    `ensayo-${createHash('sha256').update(contexto.destino).digest('hex').slice(0, 16)}.json`,
+  );
+  d.exigirIgnorado(rutaEnsayo);
+  if (a.modo === 'aplicar') {
+    const guardado = await d.leerEnsayo(rutaEnsayo);
+    if (!guardado || guardado.huella !== a.ensayo || guardado.hashPlan !== hash) {
+      d.log(
+        'No hay un ensayo correcto de este plan contra este mismo destino con esa huella. ' +
+          'Corre --modo=ensayo contra este destino y usa la huella que imprime.',
+      );
+      return 2;
+    }
+  }
+
   let bd: ResultadoBd;
   let codigo = 0;
   try {
-    bd = await d.aplicarPlan(destino.url, plan, { modo: a.modo });
+    bd = await d.aplicarPlan(destino.url, plan, {
+      modo: a.modo,
+      contexto,
+      ...(a.modo === 'aplicar' ? { huellaEsperada: a.ensayo } : {}),
+    });
   } catch (e) {
+    if (e instanceof ErrorEnsayoDistinto) {
+      d.log(e.message);
+      return 2;
+    }
     if (!(e instanceof ErrorVerificacion)) throw e;
     d.log(
       `La verificación no cuadró: ${e.diferencias.length} diferencia(s). ROLLBACK: no quedó nada en la BD.`,
@@ -242,5 +315,10 @@ async function correr(a: Argumentos, d: Dependencias): Promise<number> {
   );
   const rutas = await d.escribirReporte(dir, { plan, hash, modo: a.modo, bd });
   d.log(`Reporte (local, con datos personales): ${rutas[0]}`);
+  if (a.modo === 'ensayo' && codigo === 0) {
+    await d.guardarEnsayo(rutaEnsayo, { huella: bd.huella, hashPlan: hash, fecha: new Date().toISOString() });
+    d.log(`Huella del ensayo: ${bd.huella}`);
+    d.log(`Para aplicar en este mismo destino: --modo=aplicar --plan=${hash} --ensayo=${bd.huella}`);
+  }
   return codigo;
 }

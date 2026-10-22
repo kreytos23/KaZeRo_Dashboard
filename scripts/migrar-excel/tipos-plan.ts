@@ -266,4 +266,6 @@ export interface ResultadoBd {
   rechazosEnBd: Rechazo[];
   verificacion: VerificacionBd;
   siguienteFolio: number;
+  /** Huella de las decisiones contra la BD (atada a destino y plan): `aplicar` exige la del ensayo. */
+  huella: string;
 }

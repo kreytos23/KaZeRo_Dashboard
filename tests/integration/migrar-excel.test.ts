@@ -1,12 +1,18 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { sql } from 'drizzle-orm';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { aplicarPlan, EMAIL_ADMIN_MIGRACION, ErrorVerificacion } from '../../scripts/migrar-excel/aplicar';
+import {
+  aplicarPlan,
+  EMAIL_ADMIN_MIGRACION,
+  ErrorEnsayoDistinto,
+  ErrorVerificacion,
+} from '../../scripts/migrar-excel/aplicar';
 import { leerLibros } from '../../scripts/migrar-excel/leer';
 import { planificar } from '../../scripts/migrar-excel/planificar';
 import type { PlanImportacion } from '../../scripts/migrar-excel/tipos';
 import { conDbUrl } from '@/db/pool';
 import { numericACentavos } from '@/domain/dinero';
+import { listarAdmins } from '@/server/auth/administradores';
 import { iniciarLogin } from '@/server/auth/servicio';
 import { registrarPagoDePedido } from '@/server/pagos/servicio';
 import { crearPedido } from '@/server/pedidos/servicio';
@@ -273,7 +279,14 @@ describe('migrar-excel (aplicarPlan)', () => {
     const malo = structuredClone(plan);
     malo.conciliacion.saldoTotal += 1;
     malo.conciliacion.conteos.piezas += 1;
+    const secuencia = () =>
+      owner((db) => db.execute(sql`SELECT last_value::int AS v, is_called AS c FROM pedido_folio_seq`)).then(
+        (r) => r.rows[0],
+      );
+    const antes = await secuencia();
     const e = await aplicarPlan(urlOwner(), malo, { modo: 'aplicar' }).catch((x: unknown) => x);
+    // setval no se deshace con ROLLBACK: solo se hace después de que la verificación cuadra.
+    expect(await secuencia()).toEqual(antes);
     expect(e).toBeInstanceOf(ErrorVerificacion);
     expect((e as ErrorVerificacion).diferencias.length).toBeGreaterThanOrEqual(2);
     expect(await contar()).toMatchObject({ piezas: 0, pedidos: 0, origen: 0, admin_migracion: 0 });
@@ -313,5 +326,57 @@ describe('migrar-excel (aplicarPlan)', () => {
         WHERE email = ${EMAIL_ADMIN_MIGRACION}`),
     );
     expect(a.rows[0]).toEqual({ argon: true, t: 'migracion:sin-totp' });
+  });
+
+  it('aplicar exige que las decisiones en la BD sean las del ensayo (huella); si la BD cambió, ROLLBACK', async () => {
+    const contexto = { destino: 'prueba/neondb', hashPlan: 'h' };
+    const ensayo = await aplicarPlan(urlOwner(), plan, { modo: 'ensayo', contexto });
+    expect(ensayo.huella).toMatch(/^[0-9a-f]{64}$/);
+    // Otro destino o plan → otra huella.
+    const otro = await aplicarPlan(urlOwner(), plan, {
+      modo: 'ensayo',
+      contexto: { ...contexto, destino: 'x/y' },
+    });
+    expect(otro.huella).not.toBe(ensayo.huella);
+    // La app crea un cliente con el mismo nombre que uno del Excel: ahora se reutilizaría → decisión distinta.
+    await owner((db) => db.execute(sql`INSERT INTO cliente (nombre) VALUES ('Clienta Cinco')`));
+    const e = await aplicarPlan(urlOwner(), plan, {
+      modo: 'aplicar',
+      contexto,
+      huellaEsperada: ensayo.huella,
+    }).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(ErrorEnsayoDistinto);
+    expect(await contar()).toMatchObject({ piezas: 0, origen: 0, admin_migracion: 0 });
+    const ensayo2 = await aplicarPlan(urlOwner(), plan, { modo: 'ensayo', contexto });
+    const r = await aplicarPlan(urlOwner(), plan, {
+      modo: 'aplicar',
+      contexto,
+      huellaEsperada: ensayo2.huella,
+    });
+    expect(r.huella).toBe(ensayo2.huella);
+    expect(r.reutilizados.clientes).toBe(1);
+  });
+
+  it('insertar filas en medio del Excel no marca como cambiadas las de abajo', async () => {
+    await aplicarPlan(urlOwner(), plan, { modo: 'aplicar' });
+    const otro = await planDe({
+      ...base,
+      inventario: [filaInv({ id: 'ZZ00', prod: 'Anillo nuevo' }), ...base.inventario!],
+      concentrado: [
+        venta('AB00', { f: fecha(2026, 8, 1), coment: '02ago. vende', cliente: 'Clienta Siete' }),
+        ...base.concentrado!,
+      ],
+    });
+    const r = await aplicarPlan(urlOwner(), otro, { modo: 'aplicar' });
+    expect(r.cambiados).toEqual([]);
+    expect(r.verificacion).toEqual({ ok: true, diferencias: [] });
+    expect(r.insertados).toMatchObject({ piezas: 2, pedidos: 1 });
+  });
+
+  it('el admin de migración no aparece en la lista de administradores', async () => {
+    await aplicarPlan(urlOwner(), plan, { modo: 'aplicar' });
+    const lista = await conDbUrl(urlApp(), (db) => listarAdmins(db));
+    expect(lista.length).toBe(1);
+    expect(lista.map((a) => a.email)).not.toContain(EMAIL_ADMIN_MIGRACION);
   });
 });

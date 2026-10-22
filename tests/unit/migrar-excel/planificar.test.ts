@@ -133,6 +133,25 @@ describe('planificar', () => {
     falla((p) => void (p.pedidos[0]!.notas = 'x'.repeat(501)), /notas/);
   });
 
+  it('insertar filas en medio del libro no cambia el hash de origen de las demás piezas (la fila va en `filas`)', async () => {
+    const a = planificar(await libro(base), mapeoSintetico()).plan;
+    const b = planificar(
+      await libro({
+        ...base,
+        inventario: [filaInv({ id: 'ZZ00', prod: 'Anillo nuevo' }), ...base.inventario!],
+        concentrado: [venta('AB00', { f: fecha(2026, 8, 1) }), ...base.concentrado!],
+      }),
+      mapeoSintetico(),
+    ).plan;
+    const hashes = (p: typeof a) => new Map(p.piezas.map((x) => [x.origen.clave, x.origen.hash]));
+    const ha = hashes(a);
+    const hb = hashes(b);
+    for (const [clave, h] of ha) expect([clave, hb.get(clave)]).toEqual([clave, h]);
+    // La fila sí se corrió: queda registrada en `filas`.
+    const fila = (p: typeof a) => p.piezas.find((x) => x.codigo === 'ZZ03')!.origen.filas[0]!;
+    expect(fila(b)).toBe(fila(a) + 1);
+  });
+
   it('M-48 el hash es estable y cambia al cambiar un precio', async () => {
     // El mismo libro leído dos veces (un .xlsx recién armado trae su propia hora de creación).
     const l = await libro(base);
