@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import ExcelJS from 'exceljs';
 import { normalizar } from '../../src/domain/texto';
+import { llaveNombre } from './llave';
 import type {
   Celda,
   FilaConcentrado,
@@ -186,11 +187,31 @@ export async function leerLibros(o: {
   };
 }
 
+/** Hojas del Tracking que no son de exhibidor (se excluyen al descubrir las de exhibidor). */
+const HOJAS_NO_EXHIBIDOR = new Set([
+  'concentrado joyeria agos',
+  'tarjeta de lealtad',
+  'cumpleanos',
+  'pedidos',
+  'rifas',
+]);
+
+/** Nombres de las hojas de exhibidor del Tracking: todas menos Concentrado, Tarjeta, Cumpleaños, Pedidos y Rifas. */
+export async function hojasExhibidorDe(tracking: Buffer): Promise<string[]> {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(tracking as unknown as ArrayBuffer);
+  return wb.worksheets.map((h) => h.name).filter((n) => !HOJAS_NO_EXHIBIDOR.has(llaveNombre(n)));
+}
+
 /** Lee los dos libros del disco. Solo lectura: nunca escribe en las rutas dadas. */
 export async function leerArchivos(
   rutas: { inventario: string; tracking: string },
-  hojasExhibidor: string[],
+  hojasExhibidor?: string[],
 ): Promise<Libro> {
   const [inventario, tracking] = await Promise.all([readFile(rutas.inventario), readFile(rutas.tracking)]);
-  return leerLibros({ inventario, tracking, hojasExhibidor });
+  return leerLibros({
+    inventario,
+    tracking,
+    hojasExhibidor: hojasExhibidor ?? (await hojasExhibidorDe(tracking)),
+  });
 }

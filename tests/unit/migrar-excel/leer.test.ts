@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ExcelJS from 'exceljs';
 import { describe, expect, it } from 'vitest';
-import { leerArchivos, leerLibros } from '../../../scripts/migrar-excel/leer';
+import { hojasExhibidorDe, leerArchivos, leerLibros } from '../../../scripts/migrar-excel/leer';
 import { librosSinteticos } from '../../apoyo/libro-sintetico';
 
 describe('leerLibros', () => {
@@ -114,5 +114,14 @@ describe('leerLibros', () => {
     await leerArchivos(rutas, []);
     expect(await readFile(rutas.inventario)).toEqual(b.inventario);
     expect(await readFile(rutas.tracking)).toEqual(b.tracking);
+  });
+});
+
+describe('hojasExhibidorDe', () => {
+  it('descubre las hojas de exhibidor y excluye Concentrado, Tarjeta, Cumpleaños, Pedidos y Rifas', async () => {
+    const b = await librosSinteticos({
+      exhibidores: { 'Vend A': [], Pedidos: [], Rifas: [], Otra: [] },
+    });
+    expect(await hojasExhibidorDe(b.tracking)).toEqual(['Vend A', 'Otra']);
   });
 });

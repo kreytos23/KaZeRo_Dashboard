@@ -309,6 +309,17 @@ describe('planCatalogosYPiezas', () => {
     ]);
   });
 
+  it('dos filas idénticas sin código son dos piezas distintas (claves únicas)', async () => {
+    const fila = () => filaConc({ f: fecha(2026, 5, 2), venta: 50, estatus: 'Vendido', desc: 'Pieza igual' });
+    const { p } = await planear({ concentrado: [fila(), fila()] });
+    expect(p.piezas.map((x) => x.codigo)).toEqual(['H-F3', 'H-F4']);
+    expect(new Set(p.piezas.map((x) => x.id)).size).toBe(2);
+    expect(p.piezas.map((x) => x.origen.clave.endsWith('#1') || x.origen.clave.endsWith('#2'))).toEqual([
+      true,
+      true,
+    ]);
+  });
+
   it('un código inválido o repetido en el inventario se rechaza', async () => {
     const { p, ctx } = await planear({
       inventario: [filaInv({ id: 'ZZ01' }), filaInv({ id: 'zz01' }), filaInv({ id: 'mal codigo!' })],

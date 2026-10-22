@@ -22,6 +22,8 @@ export interface PersonasPlan {
   filaCliente: Map<number, FilaPersona>;
   /** Fila del inventario → cliente y vendedor de esa pieza. */
   filaClienteInv: Map<number, FilaPersona>;
+  /** Fila de la hoja de lealtad → cliente (null si el nombre viene vacío). */
+  filaClienteLealtad: Map<number, string | null>;
   clienteGenerico: () => string;
 }
 
@@ -219,7 +221,12 @@ export function planPersonas(l: Libro, m: Mapeo, ctx: Contexto): PersonasPlan {
     });
   }
 
-  for (const f of l.lealtad) resolver(f.cliente, 'lealtad', 'Tarjeta de Lealtad', f.fila);
+  const filaClienteLealtad = new Map<number, string | null>();
+  for (const f of l.lealtad)
+    filaClienteLealtad.set(
+      f.fila,
+      resolver(f.cliente, 'lealtad', 'Tarjeta de Lealtad', f.fila).acum?.plan.id ?? null,
+    );
 
   // --- Cumpleaños: primero el bloque B (nombres), luego el A (usuarios de red)
   const poner = (a: Acum, f: Celda, hoja: string, fila: number) => {
@@ -322,6 +329,7 @@ export function planPersonas(l: Libro, m: Mapeo, ctx: Contexto): PersonasPlan {
     candidatasFusion,
     filaCliente,
     filaClienteInv,
+    filaClienteLealtad,
     clienteGenerico,
   };
 }

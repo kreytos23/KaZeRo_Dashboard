@@ -281,7 +281,7 @@ export function planCatalogosYPiezas(l: Libro, m: Mapeo, ctx: Contexto): Catalog
 
   // --- Vínculo inventario ↔ Concentrado (M-20): solo la última aparición y solo si se parece
   const enlazadas = new Set<number>();
-  const altaInv = new Map<string, string | null>(); // pieza id → fecha de compra de la fila ligada
+  const altaInv = new Map<string, { fecha: string | null; inferida: boolean }>(); // pieza id → alta por la fila ligada
   for (const [codigo, inv] of inventario) {
     const ultima = porCodigo.get(codigo)?.at(-1);
     if (!ultima) continue;
@@ -296,7 +296,11 @@ export function planCatalogosYPiezas(l: Libro, m: Mapeo, ctx: Contexto): Catalog
     if (!parecida) continue;
     enlazadas.add(f.fila);
     vinculo.set(f.fila, inv.pieza.id);
-    altaInv.set(inv.pieza.id, compraDe.get(f.fila) ?? null);
+    const propia = compraDe.get(f.fila) ?? null;
+    altaInv.set(inv.pieza.id, {
+      fecha: propia ?? compraPrevia.get(f.fila) ?? null,
+      inferida: propia === null,
+    });
     // El Tracking manda en lo que no es ubicación: rifa, regalo sin cliente, defecto o guardado.
     const sinCliente = llaveClienteSimple(f.cliente) === null;
     if (ultima.clase === 'rifa' || (ultima.clase === 'regalo' && sinCliente)) inv.pieza.estado = 'regalo';
@@ -307,8 +311,17 @@ export function planCatalogosYPiezas(l: Libro, m: Mapeo, ctx: Contexto): Catalog
   for (const inv of inventario.values()) {
     const p = inv.pieza;
     const d = altaInv.get(p.id);
-    if (d) p.fechaAlta = d;
-    else {
+    if (d?.fecha) {
+      p.fechaAlta = d.fecha;
+      if (d.inferida)
+        avisar(
+          'INVENTARIO',
+          p.origen.filas[0]!,
+          'fecha_alta_inferida',
+          'Sin fecha de compra: se usa la de la fila anterior del Concentrado.',
+          p.origen.clave,
+        );
+    } else {
       p.fechaAlta = m.fechaCorte;
       avisar(
         'INVENTARIO',
@@ -369,12 +382,14 @@ export function planCatalogosYPiezas(l: Libro, m: Mapeo, ctx: Contexto): Catalog
         continue;
     }
     const descripcionCelda = texto(f.descripcion);
-    const n = (apariciones.get(a.codigo ?? `fila:${f.fila}`) ?? 0) + 1;
-    apariciones.set(a.codigo ?? `fila:${f.fila}`, n);
     const precio = centavosDeCelda(f.venta);
-    const clave = a.codigo
-      ? `conc:${a.codigo}#${n}`
-      : `conc:sinid:${sha8(`${descripcionCelda ?? ''}|${compraDe.get(f.fila) ?? ''}|${precio ?? ''}`)}#${n}`;
+    // Sin código usable la clave sale de la huella de la fila; `#n` es su n-ésima repetición.
+    const base = a.codigo
+      ? `conc:${a.codigo}`
+      : `conc:sinid:${sha8(`${descripcionCelda ?? ''}|${compraDe.get(f.fila) ?? ''}|${precio ?? ''}`)}`;
+    const n = (apariciones.get(base) ?? 0) + 1;
+    apariciones.set(base, n);
+    const clave = `${base}#${n}`;
     const codigo = codigoHistorico(a.codigo, f.fila, ctx.usados);
     if (a.clase === 'disponible')
       avisar(
