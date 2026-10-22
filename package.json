@@ -23,7 +23,8 @@
     "db:migrar": "tsx scripts/db-migrar.ts",
     "admin:crear": "tsx scripts/crear-admin.ts",
     "bd:configurar": "tsx scripts/configurar-bd.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "excel:migrar": "tsx scripts/migrar-excel.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.2.0",
@@ -51,6 +52,7 @@
     "drizzle-kit": "0.31.11",
     "eslint": "10.12.0",
     "eslint-config-next": "16.4.0",
+    "exceljs": "4.4.0",
     "neon": "8.0.12",
     "prettier": "3.9.9",
     "tailwindcss": "4.3.3",
