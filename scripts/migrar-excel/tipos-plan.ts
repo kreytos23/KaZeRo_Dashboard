@@ -246,8 +246,24 @@ export interface PlanImportacion {
   avisos: Aviso[];
   candidatasFusion: string[][];
 }
-/** Resultado de la verificación contra la BD (modos ensayo/aplicar; Task 6). */
-export interface ResultadoBd {
+/** Verificación dentro de la transacción: las cifras del plan contra lo que quedó en la BD. */
+export interface VerificacionBd {
   ok: boolean;
+  /** Solo agregados e ids (nunca nombres): se imprimen en el reporte local. */
   diferencias: string[];
+}
+/** Resultado de `aplicarPlan` (modos ensayo/aplicar). */
+export interface ResultadoBd {
+  modo: 'ensayo' | 'aplicar';
+  /** Filas insertadas por tabla (en `ensayo`, las que se insertaron antes del ROLLBACK). */
+  insertados: Record<string, number>;
+  /** Entidades del plan cuya clave de origen ya estaba en la BD con el mismo hash. */
+  yaAplicados: number;
+  /** Clave presente con otro hash: NO se aplica (aviso). */
+  cambiados: { clave: string; hoja: string }[];
+  reutilizados: Record<'categorias' | 'materiales' | 'proveedores' | 'vendedores' | 'clientes', number>;
+  /** Choques con datos de la app: código existente, folio movido, posición de tarjeta ocupada… */
+  rechazosEnBd: Rechazo[];
+  verificacion: VerificacionBd;
+  siguienteFolio: number;
 }

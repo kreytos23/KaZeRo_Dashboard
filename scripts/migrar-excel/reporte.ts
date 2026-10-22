@@ -41,8 +41,24 @@ export async function escribirReporte(
   md.push(`- Lote: \`${plan.lote}\``, `- Hash del plan: \`${r.hash}\``);
   if (r.destino) md.push(`- Destino: ${r.destino}`);
   for (const a of plan.archivos) md.push(`- Archivo ${a.rol}: SHA-256 \`${a.sha256}\` (${a.bytes} B)`);
-  if (r.bd)
-    md.push(`- Verificación en BD: ${r.bd.ok ? 'correcta' : `con diferencias (${r.bd.diferencias.length})`}`);
+  if (r.bd) {
+    const v = r.bd.verificacion;
+    md.push(`- Verificación en BD: ${v.ok ? 'correcta' : `con diferencias (${v.diferencias.length})`}`);
+    md.push(`- Siguiente folio de la app: ${r.bd.siguienteFolio}`, `- Ya aplicados: ${r.bd.yaAplicados}`);
+    md.push('', '## Resultado en la BD', '', '| Tabla | Insertadas |', '|---|---:|');
+    for (const [k, v2] of Object.entries(r.bd.insertados)) md.push(`| ${k} | ${v2} |`);
+    md.push('', '| Reutilizados de la app | Total |', '|---|---:|');
+    for (const [k, v2] of Object.entries(r.bd.reutilizados)) md.push(`| ${k} | ${v2} |`);
+    md.push('', `Filas cambiadas desde la última aplicación (no se aplican): ${r.bd.cambiados.length}`);
+    md.push(
+      '',
+      `### Avisos y rechazos en la BD (${r.bd.rechazosEnBd.length})`,
+      '',
+      '| Motivo | Casos |',
+      '|---|---:|',
+    );
+    for (const [k, v2] of agrupar(r.bd.rechazosEnBd, (x) => x.motivo)) md.push(`| ${celdaMd(k)} | ${v2} |`);
+  }
   md.push('', '## Conteos', '', '| Entidad | Total |', '|---|---:|');
   for (const [k, v] of Object.entries(c.conteos)) md.push(`| ${k} | ${v} |`);
   md.push('', '## Piezas por estado', '', '| Estado | Piezas |', '|---|---:|');
@@ -90,8 +106,13 @@ export async function escribirReporte(
   for (const [k, v] of agrupar(plan.avisos, (x) => x.tipo)) md.push(`| ${celdaMd(k)} | ${v} |`);
   md.push('', `## Candidatas a fusión de clientes (${plan.candidatasFusion.length})`, '');
   for (const par of plan.candidatasFusion) md.push(`- ${par.map(celdaMd).join(' ↔ ')}`);
-  if (r.bd?.diferencias.length)
-    md.push('', '## Diferencias con la BD', '', ...r.bd.diferencias.map((d) => `- ${celdaMd(d)}`));
+  if (r.bd?.verificacion.diferencias.length)
+    md.push(
+      '',
+      '## Diferencias con la BD',
+      '',
+      ...r.bd.verificacion.diferencias.map((d) => `- ${celdaMd(d)}`),
+    );
 
   // --- CSV
   const saldoCliente = new Map(c.saldoPorCliente.map((s) => [s.clienteId, s.saldo]));
@@ -194,6 +215,17 @@ export async function escribirReporte(
       ]),
     ],
   ];
+  if (r.bd)
+    archivos.push(
+      [
+        'rechazos-bd.csv',
+        csv([
+          ['hoja', 'fila', 'clave', 'motivo'],
+          ...r.bd.rechazosEnBd.map((x) => [x.hoja, x.fila, x.clave, x.motivo]),
+        ]),
+      ],
+      ['cambiados.csv', csv([['hoja', 'clave'], ...r.bd.cambiados.map((x) => [x.hoja, x.clave])])],
+    );
   await mkdir(dir, { recursive: true });
   const rutas: string[] = [];
   for (const [nombreArchivo, contenido] of archivos) {
