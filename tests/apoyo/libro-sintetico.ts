@@ -88,3 +88,68 @@ export async function librosSinteticos(
     tracking: Buffer.from(await tr.xlsx.writeBuffer()),
   };
 }
+
+/** Fecha de Excel (UTC) para las filas sintéticas. */
+export const fecha = (a: number, m: number, d: number) => new Date(Date.UTC(a, m - 1, d));
+
+type CeldaConc = string | number | Date | null;
+
+/** Fila del Concentrado (13 columnas) con valores por nombre. */
+export function filaConc(o: {
+  f?: Date | null;
+  costo?: number | string | null;
+  venta?: number | string | null;
+  cliente?: string | null;
+  estatus?: string | null;
+  id?: string | number | null;
+  desc?: string | null;
+  coment?: string | null;
+  com?: string | Date | null;
+  prov?: string | number | null;
+  tarjeta?: string | null;
+  nota?: string | Date | null;
+}): CeldaConc[] {
+  return [
+    o.f ?? null,
+    o.costo ?? null,
+    o.venta ?? null,
+    o.cliente ?? null,
+    o.estatus ?? null,
+    null,
+    o.id ?? null,
+    o.desc ?? null,
+    o.coment ?? null,
+    o.com ?? 'N/A',
+    o.prov ?? null,
+    o.tarjeta ?? null,
+    o.nota ?? null,
+  ];
+}
+
+/** Fila del inventario (11 columnas). */
+export function filaInv(o: {
+  id: string;
+  cat?: string;
+  prod?: string;
+  mat?: string | null;
+  prov?: string | number | null;
+  costo?: number | null;
+  precio?: number | null;
+  ubic?: string;
+  cliente?: string | null;
+  vend?: string | null;
+}): (string | number | null)[] {
+  return [
+    o.id,
+    o.cat ?? 'Anillos',
+    o.prod ?? 'Anillo de prueba',
+    o.mat === undefined ? 'Rodio' : o.mat,
+    o.prov === undefined ? 'PROV UNO' : o.prov,
+    o.costo === undefined ? 50 : o.costo,
+    o.precio === undefined ? 150 : o.precio,
+    1,
+    o.ubic ?? 'Kazero',
+    o.cliente ?? null,
+    o.vend ?? null,
+  ];
+}

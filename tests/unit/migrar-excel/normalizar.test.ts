@@ -16,10 +16,10 @@ import {
   separarPrefijo,
   similitud,
 } from '../../../scripts/migrar-excel/normalizar';
-import type { Mapeo } from '../../../scripts/migrar-excel/tipos';
+import type { MapeoNormalizacion } from '../../../scripts/migrar-excel/tipos';
 import { normalizar } from '../../../src/domain/texto';
 
-const mapeo: Mapeo = {
+const mapeo: MapeoNormalizacion = {
   estatus: { vendido: 'vendido', 'por cobrar': 'por_cobrar', 'no se cobro': 'no_cobrado' },
   proveedores: { 'prov uno': 'Proveedor Uno' },
   categoriasPorPalabra: { pulsera: 'Pulseras', huggie: 'Huggies', collar: 'Collares' },

@@ -69,26 +69,5 @@ export interface Libro {
   hojasExhibidor: Record<string, FilaHojaExhibidor[]>;
 }
 
-/** Clases de estatus del Concentrado (clasificación local en el mapeo). */
-export type ClaseEstatus =
-  | 'vendido'
-  | 'por_cobrar'
-  | 'no_cobrado'
-  | 'regalo'
-  | 'rifa'
-  | 'exhibidor'
-  | 'defecto'
-  | 'guardado'
-  | 'disponible'
-  | 'ignorar';
-
-/**
- * Parte del mapeo local que usan los normalizadores. Las llaves de `estatus`, `proveedores` y
- * `categoriasPorPalabra` ya vienen normalizadas (`llaveNombre`).
- */
-export interface Mapeo {
-  estatus: Record<string, ClaseEstatus>;
-  proveedores: Record<string, string>;
-  categoriasPorPalabra: Record<string, string>;
-  categoriaSinDato: string;
-}
+/** Mapeo y tipos del plan de importación. */
+export * from './tipos-plan';

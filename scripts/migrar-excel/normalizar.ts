@@ -2,7 +2,10 @@ import { esCodigoValido, normalizarCodigo } from '../../src/domain/codigos';
 import { pesosACentavos } from '../../src/domain/dinero';
 import { parsearFechaISO } from '../../src/domain/fechas';
 import { normalizar } from '../../src/domain/texto';
-import type { Celda, ClaseEstatus, Mapeo } from './tipos';
+import { llaveNombre } from './llave';
+import type { Celda, ClaseEstatus, MapeoNormalizacion } from './tipos';
+
+export { llaveNombre };
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -34,13 +37,6 @@ export function codigoHistorico(codigo: string | null, fila: number, usados: Set
   if (!esCodigoValido(c)) throw new RangeError(`Código histórico inválido: ${c}`);
   usados.add(c);
   return c;
-}
-
-/** M-04: llave de comparación de nombres (paridad con `normalizar`, sin puntuación ni espacios dobles). */
-export function llaveNombre(t: string): string {
-  return normalizar(t.replace(/[^\p{L}\p{N}\s]/gu, ' '))
-    .replace(/\s+/g, ' ')
-    .trim();
 }
 
 /** M-05: separa "<prefijo> - <nombre>" (solo el primer " - "); el prefijo es vendedor si es alias conocido. */
@@ -151,13 +147,16 @@ export function restaDeComentario(t: string): number | null {
 }
 
 /** M-11: clase de un estatus según el mapeo (por llave normalizada); null = sin clasificar. */
-export function clasificarEstatus(t: Celda, m: Mapeo): ClaseEstatus | null {
+export function clasificarEstatus(t: Celda, m: MapeoNormalizacion): ClaseEstatus | null {
   if (typeof t !== 'string') return null;
   return m.estatus[llaveNombre(t)] ?? null;
 }
 
 /** M-12: proveedor canónico; números o direcciones no son proveedores (null + aviso). */
-export function proveedorCanonico(t: Celda, m: Mapeo): { nombre: string | null; aviso: string | null } {
+export function proveedorCanonico(
+  t: Celda,
+  m: MapeoNormalizacion,
+): { nombre: string | null; aviso: string | null } {
   if (t == null) return { nombre: null, aviso: null };
   const texto = t instanceof Date ? '' : String(t).trim();
   if (!texto) return { nombre: null, aviso: null };
@@ -168,11 +167,12 @@ export function proveedorCanonico(t: Celda, m: Mapeo): { nombre: string | null; 
   if (typeof t === 'number' || t instanceof Date || pareceDireccion) {
     return { nombre: null, aviso: `Proveedor descartado (número o dirección): ${texto}` };
   }
-  return { nombre: m.proveedores[llaveNombre(texto)] ?? texto, aviso: null };
+  const llave = llaveNombre(texto);
+  return { nombre: llave in m.proveedores ? (m.proveedores[llave] ?? null) : texto, aviso: null };
 }
 
 /** M-13: categoría de una pieza histórica por la primera palabra de su descripción (en singular). */
-export function categoriaDeDescripcion(d: string, m: Mapeo): string {
+export function categoriaDeDescripcion(d: string, m: MapeoNormalizacion): string {
   const palabra = llaveNombre(d).split(' ')[0] ?? '';
   if (!palabra) return m.categoriaSinDato;
   const candidatos = [palabra, palabra.replace(/s$/, ''), palabra.replace(/es$/, '')];
