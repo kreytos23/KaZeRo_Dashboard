@@ -91,6 +91,15 @@ export function verificarSecreto(o: {
 
 /** Punto de entrada de todo script que escribe en BD: imprime el destino y lo valida. */
 export function prepararDestino(variable: string, accion: string, rutaEnv = '.env.local'): string {
+  return prepararDestinoDetallado(variable, accion, rutaEnv).url;
+}
+
+/** Igual que prepararDestino, y además dice si el destino es producción (para exigir una segunda llave). */
+export function prepararDestinoDetallado(
+  variable: string,
+  accion: string,
+  rutaEnv = '.env.local',
+): { url: string; esProduccion: boolean } {
   const archivo = existsSync(rutaEnv) ? parse(readFileSync(rutaEnv)) : {};
   const efectiva = process.env[variable] ?? archivo[variable];
   const hostProduccion = process.env.KAZERO_HOST_PROD || archivo.KAZERO_HOST_PROD;
@@ -112,5 +121,5 @@ export function prepararDestino(variable: string, accion: string, rutaEnv = '.en
     `[guarda-bd] Destino: ${destino.usuario}@${destino.host}/${destino.baseDatos}` +
       (destino.esProduccion ? '   <<< PRODUCCIÓN >>>' : ''),
   );
-  return efectiva!;
+  return { url: efectiva!, esProduccion: destino.esProduccion };
 }
