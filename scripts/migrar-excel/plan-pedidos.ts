@@ -2,7 +2,6 @@ import { parsearFolio } from '../../src/domain/pedidos';
 import { uuidDeterminista } from './ids';
 import {
   centavosDeCelda,
-  clasificarEstatus,
   fechaDeCelda,
   fechasDeComentario,
   inferirFecha,
@@ -12,7 +11,7 @@ import {
 } from './normalizar';
 import { crearOrigen } from './origen';
 import type { PersonasPlan } from './plan-personas';
-import type { CatalogosPiezasPlan } from './plan-piezas';
+import { claseDeFila, type CatalogosPiezasPlan } from './plan-piezas';
 import type {
   Celda,
   ClaseEstatus,
@@ -110,7 +109,7 @@ export function planPedidos(
   for (const f of l.concentrado) {
     if (ctx.filasRechazadas.has(f.fila)) continue;
     const piezaId = cat.vinculo.get(f.fila);
-    const clase = clasificarEstatus(f.estatus, m) as ClaseEstatus | null;
+    const clase: ClaseEstatus | null = claseDeFila(f, m);
     if (!piezaId || !clase || !['vendido', 'por_cobrar', 'no_cobrado', 'regalo'].includes(clase)) continue;
     const per = personas.filaCliente.get(f.fila);
     const clienteId = per?.clienteId ?? null;
@@ -316,9 +315,30 @@ export function planPedidos(
   for (const [folio, lns0] of notas) {
     const clientes = new Set(lns0.map((x) => x.clienteId).filter((x): x is string => !!x));
     if (clientes.size > 1) {
-      for (const x of lns0) {
-        rechazar(x.f.fila, 'nota con dos clientes');
-        rechazadas.add(x.piezaId);
+      // Dos clientes en una nota: el primero conserva el folio; cada otro cliente pasa a un pedido histórico.
+      const orden = [...clientes];
+      const porCliente = new Map<string, Linea[]>(orden.map((c) => [c, []]));
+      for (const x of lns0) porCliente.get(x.clienteId ?? orden[0]!)!.push(x);
+      avisar(
+        lns0[0]!.f.fila,
+        'nota_dividida',
+        `La nota trae ${orden.length} clientes: se divide en pedidos por cliente.`,
+        `kzr:${folio}`,
+      );
+      for (const [i, c] of orden.entries()) {
+        const lns = aceptar(porCliente.get(c)!);
+        if (!lns.length) continue;
+        if (i === 0)
+          armar({ clave: `kzr:${folio}`, tipo: 'kzr', lns, clienteId: c, esGenerico: false, folio });
+        else
+          armar({
+            clave: `hist-nota:${folio}:${clienteLlave.get(c) ?? c}`,
+            tipo: 'historico',
+            lns,
+            clienteId: c,
+            esGenerico: false,
+            folio: null,
+          });
       }
       continue;
     }

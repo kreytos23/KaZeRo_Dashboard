@@ -77,20 +77,65 @@ describe('planPedidos', () => {
     expect(pagosDe(r, 8).map((p) => p.monto)).toEqual([10000]);
   });
 
-  it('M-30 una fecha en la columna de nota → fila sin nota + aviso; una nota con 2 clientes se rechaza completa', async () => {
+  it('M-30 una fecha en la columna de nota → fila sin nota + aviso', async () => {
     const { r, ctx } = await planear({
-      concentrado: [
-        venta('AB01', { nota: fecha(2026, 9, 2) }),
-        venta('AB02', { nota: 'KZR-9', cliente: 'Clienta Uno' }),
-        venta('AB03', { nota: 'KZR-9', cliente: 'Clienta Dos' }),
-      ],
+      concentrado: [venta('AB01', { nota: fecha(2026, 9, 2) })],
     });
     expect(r.pedidos.map((p) => [p.tipo, p.folio])).toEqual([['historico', 100001]]);
     expect(ctx.avisos.some((a) => a.tipo === 'nota_con_fecha')).toBe(true);
-    expect(ctx.rechazos.filter((x) => x.motivo === 'nota con dos clientes').map((x) => x.fila)).toEqual([
-      4, 5,
+  });
+
+  it('M-30 una nota con 2 clientes se divide: el primero conserva el folio, el segundo va al rango histórico', async () => {
+    const { r, ctx, personas } = await planear({
+      concentrado: [
+        venta('AB02', { nota: 'KZR-9', cliente: 'Clienta Uno' }),
+        venta('AB03', { nota: 'KZR-9', cliente: 'Clienta Dos', estatus: 'Por cobrar', venta: 300 }),
+        venta('AB04', { nota: 'KZR-9', cliente: 'Clienta Dos' }),
+      ],
+    });
+    const id = (n: string) => personas.clientes.find((c) => c.nombre === n)!.id;
+    expect(r.pedidos).toHaveLength(2);
+    const primero = r.pedidos.find((p) => p.clienteId === id('Clienta Uno'))!;
+    const segundo = r.pedidos.find((p) => p.clienteId === id('Clienta Dos'))!;
+    expect(primero).toMatchObject({
+      folio: 9,
+      folioOriginal: 9,
+      tipo: 'kzr',
+      estado: 'liquidado',
+      total: 10000,
+    });
+    expect(segundo).toMatchObject({
+      folio: 100001,
+      folioOriginal: null,
+      tipo: 'historico',
+      estado: 'abierto',
+      total: 40000,
+    });
+    expect(segundo.items).toHaveLength(2);
+    expect(r.pagos.filter((p) => p.pedidoId === segundo.id).map((p) => p.monto)).toEqual([10000]);
+    expect(r.pagos.filter((p) => p.pedidoId === primero.id).map((p) => p.monto)).toEqual([10000]);
+    expect(ctx.rechazos).toEqual([]);
+    expect(ctx.avisos.some((a) => a.tipo === 'nota_dividida')).toBe(true);
+    expect(r.piezas.map((p) => p.codigo)).toEqual(['H-AB02', 'H-AB03', 'H-AB04']);
+  });
+
+  it('estatus vacío con cliente y precio es una venta pagada; sin cliente o sin precio sigue rechazado', async () => {
+    const { r, ctx } = await planear({
+      concentrado: [
+        venta('AB01', { estatus: null }),
+        venta('AB02', { estatus: null, cliente: null }),
+        venta('AB03', { estatus: null, venta: null }),
+      ],
+    });
+    expect(r.pedidos).toHaveLength(1);
+    expect(r.pedidos[0]).toMatchObject({ tipo: 'historico', estado: 'liquidado', total: 10000 });
+    expect(r.pagos.map((p) => p.monto)).toEqual([10000]);
+    expect(r.piezas.map((p) => [p.codigo, p.estado])).toEqual([['H-AB01', 'vendida']]);
+    expect(ctx.rechazos.map((x) => [x.fila, x.motivo])).toEqual([
+      [4, 'estatus vacío'],
+      [5, 'estatus vacío'],
     ]);
-    expect(r.piezas.map((p) => p.codigo)).toEqual(['H-AB01']); // las piezas de la nota rechazada no entran
+    expect(ctx.avisos.some((a) => a.tipo === 'estatus_vacio_como_venta')).toBe(true);
   });
 
   it('M-31 sin nota: agrupa por cliente, vendedor y fecha; folios 100001 en orden; barajar no cambia nada', async () => {

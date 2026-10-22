@@ -41,6 +41,16 @@ export interface CatalogosPiezasPlan {
 export const NOTA_MIGRACION = 'Migración Excel (fase 1)';
 export const NOMBRE_CONCILIAR = 'Histórico por conciliar';
 const CLASES_VENTA: ReadonlySet<ClaseEstatus> = new Set(['vendido', 'por_cobrar', 'no_cobrado', 'regalo']);
+/**
+ * Clase del estatus de una fila. Un estatus vacío con cliente y precio es una venta pagada (decisión de Cesar);
+ * sin cliente o sin precio queda sin clase (se rechaza).
+ */
+export function claseDeFila(f: FilaConcentrado, m: Mapeo): ClaseEstatus | null {
+  const c = clasificarEstatus(f.estatus, m);
+  if (c !== null || f.estatus != null) return c;
+  return llaveClienteSimple(f.cliente) !== null && centavosDeCelda(f.venta) !== null ? 'vendido' : null;
+}
+
 export const esClaseVenta = (c: ClaseEstatus | null): boolean => c !== null && CLASES_VENTA.has(c);
 
 const limpiar = (t: string) => t.replace(/\s+/g, ' ').trim();
@@ -169,7 +179,14 @@ export function planCatalogosYPiezas(l: Libro, m: Mapeo, ctx: Contexto): Catalog
   const aceptadas: Aceptada[] = [];
   for (const f of l.concentrado) {
     if (ctx.filasRechazadas.has(f.fila)) continue;
-    const clase = clasificarEstatus(f.estatus, m);
+    const clase = claseDeFila(f, m);
+    if (clase !== null && f.estatus == null)
+      avisar(
+        'Concentrado',
+        f.fila,
+        'estatus_vacio_como_venta',
+        'Estatus vacío con cliente y precio: se importa como venta pagada.',
+      );
     if (clase === null) {
       rechazar('Concentrado', f.fila, f.estatus == null ? 'estatus vacío' : 'estatus sin clasificar');
       continue;
