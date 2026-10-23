@@ -1,15 +1,6 @@
-import { and, asc, eq, gt, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import {
-  aplicacionPago,
-  cliente,
-  exhibidor,
-  movimientoPieza,
-  pedido,
-  pedidoItem,
-  pieza,
-  vPedido,
-} from '@/db/schema';
+import { aplicacionPago, cliente, exhibidor, movimientoPieza, pedido, pedidoItem, pieza } from '@/db/schema';
 import { normalizarCodigo } from '@/domain/codigos';
 import { numericACentavos } from '@/domain/dinero';
 import { MAX_PIEZAS_PEDIDO, formatoFolio } from '@/domain/pedidos';
@@ -372,25 +363,4 @@ export async function liquidarSiSaldoCero(
     .set({ estado: 'liquidado', liquidadoAt: sql`now()`, version: sql`${pedido.version} + 1` })
     .where(eq(pedido.id, pedidoId));
   return 'liquidado';
-}
-
-/** R-29: folios de OTRAS notas abiertas del cliente con saldo > 0. Lectura por la vista. */
-export async function foliosConSaldo(
-  db: Ejecutor,
-  clienteId: string,
-  excluirPedidoId?: string,
-): Promise<number[]> {
-  const filas = await db
-    .select({ folio: vPedido.folio })
-    .from(vPedido)
-    .where(
-      and(
-        eq(vPedido.clienteId, clienteId),
-        eq(vPedido.estado, 'abierto'),
-        gt(vPedido.saldo, '0'),
-        excluirPedidoId ? ne(vPedido.id, excluirPedidoId) : undefined,
-      ),
-    )
-    .orderBy(asc(vPedido.folio));
-  return filas.map((f) => f.folio);
 }

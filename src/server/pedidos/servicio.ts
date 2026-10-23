@@ -54,9 +54,8 @@ export interface PedidoCreado {
   total: string;
   posicion: Posicion | null;
   pctBps: number;
-  sinLealtad: 'saldo_pendiente' | null;
-  /** R-29: por qué no hubo descuento (folios de las otras notas con saldo); vacío si no aplica. */
-  foliosConSaldo: number[];
+  // Plan 3.1: R-29 derogada. Un reintento idempotente de una operación vieja puede traer `sinLealtad` y
+  // `foliosConSaldo` en el resultado guardado; la UI los ignora.
 }
 
 /** Fecha de negocio: válida y no futura (D-19). */
@@ -129,7 +128,7 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
           // kz_auditar registra el cambio de estado.
           await fijarContextoAuditoria(tx, { adminId: d.adminId, motivo: null });
           const fecha = validarFecha(v.fecha ?? undefined);
-          // 1) Cliente: serializa la asignación de posición (R-23) y la lectura de saldos de R-29.
+          // 1) Cliente: serializa la asignación de posición (R-23).
           const [c] = await tx
             .select({ id: cliente.id })
             .from(cliente)
@@ -145,9 +144,9 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
             faltantes,
             prefijo: 'No se creó el pedido.',
           });
-          // 3) Tarjeta (R-23, R-24, R-26, R-28, R-29).
+          // 3) Tarjeta (R-23, R-24, R-26, R-28). El bloqueo del cliente (paso 1) serializa la asignación.
           let posicion: Posicion | null = null;
-          let lealtad: { pctBps: number } = { pctBps: 0 };
+          let pctBps = 0;
           if (v.cuentaTarjeta) {
             const ocupadas = await tx
               .select({ ciclo: pedido.cicloTarjeta, posicion: pedido.posicionTarjeta })
@@ -160,15 +159,12 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
                 ),
               );
             posicion = siguientePosicion(ocupadas.map((o) => ({ ciclo: o.ciclo!, posicion: o.posicion! })));
-            lealtad = descuentoLealtad({
-              cuentaTarjeta: true,
-              posicion: posicion.posicion,
-            });
+            pctBps = descuentoLealtad({ cuentaTarjeta: true, posicion: posicion.posicion }).pctBps;
           }
           // 4) Totales (R-11, R-12, D-6, D-7).
           const t = calcularTotales(
             piezas.map((p) => numericACentavos(p.precio)),
-            lealtad.pctBps,
+            pctBps,
             v.descuentoManual,
           );
           if (t.manualExcede)
@@ -187,7 +183,7 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
               cuentaTarjeta: v.cuentaTarjeta,
               cicloTarjeta: posicion?.ciclo ?? null,
               posicionTarjeta: posicion?.posicion ?? null,
-              descuentoLealtadPct: pctBpsANumeric(lealtad.pctBps),
+              descuentoLealtadPct: pctBpsANumeric(pctBps),
               sinLealtadMotivo: null,
               descuentoManualMonto: centavosANumeric(v.descuentoManual),
               descuentoManualMotivo: v.descuentoMotivo,
@@ -215,9 +211,7 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
             total,
             // Objeto plano: el resultado se guarda en idempotencia.resultado (JSON) y un reintento recibe lo mismo.
             posicion: posicion ? { ciclo: posicion.ciclo, posicion: posicion.posicion } : null,
-            pctBps: lealtad.pctBps,
-            sinLealtad: null,
-            foliosConSaldo: [],
+            pctBps,
           };
         },
       ),
@@ -350,7 +344,7 @@ export interface DatosEdicion {
 }
 
 /**
- * R-27/R-22/R-11: edita un pedido abierto. La lealtad guardada (posición, %, motivo R-29) no cambia; el % guardado
+ * R-27/R-22/R-11: edita un pedido abierto. La lealtad guardada (posición, % y, en pedidos viejos, el motivo histórico de R-29) no cambia; el % guardado
  * se aplica a las piezas nuevas y las líneas que quedan conservan sus precios. Orden de bloqueo (D-10): cliente →
  * pedido → exhibidores (NO KEY UPDATE, de agregar ∪ quitar, por id) → piezas (FOR UPDATE, una consulta por id).
  * Cambiar el total o el descuento manual exige motivo (D-21); el total no puede bajar de lo ya pagado.

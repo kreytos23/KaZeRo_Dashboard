@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gt, gte, inArray, lte, ne, or, sql } from 'drizzle-
 import type { Ejecutor } from '@/db/pool';
 import { vAplicacionPago, vCliente, vPedido, vPedidoItem, vPieza, vSaldoFavor } from '@/db/schema';
 import { normalizarCodigo } from '@/domain/codigos';
+import { numericACentavos } from '@/domain/dinero';
 import { armarTarjeta, descuentoLealtad, siguientePosicion } from '@/domain/lealtad';
 import { parsearFechaISO } from '@/domain/fechas';
 import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
@@ -93,7 +94,7 @@ export async function previsualizarPedido(
   if (cliente && o.cuentaTarjeta) {
     const pos = siguientePosicion(ocupadas.map((x) => ({ ciclo: x.ciclo!, posicion: x.posicion! })));
     const l = descuentoLealtad({ cuentaTarjeta: true, posicion: pos.posicion });
-    tarjeta = { ...pos, pctBps: l.pctBps, sinLealtad: null, foliosConSaldo: [] };
+    tarjeta = { ciclo: pos.ciclo, posicion: pos.posicion, pctBps: l.pctBps };
   }
   return {
     piezas: codigos.flatMap((c) => {
@@ -227,7 +228,7 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
         posicion: t.posicion!,
         estado: t.estado as 'abierto' | 'liquidado',
         folio: t.folio,
-        conSaldo: Number(t.saldo) > 0,
+        conSaldo: numericACentavos(t.saldo) > 0,
       })),
     ),
   };

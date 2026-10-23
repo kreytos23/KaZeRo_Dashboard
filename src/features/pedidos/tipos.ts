@@ -12,8 +12,6 @@ export interface TarjetaPrevia {
   ciclo: number;
   posicion: number;
   pctBps: number;
-  sinLealtad: 'saldo_pendiente' | null;
-  foliosConSaldo: number[];
 }
 export interface PreviaPedido {
   /** En el orden pedido, sin repetidos. */

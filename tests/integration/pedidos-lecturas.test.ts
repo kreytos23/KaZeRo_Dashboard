@@ -68,36 +68,38 @@ describe('lecturas de pedidos', () => {
     ]);
     expect(r.faltantes).toEqual(['NOPE']);
     expect(r.cliente).toMatchObject({ id: ctx.clienteId, nombre: 'Tanya' });
-    expect(r.tarjeta).toEqual({
-      ciclo: 1,
-      posicion: 2,
-      pctBps: 0,
-      sinLealtad: null,
-      foliosConSaldo: [p.folio],
-    });
+    expect(r.tarjeta).toEqual({ ciclo: 1, posicion: 2, pctBps: 0 });
   });
 
-  it('vista previa R-29: en la 5 con saldo pendiente explica con folios; sin cliente no hay tarjeta', async () => {
+  it('vista previa: en el lugar 5 con otra nota con saldo da 10 % (R-29 derogada); sin cliente no hay tarjeta', async () => {
     for (const c of ['LF1', 'LF2', 'LF3']) {
       await alta(c, 0);
       await crear([c]);
     }
     await alta('LF4');
-    const cuatro = await crear(['LF4']);
+    await crear(['LF4']); // lugar 4, abierta con saldo
     const r = await app((db) =>
       previsualizarPedido(db, { clienteId: ctx.clienteId, codigos: [], cuentaTarjeta: true }),
     );
-    expect(r.tarjeta).toEqual({
-      ciclo: 1,
-      posicion: 5,
-      pctBps: 0,
-      sinLealtad: 'saldo_pendiente',
-      foliosConSaldo: [cuatro.folio],
-    });
+    expect(r.tarjeta).toEqual({ ciclo: 1, posicion: 5, pctBps: 1000 });
     expect(
       (await app((db) => previsualizarPedido(db, { clienteId: null, codigos: [], cuentaTarjeta: true })))
         .tarjeta,
     ).toBeNull();
+  });
+
+  it('resumenCliente.tarjeta: 10 casillas de la vuelta actual, ocupadas correctas y con saldo solo en la abierta', async () => {
+    await alta('LH1', 0);
+    const liquidada = await crear(['LH1']);
+    await alta('LH2');
+    const abierta = await crear(['LH2']);
+    const { tarjeta } = await app((db) => resumenCliente(db, ctx.clienteId));
+    expect(tarjeta.casillas).toHaveLength(10);
+    expect(tarjeta.ocupadas).toBe(2);
+    expect(tarjeta.casillas[0]).toMatchObject({ estado: 'ocupada', folio: liquidada.folio, conSaldo: false });
+    expect(tarjeta.casillas[1]).toMatchObject({ estado: 'ocupada', folio: abierta.folio, conSaldo: true });
+    expect(tarjeta.casillas[4]).toMatchObject({ estado: 'libre', folio: null, pctBps: 1000 });
+    expect(tarjeta.casillas[9]).toMatchObject({ estado: 'libre', pctBps: 2000 });
   });
 
   it('ficha por folio con líneas y pagos; listado con filtros y "con saldo"', async () => {

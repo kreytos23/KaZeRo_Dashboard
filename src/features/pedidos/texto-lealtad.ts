@@ -9,9 +9,8 @@ export function textoLealtadPrevia(
 ): string {
   if (!o.cuentaTarjeta) return 'No cuenta para la tarjeta de lealtad.';
   if (!o.hayCliente || !t) return 'Elige un cliente para ver su tarjeta.';
-  const quien = `Pedido ${t.posicion} de su tarjeta${t.ciclo > 1 ? ` (ciclo ${t.ciclo})` : ''}`;
-  if (t.sinLealtad === 'saldo_pendiente')
-    return `${quien}: sin descuento porque tiene saldo pendiente en ${t.foliosConSaldo.map(formatoFolio).join(', ')}.`;
+  // La vuelta de la tarjeta es interna (Plan 3.1): no se muestra.
+  const quien = `Pedido ${t.posicion} de su tarjeta`;
   return t.pctBps > 0 ? `${quien}: −${formatoPct(t.pctBps)}` : `${quien}.`;
 }
 
@@ -23,16 +22,20 @@ export function textoLealtadGuardada(p: {
   sinLealtadMotivo: 'saldo_pendiente' | null;
 }): string {
   if (!p.cuentaTarjeta || p.posicionTarjeta === null) return 'No cuenta para la tarjeta de lealtad.';
-  const donde = `Posición ${p.posicionTarjeta} del ciclo ${p.cicloTarjeta}`;
-  if (p.sinLealtadMotivo === 'saldo_pendiente')
-    return `${donde}: sin descuento porque al crearlo tenía otra nota con saldo pendiente.`;
+  // Motivo histórico: R-29 se derogó el 2026-10-23, pero los pedidos viejos lo conservan (R-27).
+  if (p.sinLealtadMotivo === 'saldo_pendiente') return 'Sin descuento (regla anterior: saldo pendiente)';
+  const donde = `Lugar ${p.posicionTarjeta}`;
   const bps = numericAPctBps(p.descuentoLealtadPct);
   return bps > 0 ? `${donde}: −${formatoPct(bps)}` : `${donde}.`;
 }
 
+/** Nombre accesible de una casilla: «Lugar 5: KZR-31, con saldo». */
 export function etiquetaCasilla(c: Casilla): string {
-  const partes = [`Posición ${c.posicion}: ${c.estado}`];
-  if (c.folio !== null) partes.push(formatoFolio(c.folio));
-  if (c.pctBps > 0) partes.push(`${formatoPct(c.pctBps)} de descuento`);
-  return partes.join(', ');
+  const partes = [`Lugar ${c.posicion}`];
+  const detalle: string[] = [];
+  if (c.estado === 'libre') detalle.push('libre');
+  if (c.folio !== null) detalle.push(formatoFolio(c.folio));
+  if (c.conSaldo) detalle.push('con saldo');
+  if (c.pctBps > 0) detalle.push(`${formatoPct(c.pctBps)} de descuento`);
+  return detalle.length ? `${partes[0]}: ${detalle.join(', ')}` : partes[0]!;
 }

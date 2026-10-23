@@ -192,7 +192,7 @@ describe('cancelarPedido', () => {
     expect(d.posicion).toEqual({ ciclo: 1, posicion: 1 });
   });
 
-  it('R-29: un pedido cancelado con saldo ya no impide el descuento del siguiente', async () => {
+  it('R-29 derogada: una nota con saldo, cancelada o no, no quita el 10 % del lugar 5', async () => {
     for (const c of ['S1', 'S2', 'S3', 'S4']) await crear([await alta(c, 0)]); // 4 liquidadas
     // Nota abierta con saldo que no cuenta para la tarjeta.
     const a = await app(async (db) =>
@@ -205,13 +205,13 @@ describe('cancelarPedido', () => {
         descuentoManualCentavos: 0,
       }),
     );
-    const sin = await crear([await alta('CS2')]);
-    expect(sin.sinLealtad).not.toBeNull();
-    expect(sin.foliosConSaldo).toContain(a.folio);
-    await cancelar(sin.id);
+    const cinco = await crear([await alta('CS2')]);
+    expect(cinco).toMatchObject({ posicion: { ciclo: 1, posicion: 5 }, pctBps: 1000 });
+    // Cancelar el lugar 5 deshace su descuento: el siguiente pedido vuelve a ser el lugar 5 con 10 %.
+    await cancelar(cinco.id);
     await cancelar(a.id);
     const siguiente = await crear([await alta('CS3')]);
-    expect(siguiente).toMatchObject({ sinLealtad: null, foliosConSaldo: [], pctBps: 1000 });
+    expect(siguiente).toMatchObject({ posicion: { ciclo: 1, posicion: 5 }, pctBps: 1000 });
   });
 
   it('R-37: la misma key cancela una sola vez y devuelve el mismo resultado', async () => {
