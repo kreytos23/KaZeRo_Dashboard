@@ -342,7 +342,13 @@ export async function liquidarSiSaldoCero(
   if (piezas.length) {
     await tx
       .update(pieza)
-      .set({ estado: 'vendida', exhibidorId: null, version: sql`${pieza.version} + 1` })
+      // D-10 (Plan 3.1): vendida sale también de la custodia de la vendedora (CHECK pieza_custodia_solo_si_aplica).
+      .set({
+        estado: 'vendida',
+        exhibidorId: null,
+        vendedorCustodiaId: null,
+        version: sql`${pieza.version} + 1`,
+      })
       .where(
         inArray(
           pieza.id,

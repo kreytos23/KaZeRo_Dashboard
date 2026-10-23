@@ -168,9 +168,71 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
               VALUES (${'X' + estado.slice(0, 3).toUpperCase()}, ${b.categoriaId}, 'Anillo', '10', '2026-10-01', ${estado},
                       ${exhibidorId}, ${custodiaId})`),
       );
-    expect(await alta('apartada', ex!.id, b.nellyId)).toBe('pieza_una_ubicacion');
-    expect(await alta('vendida', null, b.nellyId)).toBe('pieza_custodia_solo_si_aplica');
-    expect(await alta('disponible', null, b.nellyId)).toBe('ok');
+    // Una pieza nueva siempre nace en Kazero (trigger pieza_alta_sin_custodia): se entrega después del alta.
+    expect(await alta('disponible', null, b.nellyId)).toBe('pieza_alta_custodia');
+    expect(await alta('vendida', null, b.nellyId)).toBe('pieza_alta_custodia');
+    // Por UPDATE: un cambio manual que conserva la vendedora choca con el CHECK.
+    const p = await nuevaPieza('AF20');
+    await entregar(p, b.nellyId);
+    expect(await resultado(() => q(sql`UPDATE pieza SET estado = 'regalo' WHERE id = ${p}`))).toBe(
+      'pieza_custodia_solo_si_aplica',
+    );
+    // Defensa en profundidad: con la guarda del alta apagada (como dueño, en una transacción que se deshace),
+    // el CHECK pieza_una_ubicacion y el movimiento 'alta' siguen rechazando.
+    const vistos: string[] = [];
+    const deshacer = new Error('deshacer');
+    let salida: unknown = null;
+    try {
+      await owner((db) =>
+        db.transaction(async (tx) => {
+          await tx.execute(sql`ALTER TABLE pieza DISABLE TRIGGER pieza_alta_sin_custodia`);
+          const intento = async (s: SQL) => {
+            try {
+              await tx.transaction((t2) => t2.execute(s));
+              vistos.push('ok');
+            } catch (e) {
+              vistos.push(pgConstraint(e) ?? pgCode(e) ?? 'sin-codigo');
+            }
+          };
+          await intento(sql`INSERT INTO pieza (codigo, categoria_id, descripcion, precio, fecha_alta, estado, exhibidor_id, vendedor_custodia_id)
+            VALUES ('XB01', ${b.categoriaId}, 'Anillo', '10', '2026-10-01', 'apartada', ${ex!.id}, ${b.nellyId})`);
+          const id = await idDe(
+            tx,
+            sql`INSERT INTO pieza (codigo, categoria_id, descripcion, precio, fecha_alta, vendedor_custodia_id)
+                VALUES ('XC01', ${b.categoriaId}, 'Anillo', '10', '2026-10-01', ${b.nellyId}) RETURNING id`,
+          );
+          await intento(
+            sql`INSERT INTO movimiento_pieza (pieza_id, tipo, a_estado, admin_id) VALUES (${id}, 'alta', 'disponible', ${adminId})`,
+          );
+          throw deshacer;
+        }),
+      );
+    } catch (e) {
+      salida = e;
+    }
+    expect(salida).toBe(deshacer);
+    expect(vistos).toEqual(['pieza_una_ubicacion', 'movimiento_coherente']);
+  });
+
+  it('regreso_vendedora: solo deshace la entrega vigente (no se repite ni se inventa)', async () => {
+    const p = await nuevaPieza('AF21');
+    expect(await resultado(() => regresar(p, b.nellyId))).toBe('movimiento_coherente');
+    await entregar(p, b.nellyId);
+    expect(await resultado(() => regresar(p, b.nellyId))).toBe('ok');
+    expect(await resultado(() => regresar(p, b.nellyId))).toBe('movimiento_coherente');
+    // Entregada y luego sacada de la custodia por un cambio manual (D-12): ya no hay entrega que regresar.
+    await entregar(p, b.olgaId);
+    await enTx(async (tx) => {
+      await tx.execute(
+        sql`UPDATE pieza SET estado = 'guardada', vendedor_custodia_id = NULL WHERE id = ${p}`,
+      );
+      await mov(tx, p, 'cambio_estado', 'disponible', 'guardada', { vendedorId: b.olgaId });
+    });
+    await enTx(async (tx) => {
+      await tx.execute(sql`UPDATE pieza SET estado = 'disponible' WHERE id = ${p}`);
+      await mov(tx, p, 'cambio_estado', 'guardada', 'disponible');
+    });
+    expect(await resultado(() => regresar(p, b.olgaId))).toBe('movimiento_coherente');
   });
 
   it('pieza_cambio_custodia: nunca de una vendedora a otra, ni ganarla o perderla estando apartada', async () => {
@@ -310,6 +372,43 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
 });
 
 describe('devolución de una pieza de un pedido liquidado (D-13..D-17)', () => {
+  it('movimiento devolucion: solo desde vendida (no se repite tras la devolución)', async () => {
+    const p = await nuevaPieza('AF30');
+    const ped = await nuevoPedido();
+    const item = await vender(p, ped);
+    await devolver(item, p, ped);
+    expect(
+      await resultado(() => enTx((tx) => mov(tx, p, 'devolucion', 'defecto', 'defecto', { pedidoId: ped }))),
+    ).toBe('movimiento_coherente');
+  });
+
+  it('devolucion_no_es_ultima_venta: la pieza debe estar vendida por ESE pedido', async () => {
+    const p = await nuevaPieza('AF31');
+    const p1 = await nuevoPedido();
+    // La línea de P1 sigue vigente, pero la pieza quedó vendida por otro pedido (sin línea).
+    const item = await app((db) =>
+      idDe(
+        db,
+        sql`INSERT INTO pedido_item (pedido_id, pieza_id, precio_lista, precio_final) VALUES (${p1}, ${p}, '149', '149') RETURNING id`,
+      ),
+    );
+    const p2 = await nuevoPedido({ estado: 'abierto' });
+    await enTx(async (tx) => {
+      await tx.execute(sql`UPDATE pieza SET estado = 'apartada' WHERE id = ${p}`);
+      await mov(tx, p, 'apartado', 'disponible', 'apartada', { pedidoId: p2 });
+      await tx.execute(sql`UPDATE pieza SET estado = 'vendida' WHERE id = ${p}`);
+      await mov(tx, p, 'venta', 'apartada', 'vendida', { pedidoId: p2 });
+    });
+    expect(
+      await resultado(() =>
+        enTx(async (tx) => {
+          const d = await insertarDevolucion(tx, item, '10.00');
+          await saldoMov(tx, { tipo: 'devolucion', monto: '10.00', pedidoId: p1, devolucionId: d });
+        }),
+      ),
+    ).toBe('devolucion_no_es_ultima_venta');
+  });
+
   it('pieza_transicion: vendida → defecto solo con la devolución de su última venta', async () => {
     const p = await nuevaPieza('AF12');
     const ped = await nuevoPedido();
@@ -552,6 +651,24 @@ describe('garantías diferidas: el dinero no se pierde (se rechaza al confirmar)
     expect(await resultado(() => enTx((tx) => nuevoPago(tx, 'saldo_favor', '5.00')))).toBe(
       'pago_saldo_sin_aplicacion',
     );
+    // Pago saldo_favor aplicado solo en parte: lo aplicado vigente debe ser exactamente su monto.
+    await app((db) => saldoMov(db, { tipo: 'cancelacion', monto: '20.00', pedidoId: ped }));
+    expect(
+      await resultado(() =>
+        enTx(async (tx) => {
+          const ap = await aplicar(tx, await nuevoPago(tx, 'saldo_favor', '10.00'), abierto, '5.00');
+          await saldoMov(tx, { tipo: 'uso', monto: '-5.00', pedidoId: abierto, aplicacionPagoId: ap });
+        }),
+      ),
+    ).toBe('pago_saldo_sin_aplicacion');
+    expect(
+      await resultado(() =>
+        enTx(async (tx) => {
+          const ap = await aplicar(tx, await nuevoPago(tx, 'saldo_favor', '10.00'), abierto, '10.00');
+          await saldoMov(tx, { tipo: 'uso', monto: '-10.00', pedidoId: abierto, aplicacionPagoId: ap });
+        }),
+      ),
+    ).toBe('ok');
     // Un pago normal no necesita nada más.
     expect(
       await resultado(() =>

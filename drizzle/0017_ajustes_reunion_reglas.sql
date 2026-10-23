@@ -109,11 +109,32 @@ DROP TRIGGER pieza_transicion ON pieza;
 CREATE TRIGGER pieza_transicion BEFORE UPDATE OF estado, exhibidor_id, vendedor_custodia_id ON pieza
   FOR EACH ROW EXECUTE FUNCTION kz_validar_transicion_pieza();
 --> statement-breakpoint
+-- 1b. (D-9) Una pieza nueva nace en Kazero: la custodia solo se gana con una entrega (UPDATE + su movimiento
+--     entrega_vendedora), así el historial explica siempre quién la tiene.
+CREATE OR REPLACE FUNCTION public.kz_pieza_alta_sin_custodia() RETURNS trigger
+  LANGUAGE plpgsql
+  AS $$
+BEGIN
+  IF NEW.vendedor_custodia_id IS NOT NULL THEN
+    RAISE EXCEPTION 'Una pieza nueva queda en Kazero'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pieza_alta_custodia';
+  END IF;
+  RETURN NEW;
+END
+$$;
+--> statement-breakpoint
+REVOKE ALL ON FUNCTION public.kz_pieza_alta_sin_custodia() FROM PUBLIC;
+--> statement-breakpoint
+CREATE TRIGGER pieza_alta_sin_custodia BEFORE INSERT ON pieza
+  FOR EACH ROW EXECUTE FUNCTION kz_pieza_alta_sin_custodia();
+--> statement-breakpoint
 -- 2. kz_validar_movimiento_pieza VERSIÓN 2 = el cuerpo de 0009 SIN CAMBIOS + la custodia actual en el mismo
 --    SELECT ... FOR NO KEY UPDATE + tres condiciones (v2) en el IF de incoherencia:
 --    - entrega_vendedora: vendedor_id = la custodia que la pieza YA tiene (se actualiza antes), queda disponible;
---    - regreso_vendedora: la pieza ya no tiene custodia, queda disponible, y vendedor_id = el de la última entrega;
---    - devolucion: con pedido, a defecto, y con la devolución de la línea de esta pieza en ese pedido registrada.
+--    - regreso_vendedora: la pieza ya no tiene custodia, queda disponible, y deshace la entrega vigente (el
+--      último movimiento que pudo cambiar la custodia es la entrega a esa vendedora);
+--    - alta: sin custodia;
+--    - devolucion: con pedido, de vendida a defecto, y con la devolución de la línea de esta pieza en ese pedido registrada.
 --    El trigger movimiento_pieza_coherente (0009) llama a la función por nombre: CREATE OR REPLACE conserva su
 --    oid, así que no se recrea.
 CREATE OR REPLACE FUNCTION public.kz_validar_movimiento_pieza() RETURNS trigger
@@ -126,6 +147,7 @@ DECLARE
   hay_previo boolean;
   previo_a text;
   previo_exhibidor uuid;
+  ultima_custodia record;
 BEGIN
   -- FOR NO KEY UPDATE: serializa los movimientos de una pieza sin chocar con el FOR KEY SHARE que toman las
   -- FK que apuntan a pieza (p. ej. las líneas de pedido del Plan 3).
@@ -143,8 +165,25 @@ BEGIN
     ORDER BY mp.orden DESC
     LIMIT 1;
   hay_previo := FOUND;
+  -- (v2) Un regreso deshace la entrega VIGENTE: el último movimiento que pudo cambiar la custodia (todos salvo
+  -- apartado/liberacion, que la conservan) debe ser la entrega a esa misma vendedora. Así un regreso repetido,
+  -- uno sin entrega o uno tras un cambio manual que ya la sacó de la custodia no pasan.
+  IF NEW.tipo::text = 'regreso_vendedora' THEN
+    SELECT mp.tipo::text AS tipo, mp.vendedor_id INTO ultima_custodia
+      FROM public.movimiento_pieza mp
+      WHERE mp.pieza_id = NEW.pieza_id AND mp.tipo::text NOT IN ('apartado', 'liberacion')
+      ORDER BY mp.orden DESC
+      LIMIT 1;
+    IF NOT FOUND OR ultima_custodia.tipo <> 'entrega_vendedora'
+       OR ultima_custodia.vendedor_id IS DISTINCT FROM NEW.vendedor_id THEN
+      RAISE EXCEPTION 'Movimiento incoherente con la pieza o su historial'
+        USING ERRCODE = 'P0001', CONSTRAINT = 'movimiento_coherente';
+    END IF;
+  END IF;
   IF NEW.a_estado::text <> estado_actual
      OR (NEW.tipo::text = 'alta' AND (hay_previo OR NEW.de_estado IS NOT NULL))
+     -- (v2) El alta es en Kazero (también lo exige el trigger pieza_alta_sin_custodia).
+     OR (NEW.tipo::text = 'alta' AND custodia_actual IS NOT NULL)
      OR (NEW.tipo::text <> 'alta' AND NEW.de_estado::text IS DISTINCT FROM previo_a)
      OR (NEW.a_estado::text = 'en_exhibidor' AND NEW.exhibidor_id IS DISTINCT FROM exhibidor_actual)
      OR (NEW.de_estado::text = 'en_exhibidor' AND NEW.exhibidor_id IS DISTINCT FROM previo_exhibidor)
@@ -152,14 +191,11 @@ BEGIN
      OR (NEW.tipo::text = 'entrega_vendedora'
          AND (NEW.vendedor_id IS NULL OR NEW.vendedor_id IS DISTINCT FROM custodia_actual OR NEW.a_estado::text <> 'disponible'))
      OR (NEW.tipo::text = 'regreso_vendedora'
-         AND (NEW.vendedor_id IS NULL OR custodia_actual IS NOT NULL OR NEW.a_estado::text <> 'disponible'
-              OR NEW.vendedor_id IS DISTINCT FROM (
-                SELECT mp.vendedor_id FROM public.movimiento_pieza mp
-                WHERE mp.pieza_id = NEW.pieza_id AND mp.tipo::text = 'entrega_vendedora'
-                ORDER BY mp.orden DESC LIMIT 1)))
+         AND (NEW.vendedor_id IS NULL OR custodia_actual IS NOT NULL OR NEW.a_estado::text <> 'disponible'))
      -- (v2, D-17)
      OR (NEW.tipo::text = 'devolucion'
-         AND (NEW.pedido_id IS NULL OR NEW.a_estado::text <> 'defecto' OR NOT EXISTS (
+         AND (NEW.pedido_id IS NULL OR NEW.de_estado::text IS DISTINCT FROM 'vendida'
+              OR NEW.a_estado::text <> 'defecto' OR NOT EXISTS (
                 SELECT 1 FROM public.devolucion d JOIN public.pedido_item i ON i.id = d.pedido_item_id
                 WHERE i.pieza_id = NEW.pieza_id AND i.pedido_id = NEW.pedido_id))) THEN
     RAISE EXCEPTION 'Movimiento incoherente con la pieza o su historial'
@@ -180,6 +216,7 @@ DECLARE
   it record;
   pe record;
   estado_pieza_tx text;
+  ultimo record;
   devuelto numeric(12,2);
 BEGIN
   SELECT i.pedido_id, i.pieza_id, i.precio_final, i.vigente INTO it
@@ -201,6 +238,14 @@ BEGIN
   IF estado_pieza_tx <> 'vendida' THEN
     RAISE EXCEPTION 'La pieza no está vendida'
       USING ERRCODE = 'P0001', CONSTRAINT = 'devolucion_pieza_no_vendida';
+  END IF;
+  -- Espejo de la regla v5 de pieza_transicion: la pieza está vendida por ESTE pedido (su último movimiento es
+  -- la venta de it.pedido_id), no por otro.
+  SELECT mp.tipo::text AS tipo, mp.pedido_id INTO ultimo
+    FROM public.movimiento_pieza mp WHERE mp.pieza_id = it.pieza_id ORDER BY mp.orden DESC LIMIT 1;
+  IF NOT FOUND OR ultimo.tipo <> 'venta' OR ultimo.pedido_id IS DISTINCT FROM it.pedido_id THEN
+    RAISE EXCEPTION 'La pieza no está vendida por este pedido'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'devolucion_no_es_ultima_venta';
   END IF;
   IF NEW.monto > it.precio_final THEN
     RAISE EXCEPTION 'La devolución supera el precio de la línea'
@@ -294,7 +339,7 @@ $$;
 --    confirmar, cuando la transacción ya insertó todo):
 --    - una devolución sin su movimiento 'devolucion' en el libro (D-16);
 --    - una aplicación de un pago saldo_favor sin su 'uso' (D-20);
---    - un pago saldo_favor sin ninguna aplicación (D-20).
+--    - un pago saldo_favor cuyo monto no esté aplicado completo (D-20).
 --    El otro sentido lo dan los CHECK saldo_favor_origen y los índices únicos de 0016 más el trigger del libro.
 --    El error de un diferido sale en el COMMIT: conErroresDeNegocio envuelve db.transaction completo, así que
 --    lo traduce igual. Invoker: kazero_app lee saldo_favor_mov, pago y aplicacion_pago. AFTER ROW: RETURN NULL.
@@ -314,9 +359,11 @@ BEGIN
         USING ERRCODE = 'P0001', CONSTRAINT = 'saldo_favor_uso_faltante';
     END IF;
   ELSIF TG_TABLE_NAME = 'pago' THEN
+    -- Todo el pago se aplica: lo aplicado vigente es exactamente su monto (un sobrante de saldo no existe).
     IF NEW.metodo::text = 'saldo_favor'
-       AND NOT EXISTS (SELECT 1 FROM public.aplicacion_pago a WHERE a.pago_id = NEW.id) THEN
-      RAISE EXCEPTION 'Pago con saldo a favor sin aplicación'
+       AND (SELECT coalesce(sum(a.monto), 0) FROM public.aplicacion_pago a
+            WHERE a.pago_id = NEW.id AND a.anulada_at IS NULL) <> NEW.monto THEN
+      RAISE EXCEPTION 'Pago con saldo a favor sin aplicar completo'
         USING ERRCODE = 'P0001', CONSTRAINT = 'pago_saldo_sin_aplicacion';
     END IF;
   END IF;

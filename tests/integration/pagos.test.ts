@@ -68,6 +68,43 @@ beforeEach(async () => {
 });
 
 describe('registrarPagoDePedido', () => {
+  it('Plan 3.1 (D-10): liquidar saca de la custodia de la vendedora la pieza vendida', async () => {
+    await app((db) =>
+      altaPieza(db, {
+        codigo: 'PC01',
+        categoria: 'Aretes',
+        descripcion: 'Arete PC01',
+        costoCentavos: 0,
+        precioCentavos: 14900,
+      }),
+    );
+    // Entrega directa en SQL (el servicio de custodia llega en la Task 4).
+    await app((db) =>
+      db.transaction(async (tx) => {
+        await tx.execute(
+          sql`UPDATE pieza SET vendedor_custodia_id = ${ctx.vendedorId} WHERE codigo = 'PC01'`,
+        );
+        await tx.execute(sql`INSERT INTO movimiento_pieza (pieza_id, tipo, de_estado, a_estado, vendedor_id, admin_id)
+          SELECT id, 'entrega_vendedora', 'disponible', 'disponible', ${ctx.vendedorId}, ${adminId} FROM pieza WHERE codigo = 'PC01'`);
+      }),
+    );
+    const p = await app((db) =>
+      crearPedido(db, {
+        key: randomUUID(),
+        adminId,
+        ...ctx,
+        codigos: ['PC01'],
+        cuentaTarjeta: true,
+        descuentoManualCentavos: 0,
+      }),
+    );
+    expect(await pagar(p.id, 14900)).toMatchObject({ estado: 'liquidado' });
+    const r = await app((db) =>
+      db.execute(sql`SELECT estado, vendedor_custodia_id, ubicacion FROM v_pieza WHERE codigo = 'PC01'`),
+    );
+    expect(r.rows).toEqual([{ estado: 'vendida', vendedor_custodia_id: null, ubicacion: 'fuera' }]);
+  });
+
   it('R-14/R-35: un abono baja el saldo y la aplicación lleva la fecha del pago', async () => {
     const p = await pedidoCon('PG01', 14900, '2026-09-30');
     expect(await pagar(p.id, 5000, { fecha: '2026-10-01' })).toMatchObject({

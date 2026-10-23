@@ -121,6 +121,12 @@ describe('traducción de errores de Postgres', () => {
       'codigos',
     ],
     ['devolucion_pedido_item_uq', 'Esa pieza ya se devolvió.', undefined],
+    ['devolucion_no_es_ultima_venta', 'La pieza no está vendida por este pedido.', undefined],
+    [
+      'pieza_alta_custodia',
+      'Una pieza nueva queda en Kazero: entrégala a la vendedora después del alta.',
+      undefined,
+    ],
     ['devolucion_pedido_no_liquidado', 'Solo se devuelven piezas de pedidos liquidados.', undefined],
     ['devolucion_linea_no_vigente', 'Esa pieza ya no está en el pedido.', undefined],
     ['devolucion_pieza_no_vendida', 'La pieza no está vendida: no se puede devolver.', undefined],

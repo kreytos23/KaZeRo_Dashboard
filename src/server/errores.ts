@@ -137,6 +137,8 @@ const MENSAJES: Record<string, string> = {
   pieza_cambio_custodia:
     'La pieza debe estar disponible en Kazero para entregarse, y regresar antes de pasar a otra vendedora.',
   devolucion_pedido_item_uq: 'Esa pieza ya se devolvió.',
+  devolucion_no_es_ultima_venta: 'La pieza no está vendida por este pedido.',
+  pieza_alta_custodia: 'Una pieza nueva queda en Kazero: entrégala a la vendedora después del alta.',
   devolucion_pedido_no_liquidado: 'Solo se devuelven piezas de pedidos liquidados.',
   devolucion_linea_no_vigente: 'Esa pieza ya no está en el pedido.',
   devolucion_pieza_no_vendida: 'La pieza no está vendida: no se puede devolver.',
