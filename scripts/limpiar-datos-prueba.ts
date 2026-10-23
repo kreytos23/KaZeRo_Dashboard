@@ -4,7 +4,7 @@
  *   KAZERO_OTRA_BD=confirmo pnpm exec tsx scripts/limpiar-datos-prueba.ts            (rama de prueba/copia)
  *   … --confirmo-development                                                         (development)
  *   … --confirmo-produccion --respaldo=<rama Neon de respaldo>                       (producción)
- * Solo imprime el destino (guarda) y conteos.
+ * Solo imprime el destino (guarda) y conteos; reinicia los contadores (folio KZR, orden de movimientos y bitácora).
  */
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,8 +35,9 @@ try {
     },
     args,
   );
-  const borradas = await limpiarDatosPrueba(destino.url);
+  const { borradas, secuencias } = await limpiarDatosPrueba(destino.url);
   console.log(`[limpieza] Filas borradas: ${JSON.stringify(borradas)}`);
+  console.log(`[limpieza] Secuencias reiniciadas: ${secuencias.join(', ')}`);
 } catch (e) {
   console.error(
     e instanceof GuardaBdError || e instanceof TypeError
