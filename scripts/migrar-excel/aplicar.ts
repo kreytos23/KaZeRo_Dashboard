@@ -48,6 +48,12 @@ export const MOTIVO_MIGRACION = 'Migración Excel fase 1';
 /** No es un secreto cifrado: `descifrar` falla con él, así que nunca hay segundo factor válido. */
 const TOTP_INSERVIBLE = 'migracion:sin-totp';
 const FOLIO_HISTORICO_DEFECTO = 100001;
+
+/** Primer folio histórico del plan: el menor folio no-KZR (= mapeo.folioHistoricoDesde); el defecto solo si no hay. */
+export function folioHistoricoDelPlan(plan: Pick<PlanImportacion, 'pedidos'>): number {
+  const folios = plan.pedidos.filter((p) => p.tipo !== 'kzr').map((p) => p.folio);
+  return folios.length > 0 ? Math.min(...folios) : FOLIO_HISTORICO_DEFECTO;
+}
 const NOTAS_MAX = 500;
 
 /** La verificación no cuadró: la transacción se deshizo. `resultado` lleva lo calculado (para el reporte). */
@@ -199,10 +205,10 @@ async function resolver(tx: Ejecutor, plan: PlanImportacion): Promise<Resolucion
     cambiados: [],
     reutilizados: { categorias: 0, materiales: 0, proveedores: 0, vendedores: 0, clientes: 0 },
     rechazosEnBd: [],
-    folioDesde: Math.min(
-      FOLIO_HISTORICO_DEFECTO,
-      ...plan.pedidos.filter((p) => p.tipo !== 'kzr').map((p) => p.folio),
-    ),
+    // Frontera histórica configurada (mapeo.folioHistoricoDesde): los pedidos no-KZR empiezan en ella.
+    // No se acota con el valor por defecto: si el mapeo la sube, los pedidos de la app entre el
+    // defecto y esa frontera deben seguir contando para la secuencia de folios.
+    folioDesde: folioHistoricoDelPlan(plan),
   };
 
   // --- Entidades simples: ya aplicadas, cambiadas o nuevas; las nuevas se buscan en la app por nombre.
