@@ -59,7 +59,7 @@ test('pieza con vendedora: se entrega desde su ficha, aparece filtrada en el inv
   page,
 }, info) => {
   const m = marca(info.project.name);
-  const nombre = `Nelly ${m}`;
+  const nombre = `Rosa ${m}`;
   const vendedoraId = await sembrarVendedora(nombre);
   await sembrarCliente(`Cliente V ${m}`);
   const codigo = `VC${m}01`;
