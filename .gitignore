@@ -28,3 +28,6 @@ docs/
 playwright/.datos/
 next-env.d.ts
 *.tsbuildinfo
+
+# Ajustes locales de Claude Code
+.claude/settings.local.json
