@@ -12,7 +12,7 @@ import {
 } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
-import { descuentoLealtad, siguientePosicion, type Posicion, type SinLealtad } from '@/domain/lealtad';
+import { descuentoLealtad, siguientePosicion, type Posicion } from '@/domain/lealtad';
 import {
   MAX_PIEZAS_PEDIDO,
   calcularTotales,
@@ -29,7 +29,6 @@ import {
   bloquearPiezasDelPedido,
   bloquearPiezasParaApartar,
   exigirDisponibles,
-  foliosConSaldo,
   liberarPiezas,
   liquidarSiSaldoCero,
   pagadoCentavos,
@@ -55,7 +54,7 @@ export interface PedidoCreado {
   total: string;
   posicion: Posicion | null;
   pctBps: number;
-  sinLealtad: SinLealtad | null;
+  sinLealtad: 'saldo_pendiente' | null;
   /** R-29: por qué no hubo descuento (folios de las otras notas con saldo); vacío si no aplica. */
   foliosConSaldo: number[];
 }
@@ -148,8 +147,7 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
           });
           // 3) Tarjeta (R-23, R-24, R-26, R-28, R-29).
           let posicion: Posicion | null = null;
-          let lealtad: { pctBps: number; sinLealtad: SinLealtad | null } = { pctBps: 0, sinLealtad: null };
-          let otras: number[] = [];
+          let lealtad: { pctBps: number } = { pctBps: 0 };
           if (v.cuentaTarjeta) {
             const ocupadas = await tx
               .select({ ciclo: pedido.cicloTarjeta, posicion: pedido.posicionTarjeta })
@@ -162,11 +160,9 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
                 ),
               );
             posicion = siguientePosicion(ocupadas.map((o) => ({ ciclo: o.ciclo!, posicion: o.posicion! })));
-            otras = await foliosConSaldo(tx, v.clienteId);
             lealtad = descuentoLealtad({
               cuentaTarjeta: true,
               posicion: posicion.posicion,
-              otraNotaConSaldo: otras.length > 0,
             });
           }
           // 4) Totales (R-11, R-12, D-6, D-7).
@@ -192,7 +188,7 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
               cicloTarjeta: posicion?.ciclo ?? null,
               posicionTarjeta: posicion?.posicion ?? null,
               descuentoLealtadPct: pctBpsANumeric(lealtad.pctBps),
-              sinLealtadMotivo: lealtad.sinLealtad,
+              sinLealtadMotivo: null,
               descuentoManualMonto: centavosANumeric(v.descuentoManual),
               descuentoManualMotivo: v.descuentoMotivo,
               total,
@@ -220,8 +216,8 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
             // Objeto plano: el resultado se guarda en idempotencia.resultado (JSON) y un reintento recibe lo mismo.
             posicion: posicion ? { ciclo: posicion.ciclo, posicion: posicion.posicion } : null,
             pctBps: lealtad.pctBps,
-            sinLealtad: lealtad.sinLealtad,
-            foliosConSaldo: lealtad.sinLealtad ? otras : [],
+            sinLealtad: null,
+            foliosConSaldo: [],
           };
         },
       ),

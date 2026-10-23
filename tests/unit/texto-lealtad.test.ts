@@ -73,11 +73,17 @@ describe('textoLealtadGuardada (ficha del pedido)', () => {
 
 describe('etiquetaCasilla (nombre accesible de ●◐○)', () => {
   it.each([
-    [{ posicion: 1, estado: 'contada', folio: 10, pctBps: 0 }, 'Posición 1: contada, KZR-10'],
     [
-      { posicion: 5, estado: 'apartada', folio: 12, pctBps: 1000 },
-      'Posición 5: apartada, KZR-12, 10 % de descuento',
+      { posicion: 1, estado: 'ocupada', folio: 10, pctBps: 0, conSaldo: false },
+      'Posición 1: ocupada, KZR-10',
     ],
-    [{ posicion: 10, estado: 'libre', folio: null, pctBps: 2000 }, 'Posición 10: libre, 20 % de descuento'],
+    [
+      { posicion: 5, estado: 'ocupada', folio: 12, pctBps: 1000, conSaldo: true },
+      'Posición 5: ocupada, KZR-12, 10 % de descuento',
+    ],
+    [
+      { posicion: 10, estado: 'libre', folio: null, pctBps: 2000, conSaldo: false },
+      'Posición 10: libre, 20 % de descuento',
+    ],
   ] as const)('%j', (c, texto) => expect(etiquetaCasilla(c)).toBe(texto));
 });

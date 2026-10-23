@@ -2,13 +2,13 @@ import { and, asc, desc, eq, gt, gte, inArray, lte, ne, or, sql } from 'drizzle-
 import type { Ejecutor } from '@/db/pool';
 import { vAplicacionPago, vCliente, vPedido, vPedidoItem, vPieza, vSaldoFavor } from '@/db/schema';
 import { normalizarCodigo } from '@/domain/codigos';
-import { armarTarjeta, descuentoLealtad, siguientePosicion, type CicloTarjeta } from '@/domain/lealtad';
+import { armarTarjeta, descuentoLealtad, siguientePosicion } from '@/domain/lealtad';
 import { parsearFechaISO } from '@/domain/fechas';
 import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
 import { escaparLike, normalizar } from '@/domain/texto';
 import type { PreviaPedido } from '@/features/pedidos/tipos';
 import { ErrorNegocio } from '@/server/errores';
-import { foliosConSaldo, type EstadoPedido } from './comun';
+import type { EstadoPedido } from './comun';
 
 const filaPedido = {
   id: vPedido.id,
@@ -42,7 +42,7 @@ export async function previsualizarPedido(
   o: { clienteId: string | null; codigos: string[]; cuentaTarjeta: boolean },
 ): Promise<PreviaPedido> {
   const codigos = [...new Set(o.codigos.map(normalizarCodigo).filter(Boolean))].slice(0, MAX_PIEZAS_PEDIDO);
-  const [piezas, apartadas, clientes, ocupadas, conSaldo] = await Promise.all([
+  const [piezas, apartadas, clientes, ocupadas] = await Promise.all([
     codigos.length
       ? db
           .select({
@@ -85,7 +85,6 @@ export async function previsualizarPedido(
             ),
           )
       : [],
-    o.clienteId ? foliosConSaldo(db, o.clienteId) : [],
   ]);
   const porCodigo = new Map(piezas.map((p) => [p.codigo, p]));
   const folioDe = new Map(apartadas.map((a) => [a.codigo, a.folio]));
@@ -93,12 +92,8 @@ export async function previsualizarPedido(
   let tarjeta: PreviaPedido['tarjeta'] = null;
   if (cliente && o.cuentaTarjeta) {
     const pos = siguientePosicion(ocupadas.map((x) => ({ ciclo: x.ciclo!, posicion: x.posicion! })));
-    const l = descuentoLealtad({
-      cuentaTarjeta: true,
-      posicion: pos.posicion,
-      otraNotaConSaldo: conSaldo.length > 0,
-    });
-    tarjeta = { ...pos, pctBps: l.pctBps, sinLealtad: l.sinLealtad, foliosConSaldo: conSaldo };
+    const l = descuentoLealtad({ cuentaTarjeta: true, posicion: pos.posicion });
+    tarjeta = { ...pos, pctBps: l.pctBps, sinLealtad: null, foliosConSaldo: [] };
   }
   return {
     piezas: codigos.flatMap((c) => {
@@ -211,6 +206,7 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
         posicion: vPedido.posicionTarjeta,
         estado: vPedido.estado,
         folio: vPedido.folio,
+        saldo: vPedido.saldo,
       })
       .from(vPedido)
       .where(
@@ -231,8 +227,9 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
         posicion: t.posicion!,
         estado: t.estado as 'abierto' | 'liquidado',
         folio: t.folio,
+        conSaldo: Number(t.saldo) > 0,
       })),
-    ) as CicloTarjeta[],
+    ),
   };
 }
 

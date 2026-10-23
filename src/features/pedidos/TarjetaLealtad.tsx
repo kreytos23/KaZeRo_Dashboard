@@ -1,13 +1,13 @@
 import { formatoPct } from '@/domain/pedidos';
-import type { CicloTarjeta } from '@/domain/lealtad';
+import type { Tarjeta } from '@/domain/lealtad';
 import { etiquetaCasilla } from './texto-lealtad';
 
-const SIMBOLO = { contada: '●', apartada: '◐', libre: '○' } as const;
+const SIMBOLO = { ocupada: '●', libre: '○' } as const;
 
-function Ciclo({ c }: { c: CicloTarjeta }) {
+function Casillas({ c }: { c: Tarjeta }) {
   return (
     <div className="flex flex-col gap-1">
-      <ol aria-label={`Ciclo ${c.ciclo}`} className="grid grid-cols-5 gap-2 sm:grid-cols-10">
+      <ol aria-label="Tarjeta actual" className="grid grid-cols-5 gap-2 sm:grid-cols-10">
         {c.casillas.map((k) => (
           <li
             key={k.posicion}
@@ -28,32 +28,20 @@ function Ciclo({ c }: { c: CicloTarjeta }) {
           </li>
         ))}
       </ol>
-      <p className="text-sm text-tinta-suave">{c.contadas} de 10 contadas</p>
+      <p className="text-sm text-tinta-suave">{c.ocupadas} de 10 lugares</p>
     </div>
   );
 }
 
-/** Tarjeta de lealtad (R-25). Server Component sin JS: el ciclo actual primero, los anteriores plegados. */
-export function TarjetaLealtad({ ciclos }: { ciclos: readonly CicloTarjeta[] }) {
-  const actual = ciclos[ciclos.length - 1];
-  const anteriores = ciclos.slice(0, -1).reverse();
+/** Tarjeta de lealtad (R-25, D-4). Server Component sin JS: solo la tarjeta actual, de 10 lugares. */
+export function TarjetaLealtad({ tarjeta }: { tarjeta: Tarjeta }) {
   return (
     <section aria-labelledby="tarjeta-lealtad" className="tarjeta flex flex-col gap-3 p-4">
       <h2 id="tarjeta-lealtad" className="text-lg font-semibold">
         Tarjeta de lealtad
       </h2>
-      {actual && <Ciclo c={actual} />}
-      <p className="text-sm text-tinta-suave">● contada · ◐ apartada (pendiente de pago) · ○ libre</p>
-      {anteriores.map((c) => (
-        <details key={c.ciclo}>
-          <summary className="min-h-11 cursor-pointer content-center text-sm font-medium">
-            Ciclo {c.ciclo} ({c.contadas} de 10 contadas)
-          </summary>
-          <div className="mt-2">
-            <Ciclo c={c} />
-          </div>
-        </details>
-      ))}
+      <Casillas c={tarjeta} />
+      <p className="text-sm text-tinta-suave">● ocupada · ○ libre</p>
     </section>
   );
 }

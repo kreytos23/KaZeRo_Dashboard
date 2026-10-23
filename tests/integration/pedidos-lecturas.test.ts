@@ -155,7 +155,7 @@ describe('lecturas de pedidos', () => {
       cancelarPedido(db, { key: randomUUID(), adminId, pedidoId: c.id, version: f.version, motivo: 'x' }),
     );
     const r = await app((db) => resumenCliente(db, ctx.clienteId));
-    expect(r.tarjeta[0]!.casillas.slice(0, 3).map((x) => x.estado)).toEqual(['contada', 'apartada', 'libre']);
+    expect(r.tarjeta.casillas.slice(0, 3).map((x) => x.estado)).toEqual(['ocupada', 'ocupada', 'libre']);
     expect(r).toMatchObject({ saldoPendiente: '149.00', saldoFavor: '50.00' });
     expect(r.pedidos).toHaveLength(3);
   });

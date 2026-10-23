@@ -130,7 +130,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
           </ul>
         )}
       </section>
-      <TarjetaLealtad ciclos={resumen.tarjeta} />
+      <TarjetaLealtad tarjeta={resumen.tarjeta} />
       <HistorialCambios entradas={cambios} />
     </section>
   );
