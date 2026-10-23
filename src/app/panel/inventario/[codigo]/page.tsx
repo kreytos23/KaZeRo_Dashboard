@@ -19,7 +19,7 @@ import { listarCatalogo } from '@/server/catalogos/servicio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { historial, obtenerPiezaPorCodigo, pedidoVigenteDePieza } from '@/server/piezas/servicio';
 import { accionCambiarEstado, accionEditarPieza, accionQuitarImagen } from '../acciones';
-import { ETIQUETA_ESTADO, ETIQUETA_MOVIMIENTO, destinosManuales } from '../etiquetas';
+import { ETIQUETA_ESTADO, destinosManuales, textoMovimiento } from '../etiquetas';
 import { FormDeshacerCambio } from './FormDeshacerCambio';
 import { FormFoto } from './FormFoto';
 
@@ -103,6 +103,19 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
       <dl className="grid grid-cols-2 gap-2 text-sm">
         <dt className="font-medium">Estado</dt>
         <dd>{ETIQUETA_ESTADO[p.estado]}</dd>
+        <dt className="font-medium">Ubicación</dt>
+        <dd>
+          {p.ubicacion === 'vendedora' && p.vendedorCustodiaId ? (
+            <>
+              Con{' '}
+              <Link href={`/panel/vendedores/${p.vendedorCustodiaId}`} className="enlace">
+                {p.vendedorCustodiaNombre}
+              </Link>
+            </>
+          ) : (
+            p.ubicacionEtiqueta
+          )}
+        </dd>
         <dt className="font-medium">Exhibidor</dt>
         <dd>
           {p.exhibidorId ? (
@@ -220,9 +233,9 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
           {movimientos.map((m, i) => (
             // El más reciente conserva su clave: su formulario de deshacer sigue montado tras corregir.
             <li key={i === 0 ? 'ultimo' : m.id} className="border-l-2 border-marca-rubor pl-3">
-              <span className="font-medium">{ETIQUETA_MOVIMIENTO[m.tipo] ?? m.tipo}</span>
+              <span className="font-medium">{textoMovimiento(m)}</span>
               {' · '}
-              {m.deEstado ? `${ETIQUETA_ESTADO[m.deEstado]} → ` : ''}
+              {m.deEstado && m.deEstado !== m.aEstado ? `${ETIQUETA_ESTADO[m.deEstado]} → ` : ''}
               {ETIQUETA_ESTADO[m.aEstado]}
               {m.exhibidorNombre && ` · ${m.exhibidorNombre}`}
               {m.pedidoFolio !== null && (

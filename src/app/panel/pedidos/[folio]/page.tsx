@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { conDbLectura } from '@/db/client';
+import { montoDevolucion } from '@/domain/devolucion';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { hoyMX } from '@/domain/fechas';
 import { formatoFolio, parsearFolio } from '@/domain/pedidos';
@@ -12,7 +13,9 @@ import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { obtenerPedidoPorFolio } from '@/server/pedidos/lecturas';
+import { saldoFavorDeCliente } from '@/server/saldo-favor/servicio';
 import { ETIQUETA_ESTADO_PEDIDO, ETIQUETA_METODO_REGISTRADO, fechaCorta } from '../etiquetas';
+import { FormDevolver } from './FormDevolver';
 import { FormsPedido } from './FormsPedido';
 
 type Params = Promise<{ folio: string }>;
@@ -38,12 +41,25 @@ export default async function FichaPedido({
   const resultado = await conDbLectura(async (db) => {
     const p = await obtenerPedidoPorFolio(db, folio);
     if (!p) return null;
-    return { p, historial: await historialDeCambios(db, 'pedido', p.id) };
+    const [historial, saldoFavor] = await Promise.all([
+      historialDeCambios(db, 'pedido', p.id),
+      saldoFavorDeCliente(db, p.clienteId),
+    ]);
+    return { p, historial, saldoFavor };
   });
   if (!resultado) notFound();
-  const { p, historial } = resultado;
+  const { p, historial, saldoFavor } = resultado;
   const vigentes = p.items.filter((i) => i.vigente);
-  const quitadas = p.items.filter((i) => !i.vigente);
+  // Una línea devuelta (Plan 3.1) deja de ser vigente pero sigue en el subtotal: no es una pieza «quitada».
+  const devueltas = p.items.filter((i) => !i.vigente && i.devolucionId);
+  const quitadas = p.items.filter((i) => !i.vigente && !i.devolucionId);
+  // Lo que se devolvería por cada línea: el mismo cálculo que hace el servicio (todas las líneas sin quitar).
+  const lineasDelPedido = p.items
+    .filter((i) => i.quitadoAt === null)
+    .sort((a, b) => (a.id < b.id ? -1 : 1))
+    .map((i) => ({ id: i.id, precioFinal: numericACentavos(i.precioFinal) }));
+  const montoAFavor = (id: string) =>
+    montoDevolucion(lineasDelPedido, numericACentavos(p.descuentoManualMonto), id);
   const abierto = p.estado === 'abierto';
   const pagadoCentavos = numericACentavos(p.pagado);
   return (
@@ -58,6 +74,11 @@ export default async function FichaPedido({
       {sp.creado === '1' && (
         <p role="status" className="aviso-exito">
           Pedido creado.
+        </p>
+      )}
+      {sp.devuelta === '1' && (
+        <p role="status" className="aviso-exito">
+          Pieza devuelta. Lo pagado por ella quedó como saldo a favor de la clienta.
         </p>
       )}
       {sp.editado === '1' && (
@@ -105,9 +126,34 @@ export default async function FichaPedido({
                 )}
                 {mxn(i.precioFinal)}
               </span>
+              {p.estado === 'liquidado' && montoAFavor(i.id) > 0 && (
+                <div className="basis-full">
+                  <FormDevolver
+                    pedidoId={p.id}
+                    folio={p.folio}
+                    itemId={i.id}
+                    codigo={i.codigo}
+                    montoTexto={formatoMXN(montoAFavor(i.id))}
+                    hoy={hoyMX()}
+                    fechaPedido={p.fecha}
+                  />
+                </div>
+              )}
             </li>
           ))}
         </ul>
+        {devueltas.length > 0 && (
+          <ul aria-label="Piezas devueltas" className="flex flex-col gap-1 text-sm text-tinta-suave">
+            {devueltas.map((i) => (
+              <li key={i.id}>
+                <span className="font-mono">{i.codigo}</span> · {i.descripcion} · Devuelta el{' '}
+                {i.devolucionFecha ? fechaCorta(i.devolucionFecha) : '—'} —{' '}
+                {i.devolucionMonto ? mxn(i.devolucionMonto) : '—'} a saldo a favor —{' '}
+                {i.devolucionMotivo ?? '—'}
+              </li>
+            ))}
+          </ul>
+        )}
         {vigentes.length === 0 && p.estado !== 'cancelado' && (
           <p className="text-sm text-tinta-suave">Sin piezas vigentes.</p>
         )}
@@ -142,9 +188,13 @@ export default async function FichaPedido({
         <dd className="text-right font-semibold">{mxn(p.total)}</dd>
         <dt>Pagado</dt>
         <dd className="text-right">{mxn(p.pagado)}</dd>
+
         <dt className="font-semibold">Saldo</dt>
         <dd className="text-right font-semibold">{mxn(p.saldo)}</dd>
       </dl>
+      {numericACentavos(p.devuelto) > 0 && (
+        <p className="text-sm text-tinta-suave">Devuelto: {mxn(p.devuelto)} (pasó a saldo a favor).</p>
+      )}
 
       <section aria-labelledby="pagos-pedido" className="flex flex-col gap-2">
         <h2 id="pagos-pedido" className="text-lg font-semibold">
@@ -184,6 +234,8 @@ export default async function FichaPedido({
         hayPagado={pagadoCentavos > 0}
         piezas={p.piezas}
         hoy={hoyMX()}
+        saldoFavor={saldoFavor}
+        saldoFavorTexto={mxn(saldoFavor)}
       />
 
       <HistorialCambios entradas={historial} />

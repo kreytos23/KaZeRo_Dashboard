@@ -97,6 +97,12 @@ export async function sembrarVendedor(nombre: string): Promise<string> {
   return dueno((db) => s.vendedores.crearVendedor(db, { nombre, tipo: 'casa', comisionPct: '0.00' }));
 }
 
+/** Vendedora que no es la casa: puede tener piezas en su poder (Plan 3.1). */
+export async function sembrarVendedora(nombre: string): Promise<string> {
+  const s = await servicios();
+  return dueno((db) => s.vendedores.crearVendedor(db, { nombre, tipo: 'revendedora', comisionPct: '10.00' }));
+}
+
 export async function sembrarCliente(nombre: string): Promise<string> {
   const s = await servicios();
   return dueno((db) => s.clientes.crearCliente(db, { nombre }));

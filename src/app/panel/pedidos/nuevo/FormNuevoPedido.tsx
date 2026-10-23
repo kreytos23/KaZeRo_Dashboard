@@ -186,6 +186,14 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
                     : previa?.faltantes.includes(c)
                       ? 'No existe'
                       : '…'}
+                  {p?.disponible && p.vendedorCustodiaId && (
+                    <span className={p.vendedorCustodiaId === vendedorId ? 'text-tinta-suave' : 'text-error'}>
+                      {' · '}Con {p.vendedorCustodiaNombre ?? 'otra vendedora'}
+                      {p.vendedorCustodiaId === vendedorId
+                        ? ''
+                        : ': la nota debe ser de esa vendedora o hay que regresarla a Kazero'}
+                    </span>
+                  )}
                   {p && !p.disponible && (
                     <span className="text-error">
                       {' · '}No disponible

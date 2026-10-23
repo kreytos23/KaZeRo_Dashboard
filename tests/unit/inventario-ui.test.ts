@@ -4,6 +4,7 @@ import {
   ETIQUETA_ESTADO,
   ETIQUETA_MOVIMIENTO,
   textoBotonFoto,
+  textoMovimiento,
 } from '@/app/panel/inventario/etiquetas';
 import { tipoMovimiento } from '@/db/schema';
 import { POR_PAGINA, idDeCatalogo, leerFiltros } from '@/app/panel/inventario/filtros';
@@ -90,5 +91,35 @@ describe('idDeCatalogo', () => {
   });
   it('un nombre desconocido da un id inexistente (cero resultados, no "todos")', () => {
     expect(idDeCatalogo(cat, 'Relojes')).toBe('00000000-0000-0000-0000-000000000000');
+  });
+});
+
+describe('ubicación en el inventario (Plan 3.1)', () => {
+  it('filtra por ubicación y vendedora; lo inválido se descarta', () => {
+    const v = '0b0e4c43-4a6b-4a1f-9a5e-2f9d8d1e7c11';
+    expect(leerFiltros({ ubicacion: 'vendedora', vendedor: v })).toMatchObject({
+      ubicacion: 'vendedora',
+      vendedor: v,
+    });
+    expect(leerFiltros({ ubicacion: 'kazero' }).ubicacion).toBe('kazero');
+    expect(leerFiltros({ ubicacion: 'fuera' }).ubicacion).toBeUndefined();
+    expect(leerFiltros({ ubicacion: 'inventada', vendedor: 'no-uuid' })).toMatchObject({
+      ubicacion: undefined,
+      vendedor: undefined,
+    });
+  });
+  it('la vendedora solo cuenta con la ubicación «Con vendedora»', () => {
+    const v = '0b0e4c43-4a6b-4a1f-9a5e-2f9d8d1e7c11';
+    expect(leerFiltros({ ubicacion: 'kazero', vendedor: v }).vendedor).toBeUndefined();
+  });
+  it('los movimientos de custodia nombran a la vendedora y la devolución a su pedido', () => {
+    const m = { vendedorNombre: 'Nelly', pedidoFolio: 5 };
+    expect(textoMovimiento({ ...m, tipo: 'entrega_vendedora' })).toBe('Entregada a Nelly');
+    expect(textoMovimiento({ ...m, tipo: 'regreso_vendedora' })).toBe('Regresó a Kazero de Nelly');
+    expect(textoMovimiento({ ...m, tipo: 'devolucion' })).toBe('Devuelta por defecto (KZR-5)');
+    expect(textoMovimiento({ ...m, tipo: 'alta' })).toBe('Alta');
+    expect(textoMovimiento({ vendedorNombre: null, pedidoFolio: null, tipo: 'entrega_vendedora' })).toBe(
+      'Entregada a vendedora',
+    );
   });
 });

@@ -8,6 +8,7 @@ import { formatoFolio } from '@/domain/pedidos';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { AreaTexto, Campo, Selector } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
+import { montoConSigno, textoMovimientoSaldo } from '@/features/saldo-favor/texto';
 import { TarjetaLealtad } from '@/features/pedidos/TarjetaLealtad';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
@@ -15,9 +16,11 @@ import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { obtenerCliente } from '@/server/clientes/servicio';
 import { resumenCliente } from '@/server/pedidos/lecturas';
+import { movimientosSaldoFavor } from '@/server/saldo-favor/servicio';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { ETIQUETA_ESTADO_PEDIDO, fechaCorta } from '../../pedidos/etiquetas';
 import { accionEditarCliente } from '../acciones';
+import { FormsSaldoFavor } from './FormsSaldoFavor';
 
 const mxn = (n: string) => formatoMXN(numericACentavos(n));
 
@@ -27,12 +30,13 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [c, vendedores, cambios, resumen] = await conDbLectura((db) =>
+  const [c, vendedores, cambios, resumen, libro] = await conDbLectura((db) =>
     Promise.all([
       obtenerCliente(db, id.data),
       listarVendedores(db),
       historialDeCambios(db, 'cliente', id.data),
       resumenCliente(db, id.data),
+      movimientosSaldoFavor(db, { clienteId: id.data, limite: 100 }),
     ]),
   );
   if (!c) notFound();
@@ -104,14 +108,6 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
             Saldo pendiente: {mxn(resumen.saldoPendiente)}
           </Link>
         </p>
-        {numericACentavos(resumen.saldoFavor) > 0 && (
-          <p>
-            Saldo a favor: {mxn(resumen.saldoFavor)}
-            <span className="block text-sm text-tinta-suave">
-              Se podrá usar en un pago (módulo de pagos).
-            </span>
-          </p>
-        )}
         {resumen.pedidos.length === 0 ? (
           <p className="text-sm text-tinta-suave">Este cliente todavía no tiene pedidos.</p>
         ) : (
@@ -131,6 +127,41 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
         )}
       </section>
       <TarjetaLealtad tarjeta={resumen.tarjeta} />
+      <section aria-labelledby="saldo-favor" className="flex flex-col gap-3">
+        <h2 id="saldo-favor" className="text-lg font-semibold">
+          Saldo a favor
+        </h2>
+        <p className="tarjeta p-4 text-3xl font-semibold">Saldo a favor: {mxn(resumen.saldoFavor)}</p>
+        <FormsSaldoFavor
+          clienteId={c.id}
+          saldo={resumen.saldoFavor}
+          saldoTexto={mxn(resumen.saldoFavor)}
+          hayInicial={numericACentavos(resumen.saldoFavor) > 0}
+        />
+        {libro.length === 0 ? (
+          <p className="text-sm text-tinta-suave">Sin movimientos de saldo a favor.</p>
+        ) : (
+          <ul
+            aria-label="Historial de saldo a favor"
+            className="tarjeta flex flex-col divide-y divide-borde px-4"
+          >
+            {libro.map((m) => (
+              <li key={m.id} className="flex flex-wrap items-baseline gap-x-3 py-2 text-sm">
+                <span className="min-w-0 flex-1">
+                  {textoMovimientoSaldo(m)}
+                  <span className="block text-tinta-suave">
+                    {fechaCorta(m.fecha)}
+                    {m.adminEmail ? ` · ${m.adminEmail}` : ''}
+                  </span>
+                </span>
+                <span className={`font-medium ${m.monto.startsWith('-') ? '' : 'text-exito'}`}>
+                  {montoConSigno(m.monto)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
       <HistorialCambios entradas={cambios} />
     </section>
   );

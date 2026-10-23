@@ -53,6 +53,8 @@ export async function previsualizarPedido(
             precio: vPieza.precio,
             estado: vPieza.estado,
             imagenClave: vPieza.imagenClave,
+            vendedorCustodiaId: vPieza.vendedorCustodiaId,
+            vendedorCustodiaNombre: vPieza.vendedorCustodiaNombre,
           })
           .from(vPieza)
           .where(inArray(vPieza.codigo, codigos))
@@ -129,6 +131,10 @@ export async function obtenerPedidoPorFolio(db: Ejecutor, folio: number) {
         vigente: vPedidoItem.vigente,
         quitadoAt: vPedidoItem.quitadoAt,
         piezaEstado: vPedidoItem.piezaEstado,
+        devolucionId: vPedidoItem.devolucionId,
+        devolucionFecha: vPedidoItem.devolucionFecha,
+        devolucionMotivo: vPedidoItem.devolucionMotivo,
+        devolucionMonto: vPedidoItem.devolucionMonto,
       })
       .from(vPedidoItem)
       .where(eq(vPedidoItem.pedidoId, p.id))
