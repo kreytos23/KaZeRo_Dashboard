@@ -81,6 +81,12 @@ export async function devolverPiezaDefectuosa(db: Ejecutor, d: DatosDevolucion):
             numericACentavos(p.descuentoManualMonto),
             linea.id,
           );
+          // El descuento del pedido pudo cubrir todo el precio de la línea: no hay nada que devolver (sin campo).
+          if (monto <= 0)
+            throw new ErrorNegocio(
+              'sin_monto_devolver',
+              'Esta pieza no tiene monto por devolver: el descuento del pedido cubrió su precio.',
+            );
           const [dv] = await tx
             .insert(devolucion)
             .values({

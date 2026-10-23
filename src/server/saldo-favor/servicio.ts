@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc, eq, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { cliente, saldoFavorMov, vSaldoFavor, vSaldoFavorMov } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
@@ -18,7 +18,13 @@ export async function saldoFavorDeCliente(db: Ejecutor, clienteId: string): Prom
   return r?.saldo ?? '0.00';
 }
 
-/** Historial del libro de la clienta, el más reciente primero (D-23: es la auditoría del dinero). */
+/**
+ * Historial del libro de la clienta, el más reciente primero (D-23: es la auditoría del dinero).
+ * `created_at` es el inicio de la transacción, así que las filas de una misma transacción empatan y el libro no
+ * tiene columna serial. Desempate estable (documentado): primero lo que sale (retiro, uso) y luego lo que
+ * entra (los demás), porque dentro de una transacción el crédito precede al gasto; luego monto mayor primero
+ * y por último el id, solo para que el orden sea total y repetible.
+ */
 export function movimientosSaldoFavor(
   db: Ejecutor,
   d: { clienteId: string; limite?: number },
@@ -27,7 +33,12 @@ export function movimientosSaldoFavor(
     .select()
     .from(vSaldoFavorMov)
     .where(eq(vSaldoFavorMov.clienteId, d.clienteId))
-    .orderBy(desc(vSaldoFavorMov.createdAt), desc(vSaldoFavorMov.id));
+    .orderBy(
+      desc(vSaldoFavorMov.createdAt),
+      sql`CASE WHEN ${vSaldoFavorMov.tipo}::text IN ('retiro', 'uso') THEN 0 ELSE 1 END`,
+      sql`abs(${vSaldoFavorMov.monto}) DESC`,
+      desc(vSaldoFavorMov.id),
+    );
   return d.limite ? q.limit(d.limite) : q;
 }
 

@@ -11,7 +11,7 @@ import { cancelarPedido, crearPedido } from '@/server/pedidos/servicio';
 import { altaPieza, cambiarEstado, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { movimientosSaldoFavor, saldoFavorDeCliente } from '@/server/saldo-favor/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
-import { reiniciarConAdmin, urlApp } from './utilidades';
+import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 let adminId = '';
@@ -257,5 +257,43 @@ describe('devolverPiezaDefectuosa', () => {
     );
     expect(traducirErrorPg(e)?.codigo).toBe('pieza_transicion');
     expect((await ficha(p.id)).devuelto).toBe('0.00');
+  });
+
+  it('inconsistente: si la pieza de la línea ya no está vendida se rechaza y no se escribe nada', async () => {
+    const p = await pedidoCon([['DV81', 10000]]);
+    const item = await itemDe(p.id, 'DV81');
+    // Solo con triggers apagados (rol dueño) se puede dejar la pieza fuera de `vendida`.
+    await conDbUrl(urlOwner(), (db) =>
+      db.transaction(async (tx) => {
+        await tx.execute(sql`ALTER TABLE pieza DISABLE TRIGGER USER`);
+        await tx.execute(sql`UPDATE pieza SET estado = 'disponible' WHERE codigo = 'DV81'`);
+        await tx.execute(sql`ALTER TABLE pieza ENABLE TRIGGER USER`);
+      }),
+    );
+    await expect(devolver(p.id, item.id)).rejects.toMatchObject({
+      codigo: 'inconsistente',
+      message: 'La pieza DV81 no está vendida (disponible). Recarga la página.',
+    });
+    expect(await saldo()).toBe('0.00');
+    expect(await itemDe(p.id, 'DV81')).toMatchObject({ vigente: true, devolucionId: null });
+  });
+
+  it('rechaza con su propio mensaje (sin campo) cuando el descuento del pedido cubrió el precio de la línea', async () => {
+    // Líneas $100 y $1 con $100.50 de descuento: la parte de la de $1 es $1.00, así que le quedan $0.
+    const p = await pedidoCon(
+      [
+        ['DV91', 10000],
+        ['DV92', 100],
+      ],
+      10050,
+    );
+    const e = await devolver(p.id, (await itemDe(p.id, 'DV92')).id).catch((x: unknown) => x);
+    expect(e).toMatchObject({
+      codigo: 'sin_monto_devolver',
+      message: 'Esta pieza no tiene monto por devolver: el descuento del pedido cubrió su precio.',
+    });
+    expect((e as { campo?: string }).campo).toBeUndefined();
+    expect(await saldo()).toBe('0.00');
+    expect(await itemDe(p.id, 'DV92')).toMatchObject({ vigente: true });
   });
 });

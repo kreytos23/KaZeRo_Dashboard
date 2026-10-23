@@ -245,4 +245,16 @@ describe('movimientosSaldoFavor', () => {
     const uno = await app((db) => movimientosSaldoFavor(db, { clienteId: ctx.clienteId, limite: 1 }));
     expect(uno).toHaveLength(1);
   });
+
+  it('desempata de forma estable las filas de una misma transacción (mayor monto primero)', async () => {
+    const a = await pedidoCon('SH01', 100000);
+    await pagar(a.id, 10000);
+    await pagar(a.id, 30000);
+    await pagar(a.id, 20000);
+    await cancelar(a.id); // tres `cancelacion` con el mismo created_at
+    const orden = async () =>
+      (await app((db) => movimientosSaldoFavor(db, { clienteId: ctx.clienteId }))).map((m) => m.monto);
+    expect(await orden()).toEqual(['300.00', '200.00', '100.00']);
+    expect(await orden()).toEqual(['300.00', '200.00', '100.00']);
+  });
 });
