@@ -12,7 +12,8 @@ import {
 } from 'drizzle-orm/pg-core';
 import { entidadAuditoria } from './auditoria';
 import { estadoExhibidor, estadoPieza, tipoMovimiento, tipoVendedor } from './inventario';
-import { estadoPedido, metodoPago, motivoSinLealtad } from './pedidos';
+import type { Ubicacion } from '../../domain/ubicacion';
+import { estadoPedido, metodoPago, motivoSinLealtad, tipoSaldoFavor } from './pedidos';
 
 // Vistas de SOLO LECTURA creadas en 0003_inventario_reglas.sql (security_invoker, columnas explícitas).
 // `.existing()`: drizzle-kit no las genera ni las borra. Toda lectura de servicios va por aquí.
@@ -66,6 +67,10 @@ export const vPieza = pgView('v_pieza', {
   exhibidorId: uuid('exhibidor_id'),
   exhibidorNombre: text('exhibidor_nombre'),
   imagenClave: uuid('imagen_clave'),
+  // Plan 3.1 (0017), al final: custodia de vendedora y ubicación derivada (D-8).
+  vendedorCustodiaId: uuid('vendedor_custodia_id'),
+  vendedorCustodiaNombre: text('vendedor_custodia_nombre'),
+  ubicacion: text('ubicacion').$type<Ubicacion>().notNull(),
 }).existing();
 
 export const vMovimientoPieza = pgView('v_movimiento_pieza', {
@@ -85,6 +90,9 @@ export const vMovimientoPieza = pgView('v_movimiento_pieza', {
   // Plan 3 (0013), al final.
   pedidoId: uuid('pedido_id'),
   pedidoFolio: integer('pedido_folio'),
+  // Plan 3.1 (0017), al final.
+  vendedorId: uuid('vendedor_id'),
+  vendedorNombre: text('vendedor_nombre'),
 }).existing();
 
 export const vExhibidor = pgView('v_exhibidor', {
@@ -151,6 +159,8 @@ export const vPedido = pgView('v_pedido', {
   liquidadoAt: ts('liquidado_at'),
   canceladoAt: ts('cancelado_at'),
   cancelacionMotivo: text('cancelacion_motivo'),
+  // Plan 3.1 (0017), al final: lo devuelto a saldo a favor.
+  devuelto: numeric('devuelto').notNull(),
 }).existing();
 
 export const vPedidoItem = pgView('v_pedido_item', {
@@ -169,6 +179,11 @@ export const vPedidoItem = pgView('v_pedido_item', {
   precioFinal: numeric('precio_final').notNull(),
   vigente: boolean('vigente').notNull(),
   quitadoAt: ts('quitado_at'),
+  // Plan 3.1 (0017), al final: la devolución de la línea, si la hubo.
+  devolucionId: uuid('devolucion_id'),
+  devolucionFecha: date('devolucion_fecha'),
+  devolucionMotivo: text('devolucion_motivo'),
+  devolucionMonto: numeric('devolucion_monto'),
 }).existing();
 
 export const vAplicacionPago = pgView('v_aplicacion_pago', {
@@ -189,4 +204,23 @@ export const vSaldoFavor = pgView('v_saldo_favor', {
   clienteId: uuid('cliente_id'),
   vendedorId: uuid('vendedor_id'),
   saldo: numeric('saldo').notNull(),
+}).existing();
+
+// Creada en 0017_ajustes_reunion_reglas.sql (Plan 3.1): historial del saldo a favor con su origen.
+export const vSaldoFavorMov = pgView('v_saldo_favor_mov', {
+  id: uuid('id').notNull(),
+  clienteId: uuid('cliente_id'),
+  vendedorId: uuid('vendedor_id'),
+  tipo: tipoSaldoFavor('tipo').notNull(),
+  monto: numeric('monto').notNull(),
+  fecha: date('fecha').notNull(),
+  pedidoId: uuid('pedido_id'),
+  pedidoFolio: integer('pedido_folio'),
+  aplicacionPagoId: uuid('aplicacion_pago_id'),
+  devolucionId: uuid('devolucion_id'),
+  devolucionMotivo: text('devolucion_motivo'),
+  nota: text('nota'),
+  adminId: uuid('admin_id'),
+  adminEmail: text('admin_email'),
+  createdAt: ts('created_at').notNull(),
 }).existing();

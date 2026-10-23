@@ -12,7 +12,7 @@ import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { obtenerPedidoPorFolio } from '@/server/pedidos/lecturas';
-import { ETIQUETA_ESTADO_PEDIDO, ETIQUETA_METODO, fechaCorta } from '../etiquetas';
+import { ETIQUETA_ESTADO_PEDIDO, ETIQUETA_METODO_REGISTRADO, fechaCorta } from '../etiquetas';
 import { FormsPedido } from './FormsPedido';
 
 type Params = Promise<{ folio: string }>;
@@ -160,8 +160,8 @@ export default async function FichaPedido({
                 className={`flex flex-wrap items-baseline gap-x-3 py-2 ${g.anuladaAt ? 'text-tinta-suave' : ''}`}
               >
                 <span className={g.anuladaAt ? 'line-through' : undefined}>
-                  {fechaCorta(g.fecha)} · {ETIQUETA_METODO[g.metodo]} · {g.pagadorNombre} ({g.pagadorTipo})
-                  {g.nota ? ` · ${g.nota}` : ''}
+                  {fechaCorta(g.fecha)} · {ETIQUETA_METODO_REGISTRADO[g.metodo]} · {g.pagadorNombre} (
+                  {g.pagadorTipo}){g.nota ? ` · ${g.nota}` : ''}
                 </span>
                 <span className={`ml-auto ${g.anuladaAt ? 'line-through' : ''}`}>{mxn(g.monto)}</span>
                 {g.anuladaAt && <span className="text-sm">Anulado</span>}

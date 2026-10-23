@@ -20,6 +20,10 @@ export const ETIQUETA_MOVIMIENTO: Record<string, string> = {
   correccion: 'Corrección',
   apartado: 'Apartada en pedido',
   liberacion: 'Liberada',
+  // Plan 3.1.
+  entrega_vendedora: 'Entregada a vendedora',
+  regreso_vendedora: 'Regresó de vendedora',
+  devolucion: 'Devuelta por defecto',
 };
 
 type Manual = 'regalo' | 'defecto' | 'guardada' | 'disponible';

@@ -123,6 +123,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       'precio',
       'proveedor_id',
       'updated_at',
+      'vendedor_custodia_id', // Plan 3.1: entregar/regresar a vendedora
       'version',
     ];
     expect(orden(updates)).toEqual(
@@ -152,6 +153,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       ...t('categoria', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('cliente', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('codigo_recuperacion', 'INSERT', 'SELECT'),
+      ...t('devolucion', 'INSERT', 'SELECT'), // Plan 3.1: no se edita ni se borra
       ...t('exhibidor', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('idempotencia', 'DELETE', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('material', 'INSERT', 'SELECT', 'UPDATE'),

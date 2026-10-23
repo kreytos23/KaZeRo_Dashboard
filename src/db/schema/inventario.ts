@@ -50,6 +50,10 @@ export const tipoMovimiento = pgEnum('tipo_movimiento', [
   // Plan 3: al entrar a un pedido y al salir de él (cancelar o quitar). 'venta' ya existía.
   'apartado',
   'liberacion',
+  // Plan 3.1: custodia de vendedora (D-9) y devolución de una pieza vendida (D-17).
+  'entrega_vendedora',
+  'regreso_vendedora',
+  'devolucion',
 ]);
 export const estadoExhibidor = pgEnum('estado_exhibidor', ['abierto', 'cerrado']);
 
@@ -178,6 +182,9 @@ export const pieza = pgTable(
     // Desnormalización documentada: estado actual (derivable del historial), protegido por trigger y CHECK.
     estado: estadoPieza('estado').notNull().default('disponible'),
     exhibidorId: uuid('exhibidor_id').references(() => exhibidor.id),
+    // Plan 3.1 (D-8): vendedora que tiene la pieza (sin exhibidor). Desnormalización documentada como
+    // exhibidor_id: la protegen el trigger pieza_transicion v5 (0017) y los CHECK de abajo.
+    vendedorCustodiaId: uuid('vendedor_custodia_id').references(() => vendedor.id),
     version: integer('version').notNull().default(1),
     ...tiempos,
   },
@@ -200,6 +207,13 @@ export const pieza = pgTable(
       sql`${t.estado} IN ('en_exhibidor', 'apartada') OR ${t.exhibidorId} IS NULL`,
     ),
     maxLargo('pieza_foto_path_largo', t.fotoPath, 500),
+    index('pieza_vendedor_custodia_idx').on(t.vendedorCustodiaId),
+    check('pieza_una_ubicacion', sql`num_nonnulls(${t.exhibidorId}, ${t.vendedorCustodiaId}) <= 1`),
+    // Como "apartada" conserva el exhibidor, también conserva la vendedora: cancelar la devuelve con ella (D-8).
+    check(
+      'pieza_custodia_solo_si_aplica',
+      sql`${t.estado} IN ('disponible', 'apartada') OR ${t.vendedorCustodiaId} IS NULL`,
+    ),
   ],
 );
 
@@ -222,6 +236,8 @@ export const movimientoPieza = pgTable(
     // Quién hizo el movimiento (Plan 2.1). Nullable: las filas anteriores no lo tienen.
     adminId: uuid('admin_id').references(() => admin.id),
     fecha: ts('fecha').notNull().defaultNow(),
+    // Plan 3.1: vendedora de la entrega/regreso (D-9), de la venta y del cambio manual (D-10, D-12).
+    vendedorId: uuid('vendedor_id').references(() => vendedor.id),
   },
   (t) => [
     index('movimiento_pieza_pieza_idx').on(t.piezaId, t.orden),
@@ -229,6 +245,7 @@ export const movimientoPieza = pgTable(
     check('movimiento_nota_largo', sql`${t.nota} IS NULL OR char_length(${t.nota}) <= 200`),
     index('movimiento_pieza_admin_idx').on(t.adminId),
     index('movimiento_pieza_pedido_idx').on(t.pedidoId),
+    index('movimiento_pieza_vendedor_idx').on(t.vendedorId),
     // `tipo::text` y no el literal del enum: 'correccion' se agrega en esta misma tanda de migraciones (55P04).
     check(
       'movimiento_correccion_completa',

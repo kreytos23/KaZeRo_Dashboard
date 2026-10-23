@@ -104,6 +104,58 @@ describe('traducción de errores de Postgres', () => {
         'Los datos del pedido son inconsistentes. Recarga la página.',
       );
   });
+  it.each([
+    [
+      'pieza_una_ubicacion',
+      'Una pieza no puede estar en un exhibidor y con una vendedora a la vez.',
+      undefined,
+    ],
+    [
+      'pieza_custodia_solo_si_aplica',
+      'Solo una pieza disponible o apartada puede estar con una vendedora.',
+      undefined,
+    ],
+    [
+      'pieza_cambio_custodia',
+      'La pieza debe estar disponible en Kazero para entregarse, y regresar antes de pasar a otra vendedora.',
+      'codigos',
+    ],
+    ['devolucion_pedido_item_uq', 'Esa pieza ya se devolvió.', undefined],
+    ['devolucion_pedido_no_liquidado', 'Solo se devuelven piezas de pedidos liquidados.', undefined],
+    ['devolucion_linea_no_vigente', 'Esa pieza ya no está en el pedido.', undefined],
+    ['devolucion_pieza_no_vendida', 'La pieza no está vendida: no se puede devolver.', undefined],
+    [
+      'devolucion_excede_linea',
+      'La devolución no puede superar lo que costó la pieza en el pedido.',
+      'monto',
+    ],
+    ['devolucion_excede_total', 'Lo devuelto no puede superar el total del pedido.', 'monto'],
+    ['devolucion_fecha', 'La devolución no puede ser anterior a la fecha del pedido.', 'fecha'],
+    ['devolucion_monto_positivo', 'El monto debe ser mayor que cero.', 'monto'],
+    ['devolucion_motivo_largo', 'Escribe el motivo de la devolución (hasta 200 caracteres).', 'motivo'],
+    ['saldo_favor_retiro_completo', 'El retiro necesita una nota (hasta 200 caracteres).', 'nota'],
+    ['saldo_favor_nota_largo', 'La nota admite hasta 200 caracteres.', 'nota'],
+    ['pago_saldo_favor_cliente', 'Solo una clienta puede pagar con su saldo a favor.', undefined],
+  ])('traduce la regla del Plan 3.1 %s', (constraint, mensaje, campo) => {
+    const e = traducirErrorPg(envuelto({ code: 'P0001', constraint }));
+    expect(e).toMatchObject({ codigo: constraint, message: mensaje });
+    expect(e?.campo).toBe(campo);
+  });
+  it('las garantías internas del libro de saldo a favor son "datos inconsistentes"', () => {
+    for (const constraint of [
+      'saldo_favor_signo_v2',
+      'saldo_favor_pedido_requerido_v2',
+      'saldo_favor_origen',
+      'saldo_favor_uso_incoherente',
+      'saldo_favor_devolucion_incoherente',
+      'saldo_favor_uso_faltante',
+      'pago_saldo_sin_aplicacion',
+      'devolucion_sin_saldo',
+    ])
+      expect(traducirErrorPg(envuelto({ code: 'P0001', constraint }))?.message).toBe(
+        'Los datos del pedido son inconsistentes. Recarga la página.',
+      );
+  });
   it('traduce interbloqueos y fallos de serialización', () => {
     for (const code of ['40P01', '40001']) {
       const e = traducirErrorPg(envuelto({ code }));

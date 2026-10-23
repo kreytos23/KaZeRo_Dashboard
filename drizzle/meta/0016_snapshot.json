@@ -1,0 +1,4429 @@
+{
+  "id": "ba79782f-b3ee-45db-a2ed-bbf66d61a340",
+  "prevId": "5b0f2c6e-7a41-4d3e-9c58-2e1f6a9d0b73",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.auditoria": {
+      "name": "auditoria",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "orden": {
+          "name": "orden",
+          "type": "bigserial",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entidad": {
+          "name": "entidad",
+          "type": "entidad_auditoria",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entidad_id": {
+          "name": "entidad_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motivo": {
+          "name": "motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "auditoria_entidad_idx": {
+          "name": "auditoria_entidad_idx",
+          "columns": [
+            {
+              "expression": "entidad",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "entidad_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "orden",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "auditoria_admin_idx": {
+          "name": "auditoria_admin_idx",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "auditoria_admin_id_admin_id_fk": {
+          "name": "auditoria_admin_id_admin_id_fk",
+          "tableFrom": "auditoria",
+          "tableTo": "admin",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "auditoria_motivo_largo": {
+          "name": "auditoria_motivo_largo",
+          "value": "\"auditoria\".\"motivo\" IS NULL OR char_length(btrim(\"auditoria\".\"motivo\")) BETWEEN 1 AND 200"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.auditoria_campo": {
+      "name": "auditoria_campo",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "auditoria_id": {
+          "name": "auditoria_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "posicion": {
+          "name": "posicion",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campo": {
+          "name": "campo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "antes": {
+          "name": "antes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "despues": {
+          "name": "despues",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "auditoria_campo_uq": {
+          "name": "auditoria_campo_uq",
+          "columns": [
+            {
+              "expression": "auditoria_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "posicion",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "auditoria_campo_auditoria_id_auditoria_id_fk": {
+          "name": "auditoria_campo_auditoria_id_auditoria_id_fk",
+          "tableFrom": "auditoria_campo",
+          "tableTo": "auditoria",
+          "columnsFrom": [
+            "auditoria_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "auditoria_campo_nombre": {
+          "name": "auditoria_campo_nombre",
+          "value": "\"auditoria_campo\".\"campo\" ~ '^[a-z_]{1,40}$'"
+        },
+        "auditoria_campo_posicion": {
+          "name": "auditoria_campo_posicion",
+          "value": "\"auditoria_campo\".\"posicion\" BETWEEN 1 AND 50"
+        },
+        "auditoria_campo_largo": {
+          "name": "auditoria_campo_largo",
+          "value": "(\"auditoria_campo\".\"antes\" IS NULL OR char_length(\"auditoria_campo\".\"antes\") <= 2000) AND (\"auditoria_campo\".\"despues\" IS NULL OR char_length(\"auditoria_campo\".\"despues\") <= 2000)"
+        },
+        "auditoria_campo_cambia": {
+          "name": "auditoria_campo_cambia",
+          "value": "\"auditoria_campo\".\"antes\" IS DISTINCT FROM \"auditoria_campo\".\"despues\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.acceso_log": {
+      "name": "acceso_log",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evento": {
+          "name": "evento",
+          "type": "evento_acceso",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip": {
+          "name": "ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "acceso_log_email_fecha_idx": {
+          "name": "acceso_log_email_fecha_idx",
+          "columns": [
+            {
+              "expression": "email",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "acceso_log_fecha_idx": {
+          "name": "acceso_log_fecha_idx",
+          "columns": [
+            {
+              "expression": "created_at",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.admin": {
+      "name": "admin",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "totp_secret_cifrado": {
+          "name": "totp_secret_cifrado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "totp_ultimo_paso": {
+          "name": "totp_ultimo_paso",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "rol": {
+          "name": "rol",
+          "type": "rol_admin",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'admin'"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "admin_email_uq": {
+          "name": "admin_email_uq",
+          "columns": [
+            {
+              "expression": "lower(\"email\")",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.codigo_recuperacion": {
+      "name": "codigo_recuperacion",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hash": {
+          "name": "hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usado_at": {
+          "name": "usado_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "codigo_recuperacion_hash_uq": {
+          "name": "codigo_recuperacion_hash_uq",
+          "columns": [
+            {
+              "expression": "hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "codigo_recuperacion_admin_id_admin_id_fk": {
+          "name": "codigo_recuperacion_admin_id_admin_id_fk",
+          "tableFrom": "codigo_recuperacion",
+          "tableTo": "admin",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.idempotencia": {
+      "name": "idempotencia",
+      "schema": "",
+      "columns": {
+        "key": {
+          "name": "key",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "operacion": {
+          "name": "operacion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "payload_hash": {
+          "name": "payload_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "resultado": {
+          "name": "resultado",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.sesion": {
+      "name": "sesion",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "token_hash": {
+          "name": "token_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nivel": {
+          "name": "nivel",
+          "type": "nivel_sesion",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expira_at": {
+          "name": "expira_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ultimo_uso_at": {
+          "name": "ultimo_uso_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ip": {
+          "name": "ip",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revocada_at": {
+          "name": "revocada_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "sesion_token_hash_uq": {
+          "name": "sesion_token_hash_uq",
+          "columns": [
+            {
+              "expression": "token_hash",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "sesion_admin_idx": {
+          "name": "sesion_admin_idx",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "sesion_admin_id_admin_id_fk": {
+          "name": "sesion_admin_id_admin_id_fk",
+          "tableFrom": "sesion",
+          "tableTo": "admin",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.categoria": {
+      "name": "categoria",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "categoria_nombre_largo": {
+          "name": "categoria_nombre_largo",
+          "value": "char_length(btrim(\"categoria\".\"nombre\")) BETWEEN 1 AND 80"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.cliente": {
+      "name": "cliente",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "referencia": {
+          "name": "referencia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telefono": {
+          "name": "telefono",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cumpleanos": {
+          "name": "cumpleanos",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "red_social": {
+          "name": "red_social",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usuario_red": {
+          "name": "usuario_red",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendedor_habitual_id": {
+          "name": "vendedor_habitual_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notas": {
+          "name": "notas",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "cliente_vendedor_habitual_idx": {
+          "name": "cliente_vendedor_habitual_idx",
+          "columns": [
+            {
+              "expression": "vendedor_habitual_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "cliente_vendedor_habitual_id_vendedor_id_fk": {
+          "name": "cliente_vendedor_habitual_id_vendedor_id_fk",
+          "tableFrom": "cliente",
+          "tableTo": "vendedor",
+          "columnsFrom": [
+            "vendedor_habitual_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "cliente_nombre_largo": {
+          "name": "cliente_nombre_largo",
+          "value": "char_length(btrim(\"cliente\".\"nombre\")) BETWEEN 1 AND 120"
+        },
+        "cliente_referencia_largo": {
+          "name": "cliente_referencia_largo",
+          "value": "\"cliente\".\"referencia\" IS NULL OR char_length(\"cliente\".\"referencia\") <= 120"
+        },
+        "cliente_telefono_largo": {
+          "name": "cliente_telefono_largo",
+          "value": "\"cliente\".\"telefono\" IS NULL OR char_length(\"cliente\".\"telefono\") <= 30"
+        },
+        "cliente_red_social_largo": {
+          "name": "cliente_red_social_largo",
+          "value": "\"cliente\".\"red_social\" IS NULL OR char_length(\"cliente\".\"red_social\") <= 40"
+        },
+        "cliente_usuario_red_largo": {
+          "name": "cliente_usuario_red_largo",
+          "value": "\"cliente\".\"usuario_red\" IS NULL OR char_length(\"cliente\".\"usuario_red\") <= 80"
+        },
+        "cliente_notas_largo": {
+          "name": "cliente_notas_largo",
+          "value": "char_length(\"cliente\".\"notas\") <= 2000"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.exhibidor": {
+      "name": "exhibidor",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "vendedor_id": {
+          "name": "vendedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha_envio": {
+          "name": "fecha_envio",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_exhibidor",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'abierto'"
+        },
+        "cerrado_at": {
+          "name": "cerrado_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "exhibidor_vendedor_idx": {
+          "name": "exhibidor_vendedor_idx",
+          "columns": [
+            {
+              "expression": "vendedor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "exhibidor_vendedor_id_vendedor_id_fk": {
+          "name": "exhibidor_vendedor_id_vendedor_id_fk",
+          "tableFrom": "exhibidor",
+          "tableTo": "vendedor",
+          "columnsFrom": [
+            "vendedor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "exhibidor_nombre_largo": {
+          "name": "exhibidor_nombre_largo",
+          "value": "char_length(btrim(\"exhibidor\".\"nombre\")) BETWEEN 1 AND 120"
+        },
+        "exhibidor_cierre_coherente": {
+          "name": "exhibidor_cierre_coherente",
+          "value": "(\"exhibidor\".\"estado\" = 'cerrado') = (\"exhibidor\".\"cerrado_at\" IS NOT NULL)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.material": {
+      "name": "material",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "material_nombre_largo": {
+          "name": "material_nombre_largo",
+          "value": "char_length(btrim(\"material\".\"nombre\")) BETWEEN 1 AND 80"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.movimiento_pieza": {
+      "name": "movimiento_pieza",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "orden": {
+          "name": "orden",
+          "type": "bigserial",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pieza_id": {
+          "name": "pieza_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_movimiento",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "de_estado": {
+          "name": "de_estado",
+          "type": "estado_pieza",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "a_estado": {
+          "name": "a_estado",
+          "type": "estado_pieza",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exhibidor_id": {
+          "name": "exhibidor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pedido_id": {
+          "name": "pedido_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nota": {
+          "name": "nota",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "vendedor_id": {
+          "name": "vendedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "movimiento_pieza_pieza_idx": {
+          "name": "movimiento_pieza_pieza_idx",
+          "columns": [
+            {
+              "expression": "pieza_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "orden",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "movimiento_pieza_exhibidor_idx": {
+          "name": "movimiento_pieza_exhibidor_idx",
+          "columns": [
+            {
+              "expression": "exhibidor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "movimiento_pieza_admin_idx": {
+          "name": "movimiento_pieza_admin_idx",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "movimiento_pieza_pedido_idx": {
+          "name": "movimiento_pieza_pedido_idx",
+          "columns": [
+            {
+              "expression": "pedido_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "movimiento_pieza_vendedor_idx": {
+          "name": "movimiento_pieza_vendedor_idx",
+          "columns": [
+            {
+              "expression": "vendedor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "movimiento_pieza_pieza_id_pieza_id_fk": {
+          "name": "movimiento_pieza_pieza_id_pieza_id_fk",
+          "tableFrom": "movimiento_pieza",
+          "tableTo": "pieza",
+          "columnsFrom": [
+            "pieza_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "movimiento_pieza_exhibidor_id_exhibidor_id_fk": {
+          "name": "movimiento_pieza_exhibidor_id_exhibidor_id_fk",
+          "tableFrom": "movimiento_pieza",
+          "tableTo": "exhibidor",
+          "columnsFrom": [
+            "exhibidor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "movimiento_pieza_pedido_id_pedido_id_fk": {
+          "name": "movimiento_pieza_pedido_id_pedido_id_fk",
+          "tableFrom": "movimiento_pieza",
+          "tableTo": "pedido",
+          "columnsFrom": [
+            "pedido_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "movimiento_pieza_admin_id_admin_id_fk": {
+          "name": "movimiento_pieza_admin_id_admin_id_fk",
+          "tableFrom": "movimiento_pieza",
+          "tableTo": "admin",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "movimiento_pieza_vendedor_id_vendedor_id_fk": {
+          "name": "movimiento_pieza_vendedor_id_vendedor_id_fk",
+          "tableFrom": "movimiento_pieza",
+          "tableTo": "vendedor",
+          "columnsFrom": [
+            "vendedor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "movimiento_nota_largo": {
+          "name": "movimiento_nota_largo",
+          "value": "\"movimiento_pieza\".\"nota\" IS NULL OR char_length(\"movimiento_pieza\".\"nota\") <= 200"
+        },
+        "movimiento_correccion_completa": {
+          "name": "movimiento_correccion_completa",
+          "value": "\"movimiento_pieza\".\"tipo\"::text <> 'correccion' OR (\"movimiento_pieza\".\"admin_id\" IS NOT NULL AND char_length(btrim(coalesce(\"movimiento_pieza\".\"nota\", ''))) >= 1)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.pieza": {
+      "name": "pieza",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "codigo": {
+          "name": "codigo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "categoria_id": {
+          "name": "categoria_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proveedor_id": {
+          "name": "proveedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "descripcion": {
+          "name": "descripcion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "costo": {
+          "name": "costo",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "precio": {
+          "name": "precio",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha_alta": {
+          "name": "fecha_alta",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "foto_path": {
+          "name": "foto_path",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imagen_clave": {
+          "name": "imagen_clave",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_pieza",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'disponible'"
+        },
+        "exhibidor_id": {
+          "name": "exhibidor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendedor_custodia_id": {
+          "name": "vendedor_custodia_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "pieza_codigo_uq": {
+          "name": "pieza_codigo_uq",
+          "columns": [
+            {
+              "expression": "codigo",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pieza_imagen_clave_uq": {
+          "name": "pieza_imagen_clave_uq",
+          "columns": [
+            {
+              "expression": "imagen_clave",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pieza_estado_idx": {
+          "name": "pieza_estado_idx",
+          "columns": [
+            {
+              "expression": "estado",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pieza_categoria_idx": {
+          "name": "pieza_categoria_idx",
+          "columns": [
+            {
+              "expression": "categoria_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pieza_material_idx": {
+          "name": "pieza_material_idx",
+          "columns": [
+            {
+              "expression": "material_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pieza_proveedor_idx": {
+          "name": "pieza_proveedor_idx",
+          "columns": [
+            {
+              "expression": "proveedor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pieza_exhibidor_idx": {
+          "name": "pieza_exhibidor_idx",
+          "columns": [
+            {
+              "expression": "exhibidor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pieza_vendedor_custodia_idx": {
+          "name": "pieza_vendedor_custodia_idx",
+          "columns": [
+            {
+              "expression": "vendedor_custodia_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pieza_categoria_id_categoria_id_fk": {
+          "name": "pieza_categoria_id_categoria_id_fk",
+          "tableFrom": "pieza",
+          "tableTo": "categoria",
+          "columnsFrom": [
+            "categoria_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pieza_material_id_material_id_fk": {
+          "name": "pieza_material_id_material_id_fk",
+          "tableFrom": "pieza",
+          "tableTo": "material",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pieza_proveedor_id_proveedor_id_fk": {
+          "name": "pieza_proveedor_id_proveedor_id_fk",
+          "tableFrom": "pieza",
+          "tableTo": "proveedor",
+          "columnsFrom": [
+            "proveedor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pieza_exhibidor_id_exhibidor_id_fk": {
+          "name": "pieza_exhibidor_id_exhibidor_id_fk",
+          "tableFrom": "pieza",
+          "tableTo": "exhibidor",
+          "columnsFrom": [
+            "exhibidor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pieza_vendedor_custodia_id_vendedor_id_fk": {
+          "name": "pieza_vendedor_custodia_id_vendedor_id_fk",
+          "tableFrom": "pieza",
+          "tableTo": "vendedor",
+          "columnsFrom": [
+            "vendedor_custodia_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "pieza_codigo_formato": {
+          "name": "pieza_codigo_formato",
+          "value": "\"pieza\".\"codigo\" ~ '^[A-Z0-9][A-Z0-9-]{0,19}$'"
+        },
+        "pieza_descripcion_largo": {
+          "name": "pieza_descripcion_largo",
+          "value": "char_length(btrim(\"pieza\".\"descripcion\")) BETWEEN 1 AND 300"
+        },
+        "pieza_montos": {
+          "name": "pieza_montos",
+          "value": "\"pieza\".\"costo\" >= 0 AND \"pieza\".\"precio\" >= 0"
+        },
+        "pieza_exhibidor_coherente": {
+          "name": "pieza_exhibidor_coherente",
+          "value": "\"pieza\".\"estado\" <> 'en_exhibidor' OR \"pieza\".\"exhibidor_id\" IS NOT NULL"
+        },
+        "pieza_exhibidor_solo_si_aplica": {
+          "name": "pieza_exhibidor_solo_si_aplica",
+          "value": "\"pieza\".\"estado\" IN ('en_exhibidor', 'apartada') OR \"pieza\".\"exhibidor_id\" IS NULL"
+        },
+        "pieza_foto_path_largo": {
+          "name": "pieza_foto_path_largo",
+          "value": "\"pieza\".\"foto_path\" IS NULL OR char_length(\"pieza\".\"foto_path\") <= 500"
+        },
+        "pieza_una_ubicacion": {
+          "name": "pieza_una_ubicacion",
+          "value": "num_nonnulls(\"pieza\".\"exhibidor_id\", \"pieza\".\"vendedor_custodia_id\") <= 1"
+        },
+        "pieza_custodia_solo_si_aplica": {
+          "name": "pieza_custodia_solo_si_aplica",
+          "value": "\"pieza\".\"estado\" IN ('disponible', 'apartada') OR \"pieza\".\"vendedor_custodia_id\" IS NULL"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.proveedor": {
+      "name": "proveedor",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "proveedor_nombre_largo": {
+          "name": "proveedor_nombre_largo",
+          "value": "char_length(btrim(\"proveedor\".\"nombre\")) BETWEEN 1 AND 80"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.vendedor": {
+      "name": "vendedor",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_vendedor",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "comision_pct": {
+          "name": "comision_pct",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "vendedor_nombre_largo": {
+          "name": "vendedor_nombre_largo",
+          "value": "char_length(btrim(\"vendedor\".\"nombre\")) BETWEEN 1 AND 80"
+        },
+        "vendedor_comision_rango": {
+          "name": "vendedor_comision_rango",
+          "value": "\"vendedor\".\"comision_pct\" >= 0 AND \"vendedor\".\"comision_pct\" <= 100"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.origen_excel": {
+      "name": "origen_excel",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "lote": {
+          "name": "lote",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clave": {
+          "name": "clave",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "hoja": {
+          "name": "hoja",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "filas": {
+          "name": "filas",
+          "type": "integer[]",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::integer[]"
+        },
+        "hash_contenido": {
+          "name": "hash_contenido",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "datos": {
+          "name": "datos",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'{}'::jsonb"
+        },
+        "categoria_id": {
+          "name": "categoria_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proveedor_id": {
+          "name": "proveedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendedor_id": {
+          "name": "vendedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exhibidor_id": {
+          "name": "exhibidor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pieza_id": {
+          "name": "pieza_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pedido_id": {
+          "name": "pedido_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pago_id": {
+          "name": "pago_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "origen_excel_clave_uq": {
+          "name": "origen_excel_clave_uq",
+          "columns": [
+            {
+              "expression": "lote",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "clave",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "origen_excel_categoria_idx": {
+          "name": "origen_excel_categoria_idx",
+          "columns": [
+            {
+              "expression": "categoria_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"origen_excel\".\"categoria_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "origen_excel_material_idx": {
+          "name": "origen_excel_material_idx",
+          "columns": [
+            {
+              "expression": "material_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"origen_excel\".\"material_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "origen_excel_proveedor_idx": {
+          "name": "origen_excel_proveedor_idx",
+          "columns": [
+            {
+              "expression": "proveedor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"origen_excel\".\"proveedor_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "origen_excel_vendedor_idx": {
+          "name": "origen_excel_vendedor_idx",
+          "columns": [
+            {
+              "expression": "vendedor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"origen_excel\".\"vendedor_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "origen_excel_cliente_idx": {
+          "name": "origen_excel_cliente_idx",
+          "columns": [
+            {
+              "expression": "cliente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"origen_excel\".\"cliente_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "origen_excel_exhibidor_idx": {
+          "name": "origen_excel_exhibidor_idx",
+          "columns": [
+            {
+              "expression": "exhibidor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"origen_excel\".\"exhibidor_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "origen_excel_pieza_idx": {
+          "name": "origen_excel_pieza_idx",
+          "columns": [
+            {
+              "expression": "pieza_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"origen_excel\".\"pieza_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "origen_excel_pedido_idx": {
+          "name": "origen_excel_pedido_idx",
+          "columns": [
+            {
+              "expression": "pedido_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"origen_excel\".\"pedido_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "origen_excel_pago_idx": {
+          "name": "origen_excel_pago_idx",
+          "columns": [
+            {
+              "expression": "pago_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"origen_excel\".\"pago_id\" IS NOT NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "origen_excel_categoria_id_categoria_id_fk": {
+          "name": "origen_excel_categoria_id_categoria_id_fk",
+          "tableFrom": "origen_excel",
+          "tableTo": "categoria",
+          "columnsFrom": [
+            "categoria_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "origen_excel_material_id_material_id_fk": {
+          "name": "origen_excel_material_id_material_id_fk",
+          "tableFrom": "origen_excel",
+          "tableTo": "material",
+          "columnsFrom": [
+            "material_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "origen_excel_proveedor_id_proveedor_id_fk": {
+          "name": "origen_excel_proveedor_id_proveedor_id_fk",
+          "tableFrom": "origen_excel",
+          "tableTo": "proveedor",
+          "columnsFrom": [
+            "proveedor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "origen_excel_vendedor_id_vendedor_id_fk": {
+          "name": "origen_excel_vendedor_id_vendedor_id_fk",
+          "tableFrom": "origen_excel",
+          "tableTo": "vendedor",
+          "columnsFrom": [
+            "vendedor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "origen_excel_cliente_id_cliente_id_fk": {
+          "name": "origen_excel_cliente_id_cliente_id_fk",
+          "tableFrom": "origen_excel",
+          "tableTo": "cliente",
+          "columnsFrom": [
+            "cliente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "origen_excel_exhibidor_id_exhibidor_id_fk": {
+          "name": "origen_excel_exhibidor_id_exhibidor_id_fk",
+          "tableFrom": "origen_excel",
+          "tableTo": "exhibidor",
+          "columnsFrom": [
+            "exhibidor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "origen_excel_pieza_id_pieza_id_fk": {
+          "name": "origen_excel_pieza_id_pieza_id_fk",
+          "tableFrom": "origen_excel",
+          "tableTo": "pieza",
+          "columnsFrom": [
+            "pieza_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "origen_excel_pedido_id_pedido_id_fk": {
+          "name": "origen_excel_pedido_id_pedido_id_fk",
+          "tableFrom": "origen_excel",
+          "tableTo": "pedido",
+          "columnsFrom": [
+            "pedido_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "origen_excel_pago_id_pago_id_fk": {
+          "name": "origen_excel_pago_id_pago_id_fk",
+          "tableFrom": "origen_excel",
+          "tableTo": "pago",
+          "columnsFrom": [
+            "pago_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "origen_excel_lote_formato": {
+          "name": "origen_excel_lote_formato",
+          "value": "\"origen_excel\".\"lote\" ~ '^[a-z0-9-]{1,40}$'"
+        },
+        "origen_excel_clave_largo": {
+          "name": "origen_excel_clave_largo",
+          "value": "char_length(\"origen_excel\".\"clave\") BETWEEN 1 AND 200"
+        },
+        "origen_excel_hoja_largo": {
+          "name": "origen_excel_hoja_largo",
+          "value": "char_length(\"origen_excel\".\"hoja\") BETWEEN 1 AND 60"
+        },
+        "origen_excel_hash_formato": {
+          "name": "origen_excel_hash_formato",
+          "value": "\"origen_excel\".\"hash_contenido\" ~ '^[0-9a-f]{64}$'"
+        },
+        "origen_excel_una_entidad": {
+          "name": "origen_excel_una_entidad",
+          "value": "num_nonnulls(\"origen_excel\".\"categoria_id\", \"origen_excel\".\"material_id\", \"origen_excel\".\"proveedor_id\", \"origen_excel\".\"vendedor_id\", \"origen_excel\".\"cliente_id\", \"origen_excel\".\"exhibidor_id\", \"origen_excel\".\"pieza_id\", \"origen_excel\".\"pedido_id\", \"origen_excel\".\"pago_id\") = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.aplicacion_pago": {
+      "name": "aplicacion_pago",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "pago_id": {
+          "name": "pago_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pedido_id": {
+          "name": "pedido_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anulada_at": {
+          "name": "anulada_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "aplicacion_pago_pago_idx": {
+          "name": "aplicacion_pago_pago_idx",
+          "columns": [
+            {
+              "expression": "pago_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "aplicacion_pago_pedido_idx": {
+          "name": "aplicacion_pago_pedido_idx",
+          "columns": [
+            {
+              "expression": "pedido_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "aplicacion_pago_pago_id_pago_id_fk": {
+          "name": "aplicacion_pago_pago_id_pago_id_fk",
+          "tableFrom": "aplicacion_pago",
+          "tableTo": "pago",
+          "columnsFrom": [
+            "pago_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "aplicacion_pago_pedido_id_pedido_id_fk": {
+          "name": "aplicacion_pago_pedido_id_pedido_id_fk",
+          "tableFrom": "aplicacion_pago",
+          "tableTo": "pedido",
+          "columnsFrom": [
+            "pedido_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "aplicacion_pago_monto_positivo": {
+          "name": "aplicacion_pago_monto_positivo",
+          "value": "\"aplicacion_pago\".\"monto\" > 0"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.devolucion": {
+      "name": "devolucion",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "pedido_item_id": {
+          "name": "pedido_item_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motivo": {
+          "name": "motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "devolucion_pedido_item_uq": {
+          "name": "devolucion_pedido_item_uq",
+          "columns": [
+            {
+              "expression": "pedido_item_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "devolucion_admin_idx": {
+          "name": "devolucion_admin_idx",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "devolucion_pedido_item_id_pedido_item_id_fk": {
+          "name": "devolucion_pedido_item_id_pedido_item_id_fk",
+          "tableFrom": "devolucion",
+          "tableTo": "pedido_item",
+          "columnsFrom": [
+            "pedido_item_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "devolucion_admin_id_admin_id_fk": {
+          "name": "devolucion_admin_id_admin_id_fk",
+          "tableFrom": "devolucion",
+          "tableTo": "admin",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "devolucion_monto_positivo": {
+          "name": "devolucion_monto_positivo",
+          "value": "\"devolucion\".\"monto\" > 0"
+        },
+        "devolucion_motivo_largo": {
+          "name": "devolucion_motivo_largo",
+          "value": "char_length(btrim(\"devolucion\".\"motivo\")) BETWEEN 1 AND 200"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.pago": {
+      "name": "pago",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "idempotency_key": {
+          "name": "idempotency_key",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metodo": {
+          "name": "metodo",
+          "type": "metodo_pago",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pagador_cliente_id": {
+          "name": "pagador_cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pagador_vendedor_id": {
+          "name": "pagador_vendedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nota": {
+          "name": "nota",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "pago_idempotency_key_uq": {
+          "name": "pago_idempotency_key_uq",
+          "columns": [
+            {
+              "expression": "idempotency_key",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pago_pagador_cliente_idx": {
+          "name": "pago_pagador_cliente_idx",
+          "columns": [
+            {
+              "expression": "pagador_cliente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pago_pagador_vendedor_idx": {
+          "name": "pago_pagador_vendedor_idx",
+          "columns": [
+            {
+              "expression": "pagador_vendedor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pago_admin_idx": {
+          "name": "pago_admin_idx",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pago_pagador_cliente_id_cliente_id_fk": {
+          "name": "pago_pagador_cliente_id_cliente_id_fk",
+          "tableFrom": "pago",
+          "tableTo": "cliente",
+          "columnsFrom": [
+            "pagador_cliente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pago_pagador_vendedor_id_vendedor_id_fk": {
+          "name": "pago_pagador_vendedor_id_vendedor_id_fk",
+          "tableFrom": "pago",
+          "tableTo": "vendedor",
+          "columnsFrom": [
+            "pagador_vendedor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pago_admin_id_admin_id_fk": {
+          "name": "pago_admin_id_admin_id_fk",
+          "tableFrom": "pago",
+          "tableTo": "admin",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "pago_monto_positivo": {
+          "name": "pago_monto_positivo",
+          "value": "\"pago\".\"monto\" > 0"
+        },
+        "pago_un_pagador": {
+          "name": "pago_un_pagador",
+          "value": "num_nonnulls(\"pago\".\"pagador_cliente_id\", \"pago\".\"pagador_vendedor_id\") = 1"
+        },
+        "pago_nota_largo": {
+          "name": "pago_nota_largo",
+          "value": "\"pago\".\"nota\" IS NULL OR char_length(\"pago\".\"nota\") <= 200"
+        },
+        "pago_saldo_favor_cliente": {
+          "name": "pago_saldo_favor_cliente",
+          "value": "\"pago\".\"metodo\"::text <> 'saldo_favor' OR \"pago\".\"pagador_cliente_id\" IS NOT NULL"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.pedido": {
+      "name": "pedido",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "folio": {
+          "name": "folio",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "pedido_folio_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "2147483647",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vendedor_id": {
+          "name": "vendedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_pedido",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'abierto'"
+        },
+        "cuenta_tarjeta": {
+          "name": "cuenta_tarjeta",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "ciclo_tarjeta": {
+          "name": "ciclo_tarjeta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "posicion_tarjeta": {
+          "name": "posicion_tarjeta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "descuento_lealtad_pct": {
+          "name": "descuento_lealtad_pct",
+          "type": "numeric(5, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "sin_lealtad_motivo": {
+          "name": "sin_lealtad_motivo",
+          "type": "motivo_sin_lealtad",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "descuento_manual_monto": {
+          "name": "descuento_manual_monto",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
+        "descuento_manual_motivo": {
+          "name": "descuento_manual_motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "total": {
+          "name": "total",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notas": {
+          "name": "notas",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "liquidado_at": {
+          "name": "liquidado_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelado_at": {
+          "name": "cancelado_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelacion_motivo": {
+          "name": "cancelacion_motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "pedido_folio_uq": {
+          "name": "pedido_folio_uq",
+          "columns": [
+            {
+              "expression": "folio",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pedido_cliente_idx": {
+          "name": "pedido_cliente_idx",
+          "columns": [
+            {
+              "expression": "cliente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "fecha",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pedido_vendedor_idx": {
+          "name": "pedido_vendedor_idx",
+          "columns": [
+            {
+              "expression": "vendedor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pedido_estado_idx": {
+          "name": "pedido_estado_idx",
+          "columns": [
+            {
+              "expression": "estado",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pedido_admin_idx": {
+          "name": "pedido_admin_idx",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pedido_tarjeta_posicion_uq": {
+          "name": "pedido_tarjeta_posicion_uq",
+          "columns": [
+            {
+              "expression": "cliente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "ciclo_tarjeta",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "posicion_tarjeta",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"pedido\".\"estado\" <> 'cancelado' AND \"pedido\".\"cuenta_tarjeta\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pedido_cliente_id_cliente_id_fk": {
+          "name": "pedido_cliente_id_cliente_id_fk",
+          "tableFrom": "pedido",
+          "tableTo": "cliente",
+          "columnsFrom": [
+            "cliente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pedido_vendedor_id_vendedor_id_fk": {
+          "name": "pedido_vendedor_id_vendedor_id_fk",
+          "tableFrom": "pedido",
+          "tableTo": "vendedor",
+          "columnsFrom": [
+            "vendedor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pedido_admin_id_admin_id_fk": {
+          "name": "pedido_admin_id_admin_id_fk",
+          "tableFrom": "pedido",
+          "tableTo": "admin",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "pedido_folio_positivo": {
+          "name": "pedido_folio_positivo",
+          "value": "\"pedido\".\"folio\" > 0"
+        },
+        "pedido_tarjeta_coherente": {
+          "name": "pedido_tarjeta_coherente",
+          "value": "(\"pedido\".\"cuenta_tarjeta\" AND \"pedido\".\"ciclo_tarjeta\" IS NOT NULL AND \"pedido\".\"posicion_tarjeta\" IS NOT NULL)\n        OR (NOT \"pedido\".\"cuenta_tarjeta\" AND \"pedido\".\"ciclo_tarjeta\" IS NULL AND \"pedido\".\"posicion_tarjeta\" IS NULL\n            AND \"pedido\".\"descuento_lealtad_pct\" = 0 AND \"pedido\".\"sin_lealtad_motivo\" IS NULL)"
+        },
+        "pedido_posicion_rango": {
+          "name": "pedido_posicion_rango",
+          "value": "\"pedido\".\"ciclo_tarjeta\" >= 1 AND \"pedido\".\"posicion_tarjeta\" BETWEEN 1 AND 10"
+        },
+        "pedido_lealtad_pct_rango": {
+          "name": "pedido_lealtad_pct_rango",
+          "value": "\"pedido\".\"descuento_lealtad_pct\" >= 0 AND \"pedido\".\"descuento_lealtad_pct\" <= 100"
+        },
+        "pedido_sin_lealtad_coherente": {
+          "name": "pedido_sin_lealtad_coherente",
+          "value": "\"pedido\".\"sin_lealtad_motivo\" IS NULL OR \"pedido\".\"descuento_lealtad_pct\" = 0"
+        },
+        "pedido_descuento_manual": {
+          "name": "pedido_descuento_manual",
+          "value": "(\"pedido\".\"descuento_manual_monto\" = 0 AND \"pedido\".\"descuento_manual_motivo\" IS NULL)\n        OR (\"pedido\".\"descuento_manual_monto\" > 0 AND \"pedido\".\"descuento_manual_motivo\" IS NOT NULL\n            AND char_length(btrim(\"pedido\".\"descuento_manual_motivo\")) BETWEEN 1 AND 200)"
+        },
+        "pedido_total_no_negativo": {
+          "name": "pedido_total_no_negativo",
+          "value": "\"pedido\".\"total\" >= 0"
+        },
+        "pedido_notas_largo": {
+          "name": "pedido_notas_largo",
+          "value": "char_length(\"pedido\".\"notas\") <= 500"
+        },
+        "pedido_liquidado_coherente": {
+          "name": "pedido_liquidado_coherente",
+          "value": "(\"pedido\".\"estado\" = 'liquidado') = (\"pedido\".\"liquidado_at\" IS NOT NULL)"
+        },
+        "pedido_cancelado_coherente": {
+          "name": "pedido_cancelado_coherente",
+          "value": "(\"pedido\".\"estado\" = 'cancelado') = (\"pedido\".\"cancelado_at\" IS NOT NULL)\n        AND (\"pedido\".\"estado\" = 'cancelado') = (\"pedido\".\"cancelacion_motivo\" IS NOT NULL)\n        AND (\"pedido\".\"cancelacion_motivo\" IS NULL OR char_length(btrim(\"pedido\".\"cancelacion_motivo\")) BETWEEN 1 AND 200)"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.pedido_item": {
+      "name": "pedido_item",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "pedido_id": {
+          "name": "pedido_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pieza_id": {
+          "name": "pieza_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "precio_lista": {
+          "name": "precio_lista",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "precio_final": {
+          "name": "precio_final",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vigente": {
+          "name": "vigente",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "quitado_at": {
+          "name": "quitado_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "pedido_item_pedido_idx": {
+          "name": "pedido_item_pedido_idx",
+          "columns": [
+            {
+              "expression": "pedido_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pedido_item_pieza_idx": {
+          "name": "pedido_item_pieza_idx",
+          "columns": [
+            {
+              "expression": "pieza_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "pedido_item_pieza_activa_uq": {
+          "name": "pedido_item_pieza_activa_uq",
+          "columns": [
+            {
+              "expression": "pieza_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "where": "\"pedido_item\".\"vigente\"",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "pedido_item_pedido_id_pedido_id_fk": {
+          "name": "pedido_item_pedido_id_pedido_id_fk",
+          "tableFrom": "pedido_item",
+          "tableTo": "pedido",
+          "columnsFrom": [
+            "pedido_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "pedido_item_pieza_id_pieza_id_fk": {
+          "name": "pedido_item_pieza_id_pieza_id_fk",
+          "tableFrom": "pedido_item",
+          "tableTo": "pieza",
+          "columnsFrom": [
+            "pieza_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "pedido_item_precios": {
+          "name": "pedido_item_precios",
+          "value": "\"pedido_item\".\"precio_final\" >= 0 AND \"pedido_item\".\"precio_final\" <= \"pedido_item\".\"precio_lista\""
+        },
+        "pedido_item_quitado_coherente": {
+          "name": "pedido_item_quitado_coherente",
+          "value": "\"pedido_item\".\"quitado_at\" IS NULL OR NOT \"pedido_item\".\"vigente\""
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.saldo_favor_mov": {
+      "name": "saldo_favor_mov",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendedor_id": {
+          "name": "vendedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_saldo_favor",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "numeric(12, 2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pedido_id": {
+          "name": "pedido_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "aplicacion_pago_id": {
+          "name": "aplicacion_pago_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "devolucion_id": {
+          "name": "devolucion_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "nota": {
+          "name": "nota",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {
+        "saldo_favor_mov_cliente_idx": {
+          "name": "saldo_favor_mov_cliente_idx",
+          "columns": [
+            {
+              "expression": "cliente_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "saldo_favor_mov_vendedor_idx": {
+          "name": "saldo_favor_mov_vendedor_idx",
+          "columns": [
+            {
+              "expression": "vendedor_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "saldo_favor_mov_pedido_idx": {
+          "name": "saldo_favor_mov_pedido_idx",
+          "columns": [
+            {
+              "expression": "pedido_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "saldo_favor_mov_aplicacion_uq": {
+          "name": "saldo_favor_mov_aplicacion_uq",
+          "columns": [
+            {
+              "expression": "aplicacion_pago_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "saldo_favor_mov_devolucion_uq": {
+          "name": "saldo_favor_mov_devolucion_uq",
+          "columns": [
+            {
+              "expression": "devolucion_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "saldo_favor_mov_admin_idx": {
+          "name": "saldo_favor_mov_admin_idx",
+          "columns": [
+            {
+              "expression": "admin_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "saldo_favor_mov_cliente_id_cliente_id_fk": {
+          "name": "saldo_favor_mov_cliente_id_cliente_id_fk",
+          "tableFrom": "saldo_favor_mov",
+          "tableTo": "cliente",
+          "columnsFrom": [
+            "cliente_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "saldo_favor_mov_vendedor_id_vendedor_id_fk": {
+          "name": "saldo_favor_mov_vendedor_id_vendedor_id_fk",
+          "tableFrom": "saldo_favor_mov",
+          "tableTo": "vendedor",
+          "columnsFrom": [
+            "vendedor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "saldo_favor_mov_pedido_id_pedido_id_fk": {
+          "name": "saldo_favor_mov_pedido_id_pedido_id_fk",
+          "tableFrom": "saldo_favor_mov",
+          "tableTo": "pedido",
+          "columnsFrom": [
+            "pedido_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "saldo_favor_mov_aplicacion_pago_id_aplicacion_pago_id_fk": {
+          "name": "saldo_favor_mov_aplicacion_pago_id_aplicacion_pago_id_fk",
+          "tableFrom": "saldo_favor_mov",
+          "tableTo": "aplicacion_pago",
+          "columnsFrom": [
+            "aplicacion_pago_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "saldo_favor_mov_devolucion_id_devolucion_id_fk": {
+          "name": "saldo_favor_mov_devolucion_id_devolucion_id_fk",
+          "tableFrom": "saldo_favor_mov",
+          "tableTo": "devolucion",
+          "columnsFrom": [
+            "devolucion_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "saldo_favor_mov_admin_id_admin_id_fk": {
+          "name": "saldo_favor_mov_admin_id_admin_id_fk",
+          "tableFrom": "saldo_favor_mov",
+          "tableTo": "admin",
+          "columnsFrom": [
+            "admin_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "saldo_favor_un_titular": {
+          "name": "saldo_favor_un_titular",
+          "value": "num_nonnulls(\"saldo_favor_mov\".\"cliente_id\", \"saldo_favor_mov\".\"vendedor_id\") = 1"
+        },
+        "saldo_favor_signo_v2": {
+          "name": "saldo_favor_signo_v2",
+          "value": "(\"saldo_favor_mov\".\"tipo\"::text IN ('uso', 'retiro') AND \"saldo_favor_mov\".\"monto\" < 0) OR (\"saldo_favor_mov\".\"tipo\"::text NOT IN ('uso', 'retiro') AND \"saldo_favor_mov\".\"monto\" > 0)"
+        },
+        "saldo_favor_pedido_requerido_v2": {
+          "name": "saldo_favor_pedido_requerido_v2",
+          "value": "\"saldo_favor_mov\".\"tipo\"::text IN ('sobrante', 'retiro') OR \"saldo_favor_mov\".\"pedido_id\" IS NOT NULL"
+        },
+        "saldo_favor_origen": {
+          "name": "saldo_favor_origen",
+          "value": "(\"saldo_favor_mov\".\"tipo\"::text = 'uso') = (\"saldo_favor_mov\".\"aplicacion_pago_id\" IS NOT NULL) AND (\"saldo_favor_mov\".\"tipo\"::text = 'devolucion') = (\"saldo_favor_mov\".\"devolucion_id\" IS NOT NULL)"
+        },
+        "saldo_favor_retiro_completo": {
+          "name": "saldo_favor_retiro_completo",
+          "value": "\"saldo_favor_mov\".\"tipo\"::text <> 'retiro' OR (\"saldo_favor_mov\".\"admin_id\" IS NOT NULL AND char_length(btrim(coalesce(\"saldo_favor_mov\".\"nota\", ''))) BETWEEN 1 AND 200)"
+        },
+        "saldo_favor_nota_largo": {
+          "name": "saldo_favor_nota_largo",
+          "value": "\"saldo_favor_mov\".\"nota\" IS NULL OR char_length(\"saldo_favor_mov\".\"nota\") <= 200"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.entidad_auditoria": {
+      "name": "entidad_auditoria",
+      "schema": "public",
+      "values": [
+        "pieza",
+        "vendedor",
+        "cliente",
+        "exhibidor",
+        "categoria",
+        "material",
+        "proveedor",
+        "pedido"
+      ]
+    },
+    "public.evento_acceso": {
+      "name": "evento_acceso",
+      "schema": "public",
+      "values": [
+        "login_ok",
+        "password_fallido",
+        "totp_fallido",
+        "bloqueado",
+        "logout",
+        "logout_todos",
+        "codigo_recuperacion_usado",
+        "admin_creado",
+        "totp_regenerado"
+      ]
+    },
+    "public.nivel_sesion": {
+      "name": "nivel_sesion",
+      "schema": "public",
+      "values": [
+        "pre_mfa",
+        "completa"
+      ]
+    },
+    "public.rol_admin": {
+      "name": "rol_admin",
+      "schema": "public",
+      "values": [
+        "admin"
+      ]
+    },
+    "public.estado_exhibidor": {
+      "name": "estado_exhibidor",
+      "schema": "public",
+      "values": [
+        "abierto",
+        "cerrado"
+      ]
+    },
+    "public.estado_pieza": {
+      "name": "estado_pieza",
+      "schema": "public",
+      "values": [
+        "disponible",
+        "en_exhibidor",
+        "apartada",
+        "vendida",
+        "regalo",
+        "defecto",
+        "guardada"
+      ]
+    },
+    "public.tipo_movimiento": {
+      "name": "tipo_movimiento",
+      "schema": "public",
+      "values": [
+        "alta",
+        "envio_exhibidor",
+        "regreso",
+        "venta",
+        "cancelacion_venta",
+        "cambio_estado",
+        "correccion",
+        "apartado",
+        "liberacion",
+        "entrega_vendedora",
+        "regreso_vendedora",
+        "devolucion"
+      ]
+    },
+    "public.tipo_vendedor": {
+      "name": "tipo_vendedor",
+      "schema": "public",
+      "values": [
+        "casa",
+        "revendedora",
+        "consignacion"
+      ]
+    },
+    "public.estado_pedido": {
+      "name": "estado_pedido",
+      "schema": "public",
+      "values": [
+        "abierto",
+        "liquidado",
+        "cancelado"
+      ]
+    },
+    "public.metodo_pago": {
+      "name": "metodo_pago",
+      "schema": "public",
+      "values": [
+        "transferencia",
+        "efectivo",
+        "otro",
+        "saldo_favor"
+      ]
+    },
+    "public.motivo_sin_lealtad": {
+      "name": "motivo_sin_lealtad",
+      "schema": "public",
+      "values": [
+        "saldo_pendiente"
+      ]
+    },
+    "public.tipo_saldo_favor": {
+      "name": "tipo_saldo_favor",
+      "schema": "public",
+      "values": [
+        "cancelacion",
+        "sobrante",
+        "uso",
+        "devolucion",
+        "retiro"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {
+    "public.v_admin": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "name": "v_admin",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_aplicacion_pago": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pedido_id": {
+          "name": "pedido_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pago_id": {
+          "name": "pago_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monto": {
+          "name": "monto",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "anulada_at": {
+          "name": "anulada_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metodo": {
+          "name": "metodo",
+          "type": "metodo_pago",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nota": {
+          "name": "nota",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pagador_tipo": {
+          "name": "pagador_tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pagador_nombre": {
+          "name": "pagador_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "name": "v_aplicacion_pago",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_auditoria": {
+      "columns": {
+        "auditoria_id": {
+          "name": "auditoria_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "orden": {
+          "name": "orden",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entidad": {
+          "name": "entidad",
+          "type": "entidad_auditoria",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entidad_id": {
+          "name": "entidad_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "motivo": {
+          "name": "motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "admin_email": {
+          "name": "admin_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "posicion": {
+          "name": "posicion",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campo": {
+          "name": "campo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "antes": {
+          "name": "antes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "despues": {
+          "name": "despues",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "name": "v_auditoria",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_catalogo": {
+      "columns": {
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "name": "v_catalogo",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_cliente": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "referencia": {
+          "name": "referencia",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "telefono": {
+          "name": "telefono",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cumpleanos": {
+          "name": "cumpleanos",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "red_social": {
+          "name": "red_social",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "usuario_red": {
+          "name": "usuario_red",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendedor_habitual_id": {
+          "name": "vendedor_habitual_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendedor_habitual_nombre": {
+          "name": "vendedor_habitual_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "notas": {
+          "name": "notas",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "name": "v_cliente",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_exhibidor": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha_envio": {
+          "name": "fecha_envio",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_exhibidor",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vendedor_id": {
+          "name": "vendedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vendedor_nombre": {
+          "name": "vendedor_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "piezas_actuales": {
+          "name": "piezas_actuales",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "piezas_apartadas": {
+          "name": "piezas_apartadas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "name": "v_exhibidor",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_movimiento_pieza": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "orden": {
+          "name": "orden",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pieza_id": {
+          "name": "pieza_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_movimiento",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "de_estado": {
+          "name": "de_estado",
+          "type": "estado_pieza",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "a_estado": {
+          "name": "a_estado",
+          "type": "estado_pieza",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nota": {
+          "name": "nota",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exhibidor_id": {
+          "name": "exhibidor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exhibidor_nombre": {
+          "name": "exhibidor_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "admin_id": {
+          "name": "admin_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "admin_email": {
+          "name": "admin_email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exhibidor_estado": {
+          "name": "exhibidor_estado",
+          "type": "estado_exhibidor",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pedido_id": {
+          "name": "pedido_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pedido_folio": {
+          "name": "pedido_folio",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "name": "v_movimiento_pieza",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_pedido": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "folio": {
+          "name": "folio",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha": {
+          "name": "fecha",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_pedido",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cliente_nombre": {
+          "name": "cliente_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vendedor_id": {
+          "name": "vendedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vendedor_nombre": {
+          "name": "vendedor_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cuenta_tarjeta": {
+          "name": "cuenta_tarjeta",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ciclo_tarjeta": {
+          "name": "ciclo_tarjeta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "posicion_tarjeta": {
+          "name": "posicion_tarjeta",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "descuento_lealtad_pct": {
+          "name": "descuento_lealtad_pct",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sin_lealtad_motivo": {
+          "name": "sin_lealtad_motivo",
+          "type": "motivo_sin_lealtad",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "descuento_manual_monto": {
+          "name": "descuento_manual_monto",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descuento_manual_motivo": {
+          "name": "descuento_manual_motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "subtotal": {
+          "name": "subtotal",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descuento_lealtad_monto": {
+          "name": "descuento_lealtad_monto",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "total": {
+          "name": "total",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pagado": {
+          "name": "pagado",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "saldo": {
+          "name": "saldo",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "piezas": {
+          "name": "piezas",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notas": {
+          "name": "notas",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "liquidado_at": {
+          "name": "liquidado_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelado_at": {
+          "name": "cancelado_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cancelacion_motivo": {
+          "name": "cancelacion_motivo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "name": "v_pedido",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_pedido_item": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pedido_id": {
+          "name": "pedido_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "folio": {
+          "name": "folio",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pedido_estado": {
+          "name": "pedido_estado",
+          "type": "estado_pedido",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cliente_nombre": {
+          "name": "cliente_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pieza_id": {
+          "name": "pieza_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "codigo": {
+          "name": "codigo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descripcion": {
+          "name": "descripcion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "pieza_estado": {
+          "name": "pieza_estado",
+          "type": "estado_pieza",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "exhibidor_id": {
+          "name": "exhibidor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "precio_lista": {
+          "name": "precio_lista",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "precio_final": {
+          "name": "precio_final",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "vigente": {
+          "name": "vigente",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quitado_at": {
+          "name": "quitado_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "name": "v_pedido_item",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_pieza": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "codigo": {
+          "name": "codigo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "descripcion": {
+          "name": "descripcion",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "costo": {
+          "name": "costo",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "precio": {
+          "name": "precio",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha_alta": {
+          "name": "fecha_alta",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estado": {
+          "name": "estado",
+          "type": "estado_pieza",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "categoria_id": {
+          "name": "categoria_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "categoria_nombre": {
+          "name": "categoria_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "material_id": {
+          "name": "material_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "material_nombre": {
+          "name": "material_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proveedor_id": {
+          "name": "proveedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "proveedor_nombre": {
+          "name": "proveedor_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exhibidor_id": {
+          "name": "exhibidor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "exhibidor_nombre": {
+          "name": "exhibidor_nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "imagen_clave": {
+          "name": "imagen_clave",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "name": "v_pieza",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_saldo_favor": {
+      "columns": {
+        "cliente_id": {
+          "name": "cliente_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "vendedor_id": {
+          "name": "vendedor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "saldo": {
+          "name": "saldo",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "name": "v_saldo_favor",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    },
+    "public.v_vendedor": {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "tipo_vendedor",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "comision_pct": {
+          "name": "comision_pct",
+          "type": "numeric",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "activo": {
+          "name": "activo",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "version": {
+          "name": "version",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "name": "v_vendedor",
+      "schema": "public",
+      "isExisting": true,
+      "materialized": false
+    }
+  },
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
