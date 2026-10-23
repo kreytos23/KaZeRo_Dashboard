@@ -23,7 +23,8 @@
     "db:migrar": "tsx scripts/db-migrar.ts",
     "admin:crear": "tsx scripts/crear-admin.ts",
     "bd:configurar": "tsx scripts/configurar-bd.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "excel:migrar": "tsx scripts/migrar-excel.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.2.0",
@@ -31,7 +32,7 @@
     "@vercel/blob": "2.8.0",
     "drizzle-orm": "0.45.3",
     "minisearch": "7.2.0",
-    "next": "16.4.0",
+    "next": "16.4.2",
     "otpauth": "9.5.2",
     "qrcode": "1.5.4",
     "react": "19.3.0",
@@ -50,7 +51,8 @@
     "dotenv": "18.0.6",
     "drizzle-kit": "0.31.11",
     "eslint": "10.12.0",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.4.2",
+    "exceljs": "4.4.0",
     "neon": "8.0.12",
     "prettier": "3.9.9",
     "tailwindcss": "4.3.3",

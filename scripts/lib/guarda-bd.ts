@@ -91,9 +91,26 @@ export function verificarSecreto(o: {
 
 /** Punto de entrada de todo script que escribe en BD: imprime el destino y lo valida. */
 export function prepararDestino(variable: string, accion: string, rutaEnv = '.env.local'): string {
+  return prepararDestinoDetallado(variable, accion, rutaEnv).url;
+}
+
+/** Igual que prepararDestino, y además dice si el destino es producción (para exigir una segunda llave). */
+export function prepararDestinoDetallado(
+  variable: string,
+  accion: string,
+  rutaEnv = '.env.local',
+  opciones: { exigirHostProduccion?: boolean } = {},
+): { url: string; esProduccion: boolean; host: string; baseDatos: string } {
   const archivo = existsSync(rutaEnv) ? parse(readFileSync(rutaEnv)) : {};
   const efectiva = process.env[variable] ?? archivo[variable];
   const hostProduccion = process.env.KAZERO_HOST_PROD || archivo.KAZERO_HOST_PROD;
+  // Fail-closed para escrituras masivas: sin saber cuál es producción, no se puede pedir su confirmación.
+  if (opciones.exigirHostProduccion && !hostProduccion?.trim()) {
+    throw new GuardaBdError(
+      'KAZERO_HOST_PROD no está definida (ni en la terminal ni en .env.local): la guarda no puede reconocer ' +
+        'producción, así que no se escribe en ninguna base.',
+    );
+  }
   // En CI no hay .env.local: sin KAZERO_HOST_PROD la guarda no distinguiría producción (fail-open).
   if (process.env.CI === 'true' && !hostProduccion) {
     throw new GuardaBdError(
@@ -112,5 +129,10 @@ export function prepararDestino(variable: string, accion: string, rutaEnv = '.en
     `[guarda-bd] Destino: ${destino.usuario}@${destino.host}/${destino.baseDatos}` +
       (destino.esProduccion ? '   <<< PRODUCCIÓN >>>' : ''),
   );
-  return efectiva!;
+  return {
+    url: efectiva!,
+    esProduccion: destino.esProduccion,
+    host: destino.host,
+    baseDatos: destino.baseDatos,
+  };
 }

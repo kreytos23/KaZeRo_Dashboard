@@ -54,3 +54,9 @@ export function contarRamas(): number {
   const lista = JSON.parse(neon(['branches', 'list', '--output', 'json'])) as unknown;
   return Array.isArray(lista) ? lista.length : 0;
 }
+
+/** Nombres de las ramas del proyecto (sin credenciales). */
+export function listarRamas(): string[] {
+  const lista = JSON.parse(neon(['branches', 'list', '--output', 'json'])) as unknown;
+  return Array.isArray(lista) ? lista.map((r: { name?: unknown }) => String(r.name)) : [];
+}
