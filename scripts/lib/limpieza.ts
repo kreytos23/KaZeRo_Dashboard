@@ -77,9 +77,20 @@ export function autorizarLimpieza(
   if (!d.otraBd) throw new GuardaBdError('Para limpiar esta base repite con KAZERO_OTRA_BD=confirmo.');
 }
 
-/** Una transacción: bloquea, cuenta y vacía. Devuelve las filas borradas por tabla. */
-export async function limpiarDatosPrueba(urlOwner: string): Promise<Record<string, number>> {
+export interface ResultadoLimpieza {
+  borradas: Record<string, number>;
+  /** Secuencias (folio KZR, orden de movimientos y bitácora…) de las tablas limpiadas que volvieron a su inicio. */
+  secuencias: string[];
+}
+
+/**
+ * Una transacción: bloquea, cuenta, vacía y reinicia los contadores. TRUNCATE ... RESTART IDENTITY solo toca las
+ * secuencias de las tablas de la lista (sin CASCADE); después se reinician explícitamente las que pertenecen a esas
+ * tablas, por si alguna no estuviera ligada como identidad. Las de admin/sesion/acceso_log/codigo_recuperacion no se tocan.
+ */
+export async function limpiarDatosPrueba(urlOwner: string): Promise<ResultadoLimpieza> {
   const lista = TABLAS_NEGOCIO.join(', ');
+  const enLista = TABLAS_NEGOCIO.map((t) => `'${t}'`).join(', ');
   return conDbUrl(urlOwner, (db) =>
     db.transaction(async (tx) => {
       await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
@@ -89,7 +100,16 @@ export async function limpiarDatosPrueba(urlOwner: string): Promise<Record<strin
         sql.raw(`SELECT ${TABLAS_NEGOCIO.map((t) => `(SELECT count(*) FROM ${t})::int AS ${t}`).join(', ')}`),
       );
       await tx.execute(sql.raw(`TRUNCATE ${lista} RESTART IDENTITY`));
-      return r.rows[0] as Record<string, number>;
+      const seqs = await tx.execute(
+        sql.raw(`SELECT DISTINCT s.relname AS nombre FROM pg_class s
+          JOIN pg_depend d ON d.objid = s.oid AND d.classid = 'pg_class'::regclass AND d.deptype IN ('a', 'i')
+          JOIN pg_class t ON t.oid = d.refobjid AND d.refclassid = 'pg_class'::regclass
+          JOIN pg_namespace n ON n.oid = s.relnamespace AND n.nspname = 'public'
+          WHERE s.relkind = 'S' AND t.relname IN (${enLista}) ORDER BY 1`),
+      );
+      const secuencias = (seqs.rows as { nombre: string }[]).map((x) => x.nombre);
+      for (const nombre of secuencias) await tx.execute(sql.raw(`ALTER SEQUENCE public."${nombre}" RESTART`));
+      return { borradas: r.rows[0] as Record<string, number>, secuencias };
     }),
   );
 }
