@@ -13,6 +13,8 @@ export interface PiezaBloqueada {
   codigo: string;
   estado: EstadoPieza;
   exhibidorId: string | null;
+  /** Plan 3.1: vendedora que la tiene en su poder (solo disponible o apartada). */
+  vendedorCustodiaId: string | null;
   precio: string;
 }
 
@@ -21,6 +23,7 @@ const columnasPieza = {
   codigo: pieza.codigo,
   estado: pieza.estado,
   exhibidorId: pieza.exhibidorId,
+  vendedorCustodiaId: pieza.vendedorCustodiaId,
   precio: pieza.precio,
 };
 
@@ -175,6 +178,7 @@ export async function apartarPiezas(
       deEstado: p.estado,
       aEstado: 'apartada' as const,
       exhibidorId: p.exhibidorId,
+      vendedorId: p.vendedorCustodiaId,
       pedidoId,
       adminId,
     })),
@@ -240,6 +244,7 @@ export async function liberarPiezas(
       deEstado: 'apartada' as const,
       aEstado: vuelve(p) ? ('en_exhibidor' as const) : ('disponible' as const),
       exhibidorId: p.exhibidorId,
+      vendedorId: p.vendedorCustodiaId, // la apartada conserva su vendedora: vuelve con ella
       pedidoId: d.pedidoId,
       adminId: d.adminId,
       nota: p.exhibidorId && !vuelve(p) ? `${d.nota} El exhibidor está cerrado: queda disponible.` : d.nota,
@@ -353,6 +358,7 @@ export async function liquidarSiSaldoCero(
         deEstado: 'apartada' as const,
         aEstado: 'vendida' as const,
         exhibidorId: x.exhibidorId,
+        vendedorId: x.vendedorCustodiaId, // trazabilidad: de quién salió (comisiones, Plan 5)
         pedidoId,
         adminId,
       })),

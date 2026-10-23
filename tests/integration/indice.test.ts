@@ -42,15 +42,15 @@ describe('índice de búsqueda', () => {
       crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
     );
     expect(await app((db) => construirIndice(db))).toEqual({
-      v: 3,
-      piezas: [[pid.id, 'IX01', 'Anillo luna', 'disponible', null]],
+      v: 4,
+      piezas: [[pid.id, 'IX01', 'Anillo luna', 'disponible', null, null]],
       clientes: [[cid, 'Danya', '5to norte']],
       vendedores: [[vid, 'Nelly']],
       pedidos: [],
     });
   });
 
-  it('v3: conserva la miniatura de la pieza y trae pedidos [id, folio, cliente, estado] sin montos', async () => {
+  it('v4: conserva la miniatura de la pieza y trae pedidos [id, folio, cliente, estado] sin montos', async () => {
     const pid = await app((db) =>
       altaPieza(db, {
         codigo: 'IX03',
@@ -84,8 +84,8 @@ describe('índice de búsqueda', () => {
       }),
     );
     const idx = await app((db) => construirIndice(db));
-    expect(idx.v).toBe(3);
-    expect(idx.piezas[0]).toHaveLength(5);
+    expect(idx.v).toBe(4);
+    expect(idx.piezas[0]).toHaveLength(6);
     expect(idx.piezas[0]![4]).toBe(clave);
     expect(idx.pedidos).toEqual([[p.id, p.folio, 'Gloria', 'abierto']]);
     expect(JSON.stringify(idx)).not.toMatch(/777\.00|77700/);

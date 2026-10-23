@@ -1,6 +1,7 @@
 import { asc, desc } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { vCliente, vPedido, vPieza, vVendedor } from '@/db/schema';
+import { etiquetaUbicacion } from '@/domain/ubicacion';
 import type { IndiceBusqueda } from '@/search/tipos';
 
 /**
@@ -16,6 +17,9 @@ export async function construirIndice(db: Ejecutor): Promise<IndiceBusqueda> {
         descripcion: vPieza.descripcion,
         estado: vPieza.estado,
         imagen: vPieza.imagenClave,
+        ubicacion: vPieza.ubicacion,
+        exhibidorNombre: vPieza.exhibidorNombre,
+        vendedorNombre: vPieza.vendedorCustodiaNombre,
       })
       .from(vPieza)
       .orderBy(asc(vPieza.codigo)),
@@ -35,8 +39,16 @@ export async function construirIndice(db: Ejecutor): Promise<IndiceBusqueda> {
       .orderBy(desc(vPedido.folio)),
   ]);
   return {
-    v: 3,
-    piezas: piezas.map((p) => [p.id, p.codigo, p.descripcion, p.estado, p.imagen]),
+    v: 4,
+    // La etiqueta de ubicación solo viaja cuando dice algo más que el estado: exhibidor o vendedora.
+    piezas: piezas.map((p) => [
+      p.id,
+      p.codigo,
+      p.descripcion,
+      p.estado,
+      p.imagen,
+      p.ubicacion === 'exhibidor' || p.ubicacion === 'vendedora' ? etiquetaUbicacion(p) : null,
+    ]),
     clientes: clientes.map((c) => [c.id, c.nombre, c.referencia]),
     vendedores: vendedores.map((v) => [v.id, v.nombre]),
     pedidos: pedidos.map((p) => [p.id, p.folio, p.cliente, p.estado]),

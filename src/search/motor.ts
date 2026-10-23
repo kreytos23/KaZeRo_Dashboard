@@ -52,12 +52,12 @@ export function crearMotor(indice: IndiceBusqueda) {
   // Los pedidos NO entran a MiniSearch (el token "kzr" emparejaría con todos): solo se resuelven por folio.
   const porFolio = new Map<number, Resultado>();
 
-  for (const [id, codigo, descripcion, estado, imagen] of indice.piezas) {
+  for (const [id, codigo, descripcion, estado, imagen, ubicacion] of indice.piezas) {
     const r: Resultado = {
       clave: `pieza:${id}`,
       tipo: 'pieza',
       titulo: `${codigo} · ${descripcion}`,
-      subtitulo: ESTADOS[estado] ?? estado,
+      subtitulo: ubicacion ? `${ESTADOS[estado] ?? estado} · ${ubicacion}` : (ESTADOS[estado] ?? estado),
       href: `/panel/inventario/${encodeURIComponent(codigo)}`,
       miniatura: imagen ? urlImagenPieza(id, imagen, 'mini') : null,
     };

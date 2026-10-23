@@ -8,7 +8,7 @@ import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio'
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 import { apartadasDeExhibidor } from '@/server/pedidos/lecturas';
 
-const MAX_CODIGOS = 500;
+export const MAX_CODIGOS = 500;
 
 // Lecturas por la vista v_exhibidor: piezas_actuales es un agregado de la vista (sin consulta por fila).
 export type ExhibidorResumen = {
@@ -98,7 +98,7 @@ export async function crearExhibidor(
 }
 
 /** Normaliza y valida la lista antes de tocar la BD: no vacía, sin repetidos, con tope. */
-function codigosValidos(codigos: string[]): string[] {
+export function codigosValidos(codigos: string[]): string[] {
   const lista = codigos.map(normalizarCodigo).filter(Boolean);
   if (lista.length === 0) throw new ErrorNegocio('sin_codigos', 'Escribe al menos un código.', 'codigos');
   if (lista.length > MAX_CODIGOS)
@@ -144,6 +144,7 @@ async function bloquear(tx: Ejecutor, exhibidorId: string, codigos: string[]) {
       codigo: pieza.codigo,
       estado: pieza.estado,
       exhibidorId: pieza.exhibidorId,
+      custodiaId: pieza.vendedorCustodiaId,
     })
     .from(pieza)
     .where(inArray(pieza.codigo, codigos))
@@ -177,14 +178,33 @@ export async function enviarPiezas(
       if (estado === 'cerrado') throw new ErrorNegocio('exhibidor_cerrado', 'El exhibidor está cerrado.');
       if (!vendedorActivo)
         throw new ErrorNegocio('vendedor_inactivo', 'El vendedor del exhibidor está inactivo.');
-      const noDisponibles = porEscritura(piezas.filter((p) => p.estado !== 'disponible'));
+      // Plan 3.1: una pieza disponible puede estar con una vendedora; esa no se manda a exhibidor.
+      const noDisponibles = porEscritura(piezas.filter((p) => p.estado !== 'disponible' || p.custodiaId));
       if (faltantes.length || noDisponibles.length) {
         const partes = ['No se envió nada.'];
         if (faltantes.length) partes.push(`No existen: ${faltantes.join(', ')}.`);
-        if (noDisponibles.length)
+        if (noDisponibles.length) {
+          const conVendedora = noDisponibles.filter((p) => p.custodiaId).map((p) => p.custodiaId!);
+          const nombres = conVendedora.length
+            ? new Map(
+                (
+                  await tx
+                    .select({ id: vendedor.id, nombre: vendedor.nombre })
+                    .from(vendedor)
+                    .where(inArray(vendedor.id, conVendedora))
+                ).map((v) => [v.id, v.nombre]),
+              )
+            : new Map<string, string>();
           partes.push(
-            `No están disponibles: ${noDisponibles.map((p) => `${p.codigo} (${p.estado})`).join(', ')}.`,
+            `No están disponibles: ${noDisponibles
+              .map((p) =>
+                p.custodiaId
+                  ? `${p.codigo} (la tiene ${nombres.get(p.custodiaId)})`
+                  : `${p.codigo} (${p.estado})`,
+              )
+              .join(', ')}.`,
           );
+        }
         throw new ErrorNegocio('envio_rechazado', partes.join(' '));
       }
       const ids = piezas.map((p) => p.id);

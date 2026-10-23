@@ -23,6 +23,7 @@ import {
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 import { conIdempotencia } from '@/server/idempotencia';
+import { exigirCustodiaDe } from '@/server/piezas/custodia';
 import {
   apartarPiezas,
   bloquearPedido,
@@ -144,6 +145,8 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
             faltantes,
             prefijo: 'No se creó el pedido.',
           });
+          // P2 (reunión 2026-10-23): la pieza en poder de una vendedora solo se vende en su nota.
+          await exigirCustodiaDe(tx, piezas, v.vendedorId);
           // 3) Tarjeta (R-23, R-24, R-26, R-28). El bloqueo del cliente (paso 1) serializa la asignación.
           let posicion: Posicion | null = null;
           let pctBps = 0;
@@ -441,6 +444,20 @@ export async function editarPedido(
             faltantes: faltantes.filter((c) => v.agregar.includes(c)),
             prefijo: 'No se guardó el cambio.',
           });
+          // P2: las que se agregan, y las que se quedan si cambia el vendedor, deben ser de esa vendedora.
+          await exigirCustodiaDe(tx, nuevas, v.vendedorId);
+          if (v.vendedorId !== p.vendedorId && quedan.length) {
+            const enPoder = await tx
+              .select({ codigo: pieza.codigo, vendedorCustodiaId: pieza.vendedorCustodiaId })
+              .from(pieza)
+              .where(
+                inArray(
+                  pieza.id,
+                  quedan.map((i) => i.piezaId),
+                ),
+              );
+            await exigirCustodiaDe(tx, enPoder, v.vendedorId);
+          }
           // R-27: el % guardado no cambia y se aplica a las nuevas. R-11: las que quedan conservan sus precios.
           const t = calcularTotales(
             [
