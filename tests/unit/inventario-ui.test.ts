@@ -72,6 +72,15 @@ describe('leerFiltros', () => {
     expect(leerFiltros({ pagina: '99999999' }).pagina).toBe(1000);
     expect(leerFiltros({ pagina: '1.5' }).pagina).toBe(1);
   });
+  it('una vendedora elegida con ubicación «Todas» fija la ubicación en vendedora', () => {
+    const id = '11111111-2222-4333-8444-555555555555';
+    const f = leerFiltros({ vendedor: id });
+    expect(f.ubicacion).toBe('vendedora');
+    expect(f.vendedor).toBe(id);
+    expect(leerFiltros({ vendedor: id, ubicacion: 'kazero' }).vendedor).toBe(id);
+    expect(leerFiltros({ vendedor: id, ubicacion: 'kazero' }).ubicacion).toBe('vendedora');
+    expect(leerFiltros({ vendedor: 'no-es-uuid' }).ubicacion).toBeUndefined();
+  });
   it('expone el tamaño de página', () => {
     expect(POR_PAGINA).toBe(50);
   });
@@ -108,9 +117,11 @@ describe('ubicación en el inventario (Plan 3.1)', () => {
       vendedor: undefined,
     });
   });
-  it('la vendedora solo cuenta con la ubicación «Con vendedora»', () => {
+  it('elegir una vendedora fuerza la ubicación «Con vendedora»', () => {
     const v = '0b0e4c43-4a6b-4a1f-9a5e-2f9d8d1e7c11';
-    expect(leerFiltros({ ubicacion: 'kazero', vendedor: v }).vendedor).toBeUndefined();
+    const f = leerFiltros({ ubicacion: 'kazero', vendedor: v });
+    expect(f.vendedor).toBe(v);
+    expect(f.ubicacion).toBe('vendedora');
   });
   it('los movimientos de custodia nombran a la vendedora y la devolución a su pedido', () => {
     const m = { vendedorNombre: 'Nelly', pedidoFolio: 5 };

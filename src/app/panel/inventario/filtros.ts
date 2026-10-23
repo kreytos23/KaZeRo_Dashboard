@@ -30,10 +30,14 @@ export interface FiltrosInventario {
 export function leerFiltros(sp: Record<string, Bruto>): FiltrosInventario {
   const estado = primero(sp.estado);
   const pagina = primero(sp.pagina);
-  const ubicacion = (UBICACIONES_FILTRO as readonly string[]).includes(primero(sp.ubicacion))
-    ? (primero(sp.ubicacion) as UbicacionFiltro)
-    : undefined;
   const vendedor = primero(sp.vendedor);
+  const vendedorValido = UUID.test(vendedor) ? vendedor : undefined;
+  // Elegir una vendedora implica «Con vendedora»: con otra ubicación (o «Todas») el filtro se ignoraría en silencio.
+  const ubicacion: UbicacionFiltro | undefined = vendedorValido
+    ? 'vendedora'
+    : (UBICACIONES_FILTRO as readonly string[]).includes(primero(sp.ubicacion))
+      ? (primero(sp.ubicacion) as UbicacionFiltro)
+      : undefined;
   return {
     q: primero(sp.q).slice(0, 120),
     estado: Object.hasOwn(ETIQUETA_ESTADO, estado) ? (estado as EstadoPieza) : undefined,
@@ -41,7 +45,7 @@ export function leerFiltros(sp: Record<string, Bruto>): FiltrosInventario {
     material: nombreDeCatalogo(sp.material),
     proveedor: nombreDeCatalogo(sp.proveedor),
     ubicacion,
-    vendedor: ubicacion === 'vendedora' && UUID.test(vendedor) ? vendedor : undefined,
+    vendedor: vendedorValido,
     pagina: /^\d{1,10}$/.test(pagina) ? Math.min(Math.max(Number(pagina), 1), MAX_PAGINA) : 1,
   };
 }

@@ -50,11 +50,9 @@ const CAMPOS: Record<string, string> = {
   aplicacion_pago_excede_pago: 'monto',
   saldo_favor_insuficiente: 'monto',
   // Plan 3.1: custodia de vendedora, devoluciones y saldo a favor.
+  // Las devoluciones por monto no tienen campo propio en FormDevolver: sin campo, el mensaje real se muestra.
   pieza_cambio_custodia: 'codigos',
-  devolucion_excede_linea: 'monto',
-  devolucion_excede_total: 'monto',
   devolucion_fecha: 'fecha',
-  devolucion_monto_positivo: 'monto',
   devolucion_motivo_largo: 'motivo',
   saldo_favor_retiro_completo: 'nota',
   saldo_favor_nota_largo: 'nota',

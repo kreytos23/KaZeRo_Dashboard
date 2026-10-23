@@ -8,6 +8,7 @@ import { crearExhibidor, enviarPiezas } from '@/server/exhibidores/servicio';
 import { registrarPagoDePedido } from '@/server/pagos/servicio';
 import { cancelarPedido, crearPedido, editarPedido, type DatosEdicion } from '@/server/pedidos/servicio';
 import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
+import { entregarAVendedora } from '@/server/piezas/custodia';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
@@ -337,6 +338,24 @@ describe('editarPedido: casos de revisión', () => {
     await expect(editar(p.id, { agregar: ['ET03', 'ET02', 'NOEXISTE'], motivo: 'x' })).rejects.toThrow(
       `No se guardó el cambio. No existen: NOEXISTE. No están disponibles: ET03 (apartada en KZR-${o2.folio}), ET02 (apartada en KZR-${o1.folio}).`,
     );
+  });
+
+  it('los errores de piezas al agregar caen en el campo `agregar` del formulario de edición', async () => {
+    const p = await crear([await alta('EC01')]);
+    await crear([await alta('EC02')]);
+    const nelly = await app((db) =>
+      crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
+    );
+    await alta('EC03');
+    await app((db) => entregarAVendedora(db, { adminId, vendedorId: nelly, codigos: ['EC03'] }));
+    await expect(editar(p.id, { agregar: ['EC02'], motivo: 'x' })).rejects.toMatchObject({
+      codigo: 'piezas_no_disponibles',
+      campo: 'agregar',
+    });
+    await expect(editar(p.id, { agregar: ['EC03'], motivo: 'x' })).rejects.toMatchObject({
+      codigo: 'pieza_de_otra_vendedora',
+      campo: 'agregar',
+    });
   });
 
   it('R-37: repetir la misma key devuelve el mismo resultado y la edición se aplica una sola vez', async () => {

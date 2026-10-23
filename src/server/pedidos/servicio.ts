@@ -60,6 +60,17 @@ export interface PedidoCreado {
 }
 
 /** Fecha de negocio: válida y no futura (D-19). */
+/** Re-lanza un `ErrorNegocio` sobre `codigos` con otro campo, para formularios que no tienen ese campo. */
+async function enCampo<T>(campo: string, fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof ErrorNegocio && e.campo === 'codigos')
+      throw new ErrorNegocio(e.codigo, e.message, campo);
+    throw e;
+  }
+}
+
 export function validarFecha(t: string | undefined, campo = 'fecha'): string {
   if (!t?.trim()) return hoyMX();
   const f = parsearFechaISO(t);
@@ -439,14 +450,17 @@ export async function editarPedido(
           ]);
           const nuevas = piezas.filter((x) => v.agregar.includes(x.codigo));
           const salen = piezas.filter((x) => v.quitar.includes(x.codigo));
-          await exigirDisponibles(tx, {
-            codigos: v.agregar,
-            piezas: nuevas,
-            faltantes: faltantes.filter((c) => v.agregar.includes(c)),
-            prefijo: 'No se guardó el cambio.',
-          });
+          // FormEditar no tiene campo `codigos`: los errores de piezas se muestran en `agregar`.
+          await enCampo('agregar', () =>
+            exigirDisponibles(tx, {
+              codigos: v.agregar,
+              piezas: nuevas,
+              faltantes: faltantes.filter((c) => v.agregar.includes(c)),
+              prefijo: 'No se guardó el cambio.',
+            }),
+          );
           // P2: las que se agregan, y las que se quedan si cambia el vendedor, deben ser de esa vendedora.
-          await exigirCustodiaDe(tx, nuevas, v.vendedorId);
+          await enCampo('agregar', () => exigirCustodiaDe(tx, nuevas, v.vendedorId));
           if (v.vendedorId !== p.vendedorId && quedan.length) {
             const enPoder = await tx
               .select({ codigo: pieza.codigo, vendedorCustodiaId: pieza.vendedorCustodiaId })
@@ -457,7 +471,7 @@ export async function editarPedido(
                   quedan.map((i) => i.piezaId),
                 ),
               );
-            await exigirCustodiaDe(tx, enPoder, v.vendedorId);
+            await enCampo('vendedorId', () => exigirCustodiaDe(tx, enPoder, v.vendedorId));
           }
           // R-27: el % guardado no cambia y se aplica a las nuevas. R-11: las que quedan conservan sus precios.
           const t = calcularTotales(
