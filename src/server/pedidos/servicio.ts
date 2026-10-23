@@ -304,6 +304,7 @@ export async function cancelarPedido(
                 tipo: 'cancelacion' as const,
                 monto: a.monto,
                 pedidoId: p.id,
+                adminId: d.adminId, // Plan 3.1 (D-22): quién canceló, para el historial del saldo
                 fecha: hoyMX(),
               })),
             );
