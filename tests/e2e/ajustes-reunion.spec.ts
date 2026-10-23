@@ -69,7 +69,9 @@ test('pieza con vendedora: se entrega desde su ficha, aparece filtrada en el inv
   await page.getByLabel(`Entregar a ${nombre}`).fill(codigo);
   await page.getByRole('button', { name: `Entregar a ${nombre}` }).click();
   await expect(estadoCon(page, '1 pieza entregada.')).toBeVisible();
-  await expect(page.getByRole('list', { name: 'Piezas en su poder' }).getByText(codigo)).toBeVisible();
+  await expect(
+    page.getByRole('list', { name: 'Piezas en su poder' }).getByRole('link', { name: codigo }),
+  ).toBeVisible();
 
   await irA(page, `/panel/inventario?ubicacion=vendedora&vendedor=${vendedoraId}`);
   await expect(page.getByRole('row').filter({ hasText: codigo })).toContainText(`Con ${nombre}`);
