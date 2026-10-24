@@ -141,6 +141,10 @@ describe('esquema de la foto (0010/0011)', () => {
           'exhibidor_id',
           'exhibidor_nombre',
           'imagen_clave',
+          // Plan 3.1 (0017), al final.
+          'vendedor_custodia_id',
+          'vendedor_custodia_nombre',
+          'ubicacion',
         ],
         opciones: ['security_invoker=true'],
       },

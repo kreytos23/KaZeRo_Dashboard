@@ -1,5 +1,5 @@
 /**
- * Tarjeta de lealtad (R-20 a R-29). Lógica pura: la usa el servicio (autoridad) y la UI (vista previa).
+ * Tarjeta de lealtad (R-20 a R-28; R-29 derogada 2026-10-23). Lógica pura: la usa el servicio (autoridad) y la UI (vista previa).
  * Las reglas "Config" (R-21, R-22) llegan como parámetro; hasta que exista config_regla (Plan 5) valen
  * REGLAS_LEALTAD. El % aplicado se guarda en cada pedido (R-27), así que cambiarlas no toca pedidos viejos.
  */
@@ -18,77 +18,62 @@ export interface Posicion {
 }
 
 /**
- * R-23 / R-24 / R-26: la posición libre más baja de la tarjeta, recorriendo los ciclos desde el 1
- * (un hueco por cancelación en un ciclo anterior se llena primero, decisión P4). Si todos están llenos,
- * ciclo nuevo en la posición 1. `ocupadas` = pedidos no cancelados que cuentan para la tarjeta.
+ * D-2 (Plan 3.1): la tarjeta actual es la vuelta más alta con algún pedido vigente. Se toma su lugar libre más
+ * bajo (un lugar cancelado de la tarjeta actual se reutiliza); si está llena, vuelta nueva en el 1. Los huecos
+ * de vueltas anteriores NO se rellenan.
  */
 export function siguientePosicion(ocupadas: readonly Posicion[], reglas = REGLAS_LEALTAD): Posicion {
-  const porCiclo = new Map<number, Set<number>>();
-  let maxCiclo = 0;
-  for (const o of ocupadas) {
-    let usadas = porCiclo.get(o.ciclo);
-    if (!usadas) porCiclo.set(o.ciclo, (usadas = new Set()));
-    usadas.add(o.posicion);
-    if (o.ciclo > maxCiclo) maxCiclo = o.ciclo;
-  }
-  for (let ciclo = 1; ciclo <= maxCiclo; ciclo++) {
-    const usadas = porCiclo.get(ciclo);
-    for (let posicion = 1; posicion <= reglas.tamanoCiclo; posicion++)
-      if (!usadas?.has(posicion)) return { ciclo, posicion };
-  }
-  return { ciclo: maxCiclo + 1, posicion: 1 };
+  if (!ocupadas.length) return { ciclo: 1, posicion: 1 };
+  const actual = ocupadas.reduce((m, o) => Math.max(m, o.ciclo), 1);
+  const usadas = new Set(ocupadas.filter((o) => o.ciclo === actual).map((o) => o.posicion));
+  for (let posicion = 1; posicion <= reglas.tamanoCiclo; posicion++)
+    if (!usadas.has(posicion)) return { ciclo: actual, posicion };
+  return { ciclo: actual + 1, posicion: 1 };
 }
 
-export type SinLealtad = 'saldo_pendiente';
-
-/**
- * R-22: % de la posición. R-28: sin tarjeta no hay descuento. R-29: en una posición con descuento,
- * si el cliente tiene OTRA nota con saldo pendiente, no hay descuento y queda el motivo (la posición
- * se ocupa igual).
- */
+/** R-22 / R-28. R-29 derogada (reunión 2026-10-23): el descuento no depende de otras notas con saldo. */
 export function descuentoLealtad(
-  d: { cuentaTarjeta: boolean; posicion: number | null; otraNotaConSaldo: boolean },
+  d: { cuentaTarjeta: boolean; posicion: number | null },
   reglas = REGLAS_LEALTAD,
-): { pctBps: number; sinLealtad: SinLealtad | null } {
-  if (!d.cuentaTarjeta || d.posicion === null) return { pctBps: 0, sinLealtad: null };
-  const pctBps = reglas.descuentosBps[d.posicion] ?? 0;
-  if (pctBps === 0) return { pctBps: 0, sinLealtad: null };
-  if (d.otraNotaConSaldo) return { pctBps: 0, sinLealtad: 'saldo_pendiente' };
-  return { pctBps, sinLealtad: null };
+): { pctBps: number } {
+  if (!d.cuentaTarjeta || d.posicion === null) return { pctBps: 0 };
+  return { pctBps: reglas.descuentosBps[d.posicion] ?? 0 };
 }
 
-export type EstadoCasilla = 'contada' | 'apartada' | 'libre';
 export interface Casilla {
   posicion: number;
-  estado: EstadoCasilla;
+  estado: 'ocupada' | 'libre';
   folio: number | null;
   pctBps: number;
+  conSaldo: boolean;
 }
-export interface CicloTarjeta {
-  ciclo: number;
+export interface Tarjeta {
   casillas: Casilla[];
-  contadas: number;
+  ocupadas: number;
 }
 
-/** R-25: ● contada (pedido liquidado), ◐ apartada (abierto), ○ libre. Recibe pedidos no cancelados que cuentan. */
+/** R-25 (D-4): solo la tarjeta actual. Ocupada = pedido no cancelado (cuenta al crear); conSaldo es informativo. */
 export function armarTarjeta(
-  pedidos: readonly { ciclo: number; posicion: number; estado: 'abierto' | 'liquidado'; folio: number }[],
+  pedidos: readonly {
+    ciclo: number;
+    posicion: number;
+    estado: 'abierto' | 'liquidado';
+    folio: number;
+    conSaldo: boolean;
+  }[],
   reglas = REGLAS_LEALTAD,
-): CicloTarjeta[] {
-  const maxCiclo = pedidos.reduce((m, p) => Math.max(m, p.ciclo), 1);
-  const ciclos: CicloTarjeta[] = [];
-  for (let ciclo = 1; ciclo <= maxCiclo; ciclo++) {
-    const casillas: Casilla[] = Array.from({ length: reglas.tamanoCiclo }, (_, i) => ({
-      posicion: i + 1,
-      estado: 'libre',
-      folio: null,
-      pctBps: reglas.descuentosBps[i + 1] ?? 0,
-    }));
-    for (const p of pedidos) {
-      const c = p.ciclo === ciclo ? casillas[p.posicion - 1] : undefined;
-      if (c) Object.assign(c, { estado: p.estado === 'liquidado' ? 'contada' : 'apartada', folio: p.folio });
-    }
-    ciclos.push({ ciclo, casillas, contadas: casillas.filter((c) => c.estado === 'contada').length });
+): Tarjeta {
+  const actual = pedidos.reduce((m, p) => Math.max(m, p.ciclo), 1);
+  const casillas: Casilla[] = Array.from({ length: reglas.tamanoCiclo }, (_, i) => ({
+    posicion: i + 1,
+    estado: 'libre',
+    folio: null,
+    pctBps: reglas.descuentosBps[i + 1] ?? 0,
+    conSaldo: false,
+  }));
+  for (const p of pedidos) {
+    const c = p.ciclo === actual ? casillas[p.posicion - 1] : undefined;
+    if (c) Object.assign(c, { estado: 'ocupada', folio: p.folio, conSaldo: p.conSaldo });
   }
-  return ciclos;
+  return { casillas, ocupadas: casillas.filter((c) => c.estado === 'ocupada').length };
 }

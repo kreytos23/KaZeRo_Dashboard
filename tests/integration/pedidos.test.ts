@@ -105,9 +105,10 @@ describe('crearPedido', () => {
       total: '298.00',
       posicion: { ciclo: 1, posicion: 1 },
       pctBps: 0,
-      sinLealtad: null,
-      foliosConSaldo: [],
     });
+    // Plan 3.1: R-29 derogada, el resultado ya no lleva esos campos.
+    expect(r).not.toHaveProperty('sinLealtad');
+    expect(r).not.toHaveProperty('foliosConSaldo');
     expect(r.folio).toBeGreaterThan(0);
     expect(await fichaPedido(r.id)).toMatchObject({
       subtotal: '298.00',
@@ -172,7 +173,7 @@ describe('crearPedido', () => {
     expect((fallo.reason as Error).message).toMatch(/^No se creó el pedido\. No están disponibles: /);
   });
 
-  it('R-23 concurrencia: con 4 compras liquidadas, dos pedidos simultáneos son la #5 (10 %) y la #6', async () => {
+  it('R-23 concurrencia: con 4 ocupados, dos pedidos simultáneos son los lugares 5 (10 %) y 6', async () => {
     await comprasLiquidadas(4);
     const [a, b] = await piezas('PE', 2);
     const r = await Promise.all([crear({ codigos: [a!] }), crear({ codigos: [b!] })]);
@@ -181,37 +182,39 @@ describe('crearPedido', () => {
       { ciclo: 1, posicion: 5 },
       { ciclo: 1, posicion: 6 },
     ]);
-    // La #5 se decidió primero (bloqueo del cliente): sin otra nota con saldo, 10 %.
-    expect(porPosicion[0]).toMatchObject({ pctBps: 1000, total: '134.10', sinLealtad: null });
-    expect(porPosicion[1]).toMatchObject({ pctBps: 0, total: '149.00', sinLealtad: null });
+    // El lugar 5 se decidió primero (bloqueo del cliente): 10 %; el 6 no tiene descuento.
+    expect(porPosicion[0]).toMatchObject({ pctBps: 1000, total: '134.10' });
+    expect(porPosicion[1]).toMatchObject({ pctBps: 0, total: '149.00' });
   });
 
-  it('R-29: la #5 con otra nota con saldo pendiente no recibe descuento, explica el motivo y ocupa la posición', async () => {
+  it('R-20 (Plan 3.1): una nota abierta ocupa su lugar; la siguiente toma el siguiente aunque la primera no esté pagada', async () => {
+    const [a, b] = await piezas('PU', 2);
+    const uno = await crear({ codigos: [a!] }); // abierta, con saldo
+    expect(uno.estado).toBe('abierto');
+    expect(uno.posicion).toEqual({ ciclo: 1, posicion: 1 });
+    expect((await crear({ codigos: [b!] })).posicion).toEqual({ ciclo: 1, posicion: 2 });
+  });
+
+  it('R-29 derogada: el pedido del lugar 5 recibe 10 % aunque otra nota tenga saldo', async () => {
     await comprasLiquidadas(3);
     const [a, b, c] = await piezas('PF', 3);
-    const cuatro = await crear({ codigos: [a!] }); // #4, abierta con saldo
+    await crear({ codigos: [a!] }); // lugar 4, abierta con saldo
     const cinco = await crear({ codigos: [b!] });
-    expect(cinco).toMatchObject({
-      posicion: { ciclo: 1, posicion: 5 },
-      pctBps: 0,
-      sinLealtad: 'saldo_pendiente',
-      total: '149.00',
-      foliosConSaldo: [cuatro.folio],
-    });
+    expect(cinco).toMatchObject({ posicion: { ciclo: 1, posicion: 5 }, pctBps: 1000, total: '134.10' });
     expect(await fichaPedido(cinco.id)).toMatchObject({
-      descuentoLealtadPct: '0.00',
-      sinLealtadMotivo: 'saldo_pendiente',
+      descuentoLealtadPct: '10.00',
+      sinLealtadMotivo: null,
     });
     expect((await crear({ codigos: [c!] })).posicion).toEqual({ ciclo: 1, posicion: 6 });
   });
 
-  it('R-29: también cuenta una nota con saldo que no cuenta para la tarjeta (R-28)', async () => {
+  it('R-29 derogada: una nota con saldo que no cuenta para la tarjeta (R-28) tampoco quita el 10 %', async () => {
     await comprasLiquidadas(4);
     const [a, b] = await piezas('PG', 2);
     expect((await crear({ codigos: [a!], cuentaTarjeta: false })).posicion).toBeNull();
     expect(await crear({ codigos: [b!] })).toMatchObject({
       posicion: { ciclo: 1, posicion: 5 },
-      sinLealtad: 'saldo_pendiente',
+      pctBps: 1000,
     });
   });
 
@@ -231,14 +234,63 @@ describe('crearPedido', () => {
     expect((await crear({ codigos: [a!] })).posicion).toEqual({ ciclo: 2, posicion: 1 });
   });
 
-  it('R-24 (P4): un hueco por cancelación en un ciclo ya rebasado se llena primero', async () => {
-    await comprasLiquidadas(6);
-    const [a, b, c] = await piezas('PS', 3);
-    const siete = await crear({ codigos: [a!] }); // #7, abierta
-    expect(siete.posicion).toEqual({ ciclo: 1, posicion: 7 });
-    await comprasLiquidadas(3, 'LR'); // #8 a #10
+  /** Siembra posiciones como dueño (el servicio nunca las deja con huecos), con piezas de precio 0 sin tocar. */
+  async function sembrarPosiciones(posiciones: [number, number][]): Promise<string[]> {
+    const ids: string[] = [];
+    for (const [ciclo, posicion] of posiciones) {
+      const [codigo] = await piezas(`SB${ciclo}${posicion}X`, 1, 0);
+      const r = await crear({ codigos: [codigo!], cuentaTarjeta: false });
+      await conDbUrl(urlOwner(), (db) =>
+        db.transaction(async (tx) => {
+          await fijarContextoAuditoria(tx, { adminId, motivo: 'siembra de prueba' });
+          await tx
+            .update(pedido)
+            .set({ cuentaTarjeta: true, cicloTarjeta: ciclo, posicionTarjeta: posicion })
+            .where(eq(pedido.id, r.id));
+        }),
+      );
+      ids.push(r.id);
+    }
+    return ids;
+  }
+
+  it('R-24: con la vuelta 1 llena y un hueco en ella, y la vuelta 2 con dos pedidos, el nuevo toma la vuelta 2 lugar 3', async () => {
+    // Vuelta 1 con hueco en el lugar 7; vuelta 2 con los lugares 1 y 2.
+    await sembrarPosiciones([
+      ...[1, 2, 3, 4, 5, 6, 8, 9, 10].map((n): [number, number] => [1, n]),
+      [2, 1],
+      [2, 2],
+    ]);
+    const [a] = await piezas('PS', 1);
+    expect((await crear({ codigos: [a!] })).posicion).toEqual({ ciclo: 2, posicion: 3 });
+  });
+
+  it('R-24: cancelar el único pedido de la vuelta 2 → el siguiente vuelve a la vuelta 2 lugar 1 (la 1 está llena)', async () => {
+    await comprasLiquidadas(10);
+    const [a, b] = await piezas('PV', 2);
+    const unico = await crear({ codigos: [a!] });
+    expect(unico.posicion).toEqual({ ciclo: 2, posicion: 1 });
+    // Cancelación forzada como dueño (el pedido tiene saldo y está abierto).
+    await conDbUrl(urlOwner(), (db) =>
+      db.transaction(async (tx) => {
+        await fijarContextoAuditoria(tx, { adminId, motivo: 'prueba R-24' });
+        await tx
+          .update(pedido)
+          .set({ estado: 'cancelado', canceladoAt: new Date(), cancelacionMotivo: 'prueba' })
+          .where(eq(pedido.id, unico.id));
+      }),
+    );
+    // La vuelta actual vuelve a ser la 1 (llena): la nueva empieza la vuelta 2 en el lugar 1.
     expect((await crear({ codigos: [b!] })).posicion).toEqual({ ciclo: 2, posicion: 1 });
-    // Cancelación forzada como dueño (cancelarPedido llega en la Task 6).
+  });
+
+  it('R-24: un hueco por cancelación en una tarjeta ya superada no se rellena', async () => {
+    await comprasLiquidadas(6);
+    const [a, b, c] = await piezas('PS2', 3);
+    const siete = await crear({ codigos: [a!] }); // lugar 7, abierta
+    expect(siete.posicion).toEqual({ ciclo: 1, posicion: 7 });
+    await comprasLiquidadas(3, 'LR'); // lugares 8 a 10
+    expect((await crear({ codigos: [b!] })).posicion).toEqual({ ciclo: 2, posicion: 1 });
     await conDbUrl(urlOwner(), (db) =>
       db.transaction(async (tx) => {
         await fijarContextoAuditoria(tx, { adminId, motivo: 'prueba R-24' });
@@ -248,7 +300,7 @@ describe('crearPedido', () => {
           .where(eq(pedido.id, siete.id));
       }),
     );
-    expect((await crear({ codigos: [c!] })).posicion).toEqual({ ciclo: 1, posicion: 7 });
+    expect((await crear({ codigos: [c!] })).posicion).toEqual({ ciclo: 2, posicion: 2 });
   });
 
   it('R-28: un pedido que no cuenta no aparta posición ni recibe descuento aunque "sería" la 5', async () => {

@@ -254,7 +254,7 @@ describe('buenas prácticas del esquema (lecciones §3)', () => {
     expect(r.rows).toEqual([]);
   });
 
-  it('las 12 vistas de lectura usan security_invoker y kazero_app puede leerlas', async () => {
+  it('las 13 vistas de lectura usan security_invoker y kazero_app puede leerlas', async () => {
     const r = await conDbUrl(urlOwner(), (db) =>
       db.execute<{ vista: string; invoker: boolean; lectura: boolean }>(sql`
         SELECT c.relname AS vista,
@@ -275,6 +275,7 @@ describe('buenas prácticas del esquema (lecciones §3)', () => {
       'v_pedido_item',
       'v_pieza',
       'v_saldo_favor',
+      'v_saldo_favor_mov',
       'v_vendedor',
     ]);
     for (const f of r.rows) expect(f).toMatchObject({ invoker: true, lectura: true });

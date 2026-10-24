@@ -346,9 +346,9 @@ describe('reglas de pedidos en la BD', () => {
         }),
       );
     expect(await codigoAl(() => mov({ vendedorId: b.vendedorId }))).toBe('saldo_favor_un_titular');
-    expect(await codigoAl(() => mov({ monto: '-5.00' }))).toBe('saldo_favor_signo');
+    expect(await codigoAl(() => mov({ monto: '-5.00' }))).toBe('saldo_favor_signo_v2');
     // cancelacion y uso nacen de un pedido; sobrante (Plan 4) no necesariamente.
-    expect(await codigoAl(() => mov({ pedidoId: null }))).toBe('saldo_favor_pedido_requerido');
+    expect(await codigoAl(() => mov({ pedidoId: null }))).toBe('saldo_favor_pedido_requerido_v2');
     await mov({});
     await mov({ tipo: 'sobrante', monto: '20.00', pedidoId: null });
     const r = await app((db) => db.execute(sql`SELECT cliente_id, vendedor_id, saldo FROM v_saldo_favor`));
@@ -528,31 +528,38 @@ describe('libro de pagos garantizado por la BD', () => {
     expect(r.rows[0]!.s).toBe('70.00');
   });
 
+  // Plan 3.1: un 'uso' ya exige su aplicación de un pago saldo_favor (ajustes-reunion-esquema.test.ts); la regla
+  // "nunca negativo" (D-22) es la misma para todo lo que resta, así que aquí se prueba con un 'retiro'.
   it('el saldo a favor de un titular nunca queda negativo', async () => {
     const b = await base();
-    const mov = (tipo: 'cancelacion' | 'uso', monto: string) =>
+    const mov = (tipo: 'cancelacion' | 'retiro', monto: string) =>
       app((db) =>
-        db
-          .insert(saldoFavorMov)
-          .values({ clienteId: b.clienteId, tipo, monto, fecha: '2026-10-11', pedidoId: b.pedidoId }),
+        db.insert(saldoFavorMov).values({
+          clienteId: b.clienteId,
+          tipo,
+          monto,
+          fecha: '2026-10-11',
+          ...(tipo === 'retiro' ? { adminId, nota: 'En efectivo' } : { pedidoId: b.pedidoId }),
+        }),
       );
-    expect(traducirErrorPg(await capturar(() => mov('uso', '-0.01')))).toMatchObject({
+    expect(traducirErrorPg(await capturar(() => mov('retiro', '-0.01')))).toMatchObject({
       codigo: 'saldo_favor_insuficiente',
       campo: 'monto',
     });
     await mov('cancelacion', '50.00');
-    await mov('uso', '-50.00');
-    expect(await codigoAl(() => mov('uso', '-0.01'))).toBe('saldo_favor_insuficiente');
+    await mov('retiro', '-50.00');
+    expect(await codigoAl(() => mov('retiro', '-0.01'))).toBe('saldo_favor_insuficiente');
   });
 
-  it('concurrencia: dos usos simultáneos que juntos exceden el saldo → solo uno entra', async () => {
+  it('concurrencia: dos salidas simultáneas que juntas exceden el saldo → solo una entra', async () => {
     const b = await base();
-    const valores = (monto: string, tipo: 'cancelacion' | 'uso' = 'uso') => ({
+    // Plan 3.1: 'retiro' (el 'uso' necesita su aplicación); el candado consultivo es el mismo para ambos.
+    const valores = (monto: string, tipo: 'cancelacion' | 'retiro' = 'retiro') => ({
       vendedorId: b.vendedorId,
       tipo,
       monto,
       fecha: '2026-10-11',
-      pedidoId: b.pedidoId,
+      ...(tipo === 'retiro' ? { adminId, nota: 'En efectivo' } : { pedidoId: b.pedidoId }),
     });
     await app((db) => db.insert(saldoFavorMov).values(valores('50.00', 'cancelacion')));
     const x = barrera();

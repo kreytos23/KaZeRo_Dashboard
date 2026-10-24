@@ -113,6 +113,20 @@
       "when": 1792709300000,
       "tag": "0015_origen_excel_reglas",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1792740932262,
+      "tag": "0016_loving_terrax",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1792740946789,
+      "tag": "0017_ajustes_reunion_reglas",
+      "breakpoints": true
     }
   ]
 }

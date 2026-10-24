@@ -23,9 +23,16 @@ const dinero = (nombre: string) => numeric(nombre, { precision: 12, scale: 2 });
 
 export const estadoPedido = pgEnum('estado_pedido', ['abierto', 'liquidado', 'cancelado']);
 export const motivoSinLealtad = pgEnum('motivo_sin_lealtad', ['saldo_pendiente']);
-export const metodoPago = pgEnum('metodo_pago', ['transferencia', 'efectivo', 'otro']);
-// 'sobrante' y 'uso' los usa el Plan 4; se crean ya para no tocar el enum dos veces.
-export const tipoSaldoFavor = pgEnum('tipo_saldo_favor', ['cancelacion', 'sobrante', 'uso']);
+// Plan 3.1 (D-20): 'saldo_favor' = la clienta paga con su saldo a favor.
+export const metodoPago = pgEnum('metodo_pago', ['transferencia', 'efectivo', 'otro', 'saldo_favor']);
+// 'sobrante' lo usa el Plan 4. Plan 3.1: 'uso' (D-20), 'devolucion' (D-16) y 'retiro' en efectivo (D-21).
+export const tipoSaldoFavor = pgEnum('tipo_saldo_favor', [
+  'cancelacion',
+  'sobrante',
+  'uso',
+  'devolucion',
+  'retiro',
+]);
 
 export const pedido = pgTable(
   'pedido',
@@ -160,6 +167,11 @@ export const pago = pgTable(
     check('pago_monto_positivo', sql`${t.monto} > 0`),
     check('pago_un_pagador', sql`num_nonnulls(${t.pagadorClienteId}, ${t.pagadorVendedorId}) = 1`),
     check('pago_nota_largo', sql`${t.nota} IS NULL OR char_length(${t.nota}) <= 200`),
+    // D-20. `::text`: 'saldo_favor' se agrega en esta misma tanda de migraciones (55P04).
+    check(
+      'pago_saldo_favor_cliente',
+      sql`${t.metodo}::text <> 'saldo_favor' OR ${t.pagadorClienteId} IS NOT NULL`,
+    ),
   ],
 );
 
@@ -187,6 +199,32 @@ export const aplicacionPago = pgTable(
   ],
 );
 
+// Plan 3.1 (D-13): devolución de la pieza de una línea de un pedido liquidado. Solo inserción; el trigger
+// devolucion_validar (0017) exige pedido liquidado, línea vigente, pieza vendida, montos y fecha.
+export const devolucion = pgTable(
+  'devolucion',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    pedidoItemId: uuid('pedido_item_id')
+      .notNull()
+      .references(() => pedidoItem.id),
+    fecha: date('fecha').notNull(),
+    motivo: text('motivo').notNull(),
+    monto: dinero('monto').notNull(),
+    adminId: uuid('admin_id')
+      .notNull()
+      .references(() => admin.id),
+    createdAt: ts('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    // Una línea se devuelve una sola vez.
+    uniqueIndex('devolucion_pedido_item_uq').on(t.pedidoItemId),
+    index('devolucion_admin_idx').on(t.adminId),
+    check('devolucion_monto_positivo', sql`${t.monto} > 0`),
+    check('devolucion_motivo_largo', sql`char_length(btrim(${t.motivo})) BETWEEN 1 AND 200`),
+  ],
+);
+
 export const saldoFavorMov = pgTable(
   'saldo_favor_mov',
   {
@@ -198,17 +236,41 @@ export const saldoFavorMov = pgTable(
     pedidoId: uuid('pedido_id').references(() => pedido.id),
     fecha: date('fecha').notNull(),
     createdAt: ts('created_at').notNull().defaultNow(),
+    // Plan 3.1: origen del movimiento (únicos: un uso por aplicación, un saldo por devolución), quién y por qué.
+    aplicacionPagoId: uuid('aplicacion_pago_id').references(() => aplicacionPago.id),
+    devolucionId: uuid('devolucion_id').references(() => devolucion.id),
+    // Anulable: los movimientos anteriores al Plan 3.1 no lo tienen (D-22).
+    adminId: uuid('admin_id').references(() => admin.id),
+    nota: text('nota'),
   },
   (t) => [
     index('saldo_favor_mov_cliente_idx').on(t.clienteId),
     index('saldo_favor_mov_vendedor_idx').on(t.vendedorId),
     index('saldo_favor_mov_pedido_idx').on(t.pedidoId),
+    uniqueIndex('saldo_favor_mov_aplicacion_uq').on(t.aplicacionPagoId),
+    uniqueIndex('saldo_favor_mov_devolucion_uq').on(t.devolucionId),
+    index('saldo_favor_mov_admin_idx').on(t.adminId),
     check('saldo_favor_un_titular', sql`num_nonnulls(${t.clienteId}, ${t.vendedorId}) = 1`),
-    // En 0013 (SQL, no aquí): CHECK saldo_favor_pedido_requerido y el trigger saldo_favor_libro (nunca negativo).
-    // Entradas positivas (cancelación, sobrante), salidas negativas (uso).
+    // El trigger saldo_favor_libro (0013; v2 en 0017) valida el origen y que el saldo nunca quede negativo.
+    // D-22: versiones _v2 más permisivas que saldo_favor_signo (0012) y saldo_favor_pedido_requerido (0013),
+    // que 0016/0017 eliminan. `tipo::text`: 'devolucion' y 'retiro' se agregan en esta misma tanda (55P04).
+    // Entradas positivas (cancelación, sobrante, devolución), salidas negativas (uso, retiro).
     check(
-      'saldo_favor_signo',
-      sql`(${t.tipo} = 'uso' AND ${t.monto} < 0) OR (${t.tipo} <> 'uso' AND ${t.monto} > 0)`,
+      'saldo_favor_signo_v2',
+      sql`(${t.tipo}::text IN ('uso', 'retiro') AND ${t.monto} < 0) OR (${t.tipo}::text NOT IN ('uso', 'retiro') AND ${t.monto} > 0)`,
     ),
+    check(
+      'saldo_favor_pedido_requerido_v2',
+      sql`${t.tipo}::text IN ('sobrante', 'retiro') OR ${t.pedidoId} IS NOT NULL`,
+    ),
+    check(
+      'saldo_favor_origen',
+      sql`(${t.tipo}::text = 'uso') = (${t.aplicacionPagoId} IS NOT NULL) AND (${t.tipo}::text = 'devolucion') = (${t.devolucionId} IS NOT NULL)`,
+    ),
+    check(
+      'saldo_favor_retiro_completo',
+      sql`${t.tipo}::text <> 'retiro' OR (${t.adminId} IS NOT NULL AND char_length(btrim(coalesce(${t.nota}, ''))) BETWEEN 1 AND 200)`,
+    ),
+    check('saldo_favor_nota_largo', sql`${t.nota} IS NULL OR char_length(${t.nota}) <= 200`),
   ],
 );

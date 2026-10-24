@@ -85,19 +85,19 @@ test('nuevo pedido con alta rápida de cliente, piezas en ráfaga (una de exhibi
   // R-25: la tarjeta del cliente cuenta la compra.
   await page.goto(`/panel/pedidos/${folio}`);
   await page.getByRole('link', { name: `Ana Pedido ${m}` }).click();
-  await expect(
-    page.getByRole('listitem').filter({ hasText: `Posición 1: contada, KZR-${folio}` }),
-  ).toBeVisible();
+  await expect(page.getByRole('listitem', { name: `Lugar 1: KZR-${folio}` })).toBeVisible();
 });
 
-test('R-22 y R-29: la quinta compra muestra su descuento o explica por qué no', async ({ page }, info) => {
+test('R-22 y R-29 derogada: la quinta compra recibe su descuento aunque haya otra nota con saldo', async ({
+  page,
+}, info) => {
   const m = marca(info.project.name);
   const vendedorId = await sembrarVendedor(`Casa5 ${m}`);
   const leal = await sembrarCliente(`Leal ${m}`);
   await sembrarCompras(leal, vendedorId, 4, `C${m}L`);
   const deudora = await sembrarCliente(`Deudora ${m}`);
   await sembrarCompras(deudora, vendedorId, 3, `C${m}D`);
-  const pendiente = await sembrarPedidoAbierto(deudora, vendedorId, `C${m}P01`);
+  await sembrarPedidoAbierto(deudora, vendedorId, `C${m}P01`);
   await sembrarPiezas([`Q${m}01`], 14900);
 
   await irA(page, '/panel/pedidos/nuevo');
@@ -108,9 +108,9 @@ test('R-22 y R-29: la quinta compra muestra su descuento o explica por qué no',
 
   await irA(page, '/panel/pedidos/nuevo');
   await elegirCliente(page, `Deudora ${m}`);
-  await expect(resumen(page)).toContainText(
-    `Pedido 5 de su tarjeta: sin descuento porque tiene saldo pendiente en KZR-${pendiente.folio}.`,
-  );
+  // R-29 derogada (2026-10-23): la nota con saldo ya no quita el descuento. Con 3 liquidadas + 1 abierta, el nuevo es el lugar 5.
+  await expect(resumen(page)).toContainText('Pedido 5 de su tarjeta: −10 %');
+  await expect(resumen(page)).not.toContainText('sin descuento');
 });
 
 test('cancelar regresa la pieza a su exhibidor abierto y libera la posición', async ({ page }, info) => {

@@ -1,15 +1,6 @@
-import { and, asc, eq, gt, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import {
-  aplicacionPago,
-  cliente,
-  exhibidor,
-  movimientoPieza,
-  pedido,
-  pedidoItem,
-  pieza,
-  vPedido,
-} from '@/db/schema';
+import { aplicacionPago, cliente, exhibidor, movimientoPieza, pedido, pedidoItem, pieza } from '@/db/schema';
 import { normalizarCodigo } from '@/domain/codigos';
 import { numericACentavos } from '@/domain/dinero';
 import { MAX_PIEZAS_PEDIDO, formatoFolio } from '@/domain/pedidos';
@@ -22,6 +13,8 @@ export interface PiezaBloqueada {
   codigo: string;
   estado: EstadoPieza;
   exhibidorId: string | null;
+  /** Plan 3.1: vendedora que la tiene en su poder (solo disponible o apartada). */
+  vendedorCustodiaId: string | null;
   precio: string;
 }
 
@@ -30,6 +23,7 @@ const columnasPieza = {
   codigo: pieza.codigo,
   estado: pieza.estado,
   exhibidorId: pieza.exhibidorId,
+  vendedorCustodiaId: pieza.vendedorCustodiaId,
   precio: pieza.precio,
 };
 
@@ -184,6 +178,7 @@ export async function apartarPiezas(
       deEstado: p.estado,
       aEstado: 'apartada' as const,
       exhibidorId: p.exhibidorId,
+      vendedorId: p.vendedorCustodiaId,
       pedidoId,
       adminId,
     })),
@@ -249,6 +244,7 @@ export async function liberarPiezas(
       deEstado: 'apartada' as const,
       aEstado: vuelve(p) ? ('en_exhibidor' as const) : ('disponible' as const),
       exhibidorId: p.exhibidorId,
+      vendedorId: p.vendedorCustodiaId, // la apartada conserva su vendedora: vuelve con ella
       pedidoId: d.pedidoId,
       adminId: d.adminId,
       nota: p.exhibidorId && !vuelve(p) ? `${d.nota} El exhibidor está cerrado: queda disponible.` : d.nota,
@@ -342,7 +338,13 @@ export async function liquidarSiSaldoCero(
   if (piezas.length) {
     await tx
       .update(pieza)
-      .set({ estado: 'vendida', exhibidorId: null, version: sql`${pieza.version} + 1` })
+      // D-10 (Plan 3.1): vendida sale también de la custodia de la vendedora (CHECK pieza_custodia_solo_si_aplica).
+      .set({
+        estado: 'vendida',
+        exhibidorId: null,
+        vendedorCustodiaId: null,
+        version: sql`${pieza.version} + 1`,
+      })
       .where(
         inArray(
           pieza.id,
@@ -356,6 +358,7 @@ export async function liquidarSiSaldoCero(
         deEstado: 'apartada' as const,
         aEstado: 'vendida' as const,
         exhibidorId: x.exhibidorId,
+        vendedorId: x.vendedorCustodiaId, // trazabilidad: de quién salió (comisiones, Plan 5)
         pedidoId,
         adminId,
       })),
@@ -366,25 +369,4 @@ export async function liquidarSiSaldoCero(
     .set({ estado: 'liquidado', liquidadoAt: sql`now()`, version: sql`${pedido.version} + 1` })
     .where(eq(pedido.id, pedidoId));
   return 'liquidado';
-}
-
-/** R-29: folios de OTRAS notas abiertas del cliente con saldo > 0. Lectura por la vista. */
-export async function foliosConSaldo(
-  db: Ejecutor,
-  clienteId: string,
-  excluirPedidoId?: string,
-): Promise<number[]> {
-  const filas = await db
-    .select({ folio: vPedido.folio })
-    .from(vPedido)
-    .where(
-      and(
-        eq(vPedido.clienteId, clienteId),
-        eq(vPedido.estado, 'abierto'),
-        gt(vPedido.saldo, '0'),
-        excluirPedidoId ? ne(vPedido.id, excluirPedidoId) : undefined,
-      ),
-    )
-    .orderBy(asc(vPedido.folio));
-  return filas.map((f) => f.folio);
 }

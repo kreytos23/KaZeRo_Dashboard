@@ -4,10 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { conDb } from '@/db/client';
 import { porcentajeANumeric } from '@/domain/dinero';
+import { partirCodigos } from '@/features/exhibidores/codigos';
 import type { EstadoAccion } from '@/features/ui/estado';
 import { ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { ErrorNegocio } from '@/server/errores';
+import { entregarAVendedora, regresarAKazero } from '@/server/piezas/custodia';
 import { actualizarVendedor, crearVendedor } from '@/server/vendedores/servicio';
 
 const tipo = z.enum(['casa', 'revendedora', 'consignacion']);
@@ -54,5 +56,40 @@ export async function accionEditarVendedor(_: EstadoAccion, fd: FormData): Promi
     revalidatePath('/panel/exhibidores');
     revalidatePath('/panel/exhibidores/[id]', 'page');
     return 'Cambios guardados.';
+  });
+}
+
+const piezas = (n: number, participio: 'entregada' | 'regresada') =>
+  n === 1 ? `1 pieza ${participio}.` : `${n} piezas ${participio}s.`;
+
+/** Una pieza cambió de lugar: se refrescan la ficha de la vendedora, el inventario y las fichas de pieza. */
+function revalidarCustodia(vendedorId: string) {
+  revalidatePath(`/panel/vendedores/${vendedorId}`);
+  revalidatePath('/panel/inventario');
+  revalidatePath('/panel/inventario/[codigo]', 'page');
+  revalidatePath('/panel/pedidos/nuevo');
+}
+
+export async function accionEntregarAVendedora(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const vendedorId = uuidDe(fd, 'vendedorId');
+    const { entregadas } = await conDb((db) =>
+      entregarAVendedora(db, { adminId, vendedorId, codigos: partirCodigos(texto(fd, 'codigos')) }),
+    );
+    revalidarCustodia(vendedorId);
+    return piezas(entregadas, 'entregada');
+  });
+}
+
+export async function accionRegresarAKazero(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const vendedorId = uuidDe(fd, 'vendedorId');
+    const { regresadas } = await conDb((db) =>
+      regresarAKazero(db, { adminId, vendedorId, codigos: partirCodigos(texto(fd, 'codigos')) }),
+    );
+    revalidarCustodia(vendedorId);
+    return piezas(regresadas, 'regresada');
   });
 }

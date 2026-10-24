@@ -7,7 +7,8 @@ import { CampoConLista } from '@/features/ui/CampoConLista';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarCatalogo } from '@/server/catalogos/servicio';
 import { listarPiezas } from '@/server/piezas/servicio';
-import { ETIQUETA_ESTADO } from './etiquetas';
+import { listarVendedores } from '@/server/vendedores/servicio';
+import { ETIQUETA_ESTADO, ETIQUETA_UBICACION_FILTRO } from './etiquetas';
 import { POR_PAGINA, idDeCatalogo, leerFiltros } from './filtros';
 
 export const metadata = { title: 'Inventario' };
@@ -20,7 +21,7 @@ export default async function PaginaInventario({
   await requerirSesion();
   const f = leerFiltros(await searchParams);
   // Los filtros de catálogo llegan por nombre: se resuelven a id con las listas (que el formulario también usa).
-  const [catalogos, piezas] = await conDbLectura(async (db) => {
+  const [catalogos, piezas, vendedoras] = await conDbLectura(async (db) => {
     const cat = await Promise.all([
       listarCatalogo(db, 'categoria'),
       listarCatalogo(db, 'material'),
@@ -29,19 +30,24 @@ export default async function PaginaInventario({
     const pz = await listarPiezas(db, {
       q: f.q,
       estado: f.estado,
+      ubicacion: f.ubicacion,
+      vendedorId: f.vendedor,
       categoriaId: idDeCatalogo(cat[0], f.categoria),
       materialId: idDeCatalogo(cat[1], f.material),
       proveedorId: idDeCatalogo(cat[2], f.proveedor),
       limite: POR_PAGINA,
       offset: (f.pagina - 1) * POR_PAGINA,
     });
-    return [cat, pz] as const;
+    const vs = await listarVendedores(db);
+    return [cat, pz, vs.filter((v) => v.tipo !== 'casa')] as const;
   });
   const [categorias, materiales, proveedores] = catalogos;
   const conPagina = (p: number) => {
     const qs = new URLSearchParams();
     if (f.q) qs.set('q', f.q);
     if (f.estado) qs.set('estado', f.estado);
+    if (f.ubicacion) qs.set('ubicacion', f.ubicacion);
+    if (f.vendedor) qs.set('vendedor', f.vendedor);
     if (f.categoria) qs.set('categoria', f.categoria);
     if (f.material) qs.set('material', f.material);
     if (f.proveedor) qs.set('proveedor', f.proveedor);
@@ -78,6 +84,24 @@ export default async function PaginaInventario({
             ...Object.entries(ETIQUETA_ESTADO).map(([valor, texto]) => ({ valor, texto })),
           ]}
         />
+        <Selector
+          etiqueta="Ubicación"
+          name="ubicacion"
+          defaultValue={f.ubicacion ?? ''}
+          opciones={[
+            { valor: '', texto: 'Todas' },
+            ...Object.entries(ETIQUETA_UBICACION_FILTRO).map(([valor, texto]) => ({ valor, texto })),
+          ]}
+        />
+        <Selector
+          etiqueta="Vendedora"
+          name="vendedor"
+          defaultValue={f.vendedor ?? ''}
+          opciones={[
+            { valor: '', texto: 'Cualquiera' },
+            ...vendedoras.map((v) => ({ valor: v.id, texto: v.nombre })),
+          ]}
+        />
         <CampoConLista
           etiqueta="Categoría"
           name="categoria"
@@ -107,7 +131,7 @@ export default async function PaginaInventario({
         </button>
       </form>
       <div className="tarjeta overflow-x-auto px-4">
-        <table className="w-full min-w-[40rem] text-left text-sm">
+        <table className="w-full min-w-[46rem] text-left text-sm">
           <caption className="sr-only">Piezas del inventario</caption>
           <thead>
             <tr>
@@ -119,6 +143,7 @@ export default async function PaginaInventario({
               <th scope="col">Categoría</th>
               <th scope="col">Precio</th>
               <th scope="col">Estado</th>
+              <th scope="col">Ubicación</th>
             </tr>
           </thead>
           <tbody>
@@ -136,6 +161,7 @@ export default async function PaginaInventario({
                 <td>{p.categoriaNombre}</td>
                 <td>{formatoMXN(numericACentavos(p.precio))}</td>
                 <td>{ETIQUETA_ESTADO[p.estado]}</td>
+                <td>{p.ubicacionEtiqueta}</td>
               </tr>
             ))}
           </tbody>

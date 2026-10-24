@@ -2,13 +2,14 @@ import { and, asc, desc, eq, gt, gte, inArray, lte, ne, or, sql } from 'drizzle-
 import type { Ejecutor } from '@/db/pool';
 import { vAplicacionPago, vCliente, vPedido, vPedidoItem, vPieza, vSaldoFavor } from '@/db/schema';
 import { normalizarCodigo } from '@/domain/codigos';
-import { armarTarjeta, descuentoLealtad, siguientePosicion, type CicloTarjeta } from '@/domain/lealtad';
+import { numericACentavos } from '@/domain/dinero';
+import { armarTarjeta, descuentoLealtad, siguientePosicion } from '@/domain/lealtad';
 import { parsearFechaISO } from '@/domain/fechas';
 import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
 import { escaparLike, normalizar } from '@/domain/texto';
 import type { PreviaPedido } from '@/features/pedidos/tipos';
 import { ErrorNegocio } from '@/server/errores';
-import { foliosConSaldo, type EstadoPedido } from './comun';
+import type { EstadoPedido } from './comun';
 
 const filaPedido = {
   id: vPedido.id,
@@ -42,7 +43,7 @@ export async function previsualizarPedido(
   o: { clienteId: string | null; codigos: string[]; cuentaTarjeta: boolean },
 ): Promise<PreviaPedido> {
   const codigos = [...new Set(o.codigos.map(normalizarCodigo).filter(Boolean))].slice(0, MAX_PIEZAS_PEDIDO);
-  const [piezas, apartadas, clientes, ocupadas, conSaldo] = await Promise.all([
+  const [piezas, apartadas, clientes, ocupadas] = await Promise.all([
     codigos.length
       ? db
           .select({
@@ -52,6 +53,8 @@ export async function previsualizarPedido(
             precio: vPieza.precio,
             estado: vPieza.estado,
             imagenClave: vPieza.imagenClave,
+            vendedorCustodiaId: vPieza.vendedorCustodiaId,
+            vendedorCustodiaNombre: vPieza.vendedorCustodiaNombre,
           })
           .from(vPieza)
           .where(inArray(vPieza.codigo, codigos))
@@ -85,7 +88,6 @@ export async function previsualizarPedido(
             ),
           )
       : [],
-    o.clienteId ? foliosConSaldo(db, o.clienteId) : [],
   ]);
   const porCodigo = new Map(piezas.map((p) => [p.codigo, p]));
   const folioDe = new Map(apartadas.map((a) => [a.codigo, a.folio]));
@@ -93,12 +95,8 @@ export async function previsualizarPedido(
   let tarjeta: PreviaPedido['tarjeta'] = null;
   if (cliente && o.cuentaTarjeta) {
     const pos = siguientePosicion(ocupadas.map((x) => ({ ciclo: x.ciclo!, posicion: x.posicion! })));
-    const l = descuentoLealtad({
-      cuentaTarjeta: true,
-      posicion: pos.posicion,
-      otraNotaConSaldo: conSaldo.length > 0,
-    });
-    tarjeta = { ...pos, pctBps: l.pctBps, sinLealtad: l.sinLealtad, foliosConSaldo: conSaldo };
+    const l = descuentoLealtad({ cuentaTarjeta: true, posicion: pos.posicion });
+    tarjeta = { ciclo: pos.ciclo, posicion: pos.posicion, pctBps: l.pctBps };
   }
   return {
     piezas: codigos.flatMap((c) => {
@@ -133,6 +131,10 @@ export async function obtenerPedidoPorFolio(db: Ejecutor, folio: number) {
         vigente: vPedidoItem.vigente,
         quitadoAt: vPedidoItem.quitadoAt,
         piezaEstado: vPedidoItem.piezaEstado,
+        devolucionId: vPedidoItem.devolucionId,
+        devolucionFecha: vPedidoItem.devolucionFecha,
+        devolucionMotivo: vPedidoItem.devolucionMotivo,
+        devolucionMonto: vPedidoItem.devolucionMonto,
       })
       .from(vPedidoItem)
       .where(eq(vPedidoItem.pedidoId, p.id))
@@ -211,6 +213,7 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
         posicion: vPedido.posicionTarjeta,
         estado: vPedido.estado,
         folio: vPedido.folio,
+        saldo: vPedido.saldo,
       })
       .from(vPedido)
       .where(
@@ -231,8 +234,9 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
         posicion: t.posicion!,
         estado: t.estado as 'abierto' | 'liquidado',
         folio: t.folio,
+        conSaldo: numericACentavos(t.saldo) > 0,
       })),
-    ) as CicloTarjeta[],
+    ),
   };
 }
 

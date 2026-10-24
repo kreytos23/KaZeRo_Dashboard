@@ -1,7 +1,8 @@
 'use client';
 
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import Link from 'next/link';
+import { centavosANumeric, numericACentavos } from '@/domain/dinero';
 import { CampoKey } from '@/features/pedidos/CampoKey';
 import { AreaTexto, Campo, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
@@ -23,6 +24,70 @@ interface Props {
   hayPagado: boolean;
   piezas: number;
   hoy: string;
+  /** Plan 3.1: saldo a favor de la clienta (numeric) y su texto en pesos; '0.00' si no tiene. */
+  saldoFavor: string;
+  saldoFavorTexto: string;
+}
+
+/**
+ * Campos del pago. Con «Saldo a favor» el pagador queda en la clienta (el saldo es suyo) y el monto se
+ * prellena con lo que alcance: min(saldo a favor, saldo del pedido). Al volver a otro método se restaura el saldo.
+ */
+function CamposPago(p: Props) {
+  const favor = numericACentavos(p.saldoFavor);
+  const [metodo, setMetodo] = useState('transferencia');
+  const [monto, setMonto] = useState(p.saldo);
+  const conSaldoFavor = metodo === 'saldo_favor';
+  const elegirMetodo = (m: string) => {
+    setMetodo(m);
+    setMonto(m === 'saldo_favor' ? centavosANumeric(Math.min(favor, numericACentavos(p.saldo))) : p.saldo);
+  };
+  const opciones: { valor: string; texto: string }[] = Object.entries(ETIQUETA_METODO).map(
+    ([valor, texto]) => ({ valor, texto }),
+  );
+  if (favor > 0)
+    opciones.push({ valor: 'saldo_favor', texto: `Saldo a favor (disponible ${p.saldoFavorTexto})` });
+  return (
+    <>
+      <p className="text-sm text-tinta-suave">Saldo pendiente: {p.saldoTexto}</p>
+      <Selector
+        etiqueta="Método"
+        name="metodo"
+        required
+        value={metodo}
+        onChange={elegirMetodo}
+        opciones={opciones}
+      />
+      <Campo
+        etiqueta="Monto"
+        name="monto"
+        inputMode="decimal"
+        value={monto}
+        onChange={(e) => setMonto(e.target.value)}
+        required
+        autoComplete="off"
+      />
+      <Campo etiqueta="Fecha" name="fecha" type="date" defaultValue={p.hoy} max={p.hoy} required />
+      {conSaldoFavor ? (
+        <>
+          {/* El saldo a favor es de la clienta: el pagador no se elige. */}
+          <input type="hidden" name="pagador" value="cliente" />
+          <p className="text-sm text-tinta-suave">Paga: {p.clienteNombre} (cliente), con su saldo a favor.</p>
+        </>
+      ) : (
+        <Selector
+          etiqueta="Paga"
+          name="pagador"
+          defaultValue="cliente"
+          opciones={[
+            { valor: 'cliente', texto: `${p.clienteNombre} (cliente)` },
+            { valor: 'vendedor', texto: `${p.vendedorNombre} (vendedor)` },
+          ]}
+        />
+      )}
+      <Campo etiqueta="Nota" name="nota" maxLength={200} autoComplete="off" />
+    </>
+  );
 }
 
 /**
@@ -46,33 +111,7 @@ export function FormsPedido(p: Props) {
               <input type="hidden" name="pedidoId" value={p.pedidoId} />
               <input type="hidden" name="folio" value={p.folio} />
               <CampoKey />
-              <p className="text-sm text-tinta-suave">Saldo pendiente: {p.saldoTexto}</p>
-              <Campo
-                etiqueta="Monto"
-                name="monto"
-                inputMode="decimal"
-                defaultValue={p.saldo}
-                required
-                autoComplete="off"
-              />
-              <Campo etiqueta="Fecha" name="fecha" type="date" defaultValue={p.hoy} max={p.hoy} required />
-              <Selector
-                etiqueta="Método"
-                name="metodo"
-                required
-                defaultValue="transferencia"
-                opciones={Object.entries(ETIQUETA_METODO).map(([valor, texto]) => ({ valor, texto }))}
-              />
-              <Selector
-                etiqueta="Paga"
-                name="pagador"
-                defaultValue="cliente"
-                opciones={[
-                  { valor: 'cliente', texto: `${p.clienteNombre} (cliente)` },
-                  { valor: 'vendedor', texto: `${p.vendedorNombre} (vendedor)` },
-                ]}
-              />
-              <Campo etiqueta="Nota" name="nota" maxLength={200} autoComplete="off" />
+              <CamposPago {...p} />
             </Fragment>
           )}
         </FormAccion>

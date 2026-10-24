@@ -173,4 +173,13 @@ describe('asignarTarjeta', () => {
       );
     }
   });
+
+  it('D-2 una nota KZR sin celda va al lugar libre de la última fila, no a un hueco de una fila anterior', () => {
+    const r = asignarTarjeta({
+      pedidos: [ped('a', '2026-01-10'), ped('b', '2026-02-10'), ped('k', '2026-03-10', 'kzr', 'abierto')],
+      filasHoja: [[d('2026-01-10'), d('2026-01-20')], [d('2026-02-10')]],
+      evidencia: new Map(),
+    });
+    expect(r.asignados.get('k')).toEqual({ ciclo: 2, posicion: 2 });
+  });
 });

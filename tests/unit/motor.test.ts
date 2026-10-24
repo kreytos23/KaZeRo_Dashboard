@@ -3,11 +3,18 @@ import { crearMotor } from '@/search/motor';
 import type { IndiceBusqueda } from '@/search/tipos';
 
 const indice: IndiceBusqueda = {
-  v: 3,
+  v: 4,
   piezas: [
-    ['p1', 'AF12', 'Anillo serpiente con circonitas', 'disponible', '9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d'],
-    ['p2', 'AF120', 'Pulsera hilo rosa', 'vendida', null],
-    ['p3', 'X/1', '<img src=x onerror=alert(1)>', 'disponible', null],
+    [
+      'p1',
+      'AF12',
+      'Anillo serpiente con circonitas',
+      'disponible',
+      '9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d',
+      null,
+    ],
+    ['p2', 'AF120', 'Pulsera hilo rosa', 'vendida', null, null],
+    ['p3', 'X/1', '<img src=x onerror=alert(1)>', 'disponible', null, 'Con Nelly'],
   ],
   clientes: [
     ['c1', 'Danya', '5to norte'],
@@ -74,13 +81,20 @@ describe('búsqueda global (diseño §8)', () => {
   });
   it('los href de cliente y vendedor codifican el id', () => {
     const m = crearMotor({
-      v: 3,
+      v: 4,
       piezas: [],
       clientes: [['a/b?c', 'Zoe', null]],
       vendedores: [],
       pedidos: [],
     });
     expect(m.buscar('zoe')[0]!.href).toBe('/panel/clientes/a%2Fb%3Fc');
+  });
+});
+
+describe('ubicación (índice v4)', () => {
+  it('el subtítulo suma la ubicación solo cuando viene (exhibidor o vendedora)', () => {
+    expect(motor.buscar('AF12')[0]!.subtitulo).toBe('Disponible');
+    expect(motor.buscar('X/1')[0]!.subtitulo).toBe('Disponible · Con Nelly');
   });
 });
 
@@ -108,7 +122,7 @@ describe('código escrito con guion o espacios', () => {
 
 const motorConPieza34 = crearMotor({
   ...indice,
-  piezas: [...indice.piezas, ['p34', '34', 'Dije', 'disponible', null]],
+  piezas: [...indice.piezas, ['p34', '34', 'Dije', 'disponible', null, null]],
 });
 describe('folios de pedido', () => {
   it('D-16: "KZR-34", "kzr34" y "kzr 34" abren el pedido 34', () => {

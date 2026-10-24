@@ -11,6 +11,7 @@ import { requerirSesion } from '@/server/auth/sesion-actual';
 import { crearCliente } from '@/server/clientes/servicio';
 import { ErrorNegocio } from '@/server/errores';
 import { registrarPagoDePedido, type MetodoPago } from '@/server/pagos/servicio';
+import { devolverPiezaDefectuosa } from '@/server/pedidos/devolucion';
 import { cancelarPedido, crearPedido, editarPedido } from '@/server/pedidos/servicio';
 import { revalidarPedido } from './revalidar';
 
@@ -142,5 +143,27 @@ export async function accionEditarPedido(_: EstadoAccion, fd: FormData): Promise
     );
     revalidarPedido(folio);
     redirect(`/panel/pedidos/${folio}?editado=1`);
+  });
+}
+
+export async function accionDevolverPieza(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const folio = folioDe(fd);
+    // Mueve dinero a saldo a favor y no se deshace: la casilla `required` no basta, un POST directo la saltaría.
+    if (texto(fd, 'confirmo') !== 'on')
+      throw new ErrorNegocio('confirmacion', 'Marca la casilla para confirmar la devolución.');
+    await conDb((db) =>
+      devolverPiezaDefectuosa(db, {
+        key: uuidDe(fd, 'key'),
+        adminId,
+        pedidoId: uuidDe(fd, 'pedidoId'),
+        itemId: uuidDe(fd, 'itemId'),
+        motivo: texto(fd, 'motivo').slice(0, 400),
+        fecha: texto(fd, 'fecha').slice(0, 20),
+      }),
+    );
+    revalidarPedido(folio);
+    redirect(`/panel/pedidos/${folio}?devuelta=1`);
   });
 }

@@ -7,13 +7,14 @@ export interface PiezaPrevia {
   disponible: boolean;
   folioApartada: number | null;
   imagenClave: string | null;
+  /** Plan 3.1: la vendedora que tiene la pieza en su poder (o null si está en Kazero o en un exhibidor). */
+  vendedorCustodiaId: string | null;
+  vendedorCustodiaNombre: string | null;
 }
 export interface TarjetaPrevia {
   ciclo: number;
   posicion: number;
   pctBps: number;
-  sinLealtad: 'saldo_pendiente' | null;
-  foliosConSaldo: number[];
 }
 export interface PreviaPedido {
   /** En el orden pedido, sin repetidos. */

@@ -49,6 +49,13 @@ const CAMPOS: Record<string, string> = {
   pago_nota_largo: 'nota',
   aplicacion_pago_excede_pago: 'monto',
   saldo_favor_insuficiente: 'monto',
+  // Plan 3.1: custodia de vendedora, devoluciones y saldo a favor.
+  // Las devoluciones por monto no tienen campo propio en FormDevolver: sin campo, el mensaje real se muestra.
+  pieza_cambio_custodia: 'codigos',
+  devolucion_fecha: 'fecha',
+  devolucion_motivo_largo: 'motivo',
+  saldo_favor_retiro_completo: 'nota',
+  saldo_favor_nota_largo: 'nota',
 };
 
 /** CHECK de coherencia interna de pedidos y pagos: la app nunca debería violarlos (son la última barrera). */
@@ -121,6 +128,35 @@ const MENSAJES: Record<string, string> = {
   pedido_item_quitado_final: 'Una pieza que salió del pedido no puede volver a esa línea.',
   saldo_favor_insuficiente: 'El saldo a favor no alcanza para ese monto.',
   saldo_favor_pedido_requerido: PEDIDO_INCONSISTENTE,
+  // Plan 3.1 (0016/0017). Los nombres viejos (saldo_favor_signo, saldo_favor_pedido_requerido) se conservan
+  // arriba por si un despliegue anterior los reporta durante la transición.
+  pieza_una_ubicacion: 'Una pieza no puede estar en un exhibidor y con una vendedora a la vez.',
+  pieza_custodia_solo_si_aplica: 'Solo una pieza disponible o apartada puede estar con una vendedora.',
+  pieza_cambio_custodia:
+    'La pieza debe estar disponible en Kazero para entregarse, y regresar antes de pasar a otra vendedora.',
+  devolucion_pedido_item_uq: 'Esa pieza ya se devolvió.',
+  devolucion_no_es_ultima_venta: 'La pieza no está vendida por este pedido.',
+  pieza_alta_custodia: 'Una pieza nueva queda en Kazero: entrégala a la vendedora después del alta.',
+  devolucion_pedido_no_liquidado: 'Solo se devuelven piezas de pedidos liquidados.',
+  devolucion_linea_no_vigente: 'Esa pieza ya no está en el pedido.',
+  devolucion_pieza_no_vendida: 'La pieza no está vendida: no se puede devolver.',
+  devolucion_excede_linea: 'La devolución no puede superar lo que costó la pieza en el pedido.',
+  devolucion_excede_total: 'Lo devuelto no puede superar el total del pedido.',
+  devolucion_fecha: 'La devolución no puede ser anterior a la fecha del pedido.',
+  devolucion_monto_positivo: 'El monto debe ser mayor que cero.',
+  devolucion_motivo_largo: 'Escribe el motivo de la devolución (hasta 200 caracteres).',
+  saldo_favor_retiro_completo: 'El retiro necesita una nota (hasta 200 caracteres).',
+  saldo_favor_nota_largo: 'La nota admite hasta 200 caracteres.',
+  pago_saldo_favor_cliente: 'Solo una clienta puede pagar con su saldo a favor.',
+  // Garantías internas del libro (CHECK, triggers y diferidos de 0017): la app nunca debería violarlas.
+  saldo_favor_signo_v2: PEDIDO_INCONSISTENTE,
+  saldo_favor_pedido_requerido_v2: PEDIDO_INCONSISTENTE,
+  saldo_favor_origen: PEDIDO_INCONSISTENTE,
+  saldo_favor_uso_incoherente: PEDIDO_INCONSISTENTE,
+  saldo_favor_devolucion_incoherente: PEDIDO_INCONSISTENTE,
+  saldo_favor_uso_faltante: PEDIDO_INCONSISTENTE,
+  pago_saldo_sin_aplicacion: PEDIDO_INCONSISTENTE,
+  devolucion_sin_saldo: PEDIDO_INCONSISTENTE,
 };
 
 function mensajesPg(err: unknown): string[] {

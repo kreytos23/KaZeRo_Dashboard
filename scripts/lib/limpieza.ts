@@ -14,6 +14,7 @@ export const TABLAS_NEGOCIO = [
   'saldo_favor_mov',
   'aplicacion_pago',
   'pago',
+  'devolucion',
   'pedido_item',
   'movimiento_pieza',
   'pedido',

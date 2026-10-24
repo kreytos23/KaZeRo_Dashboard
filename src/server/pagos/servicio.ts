@@ -1,5 +1,5 @@
 import type { Ejecutor } from '@/db/pool';
-import { aplicacionPago, pago } from '@/db/schema';
+import { aplicacionPago, pago, saldoFavorMov } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
@@ -11,8 +11,9 @@ import {
   pagadoCentavos,
 } from '@/server/pedidos/comun';
 import { validarFecha } from '@/server/pedidos/servicio';
+import { noAlcanza, saldoFavorDeCliente } from '@/server/saldo-favor/servicio';
 
-export const METODOS_PAGO = ['transferencia', 'efectivo', 'otro'] as const;
+export const METODOS_PAGO = ['transferencia', 'efectivo', 'otro', 'saldo_favor'] as const;
 export type MetodoPago = (typeof METODOS_PAGO)[number];
 
 export interface DatosPagoPedido {
@@ -38,6 +39,13 @@ function validar(d: DatosPagoPedido) {
     throw new ErrorNegocio('metodo_invalido', 'Elige un método de pago válido.', 'metodo');
   if (d.pagador !== 'cliente' && d.pagador !== 'vendedor')
     throw new ErrorNegocio('pagador_invalido', 'Elige quién paga.', 'pagador');
+  // Plan 3.1 (D-20): el saldo a favor es de la clienta; con pagador vendedor no hay de dónde descontarlo.
+  if (d.metodo === 'saldo_favor' && d.pagador !== 'cliente')
+    throw new ErrorNegocio(
+      'pagador_invalido',
+      'El saldo a favor es de la clienta: elige «cliente».',
+      'pagador',
+    );
   if (d.fecha?.trim()) validarFecha(d.fecha);
   const nota = d.nota?.trim() || null;
   if (nota && nota.length > 200)
@@ -55,7 +63,9 @@ function validar(d: DatosPagoPedido) {
 /**
  * Pago mínimo del Plan 3 (D-3, P1): un pago → una aplicación a UN pedido, sin sobrante. El Plan 4 agrega
  * captura/OCR, reparto entre pedidos (R-31 a R-33) y saldo a favor por sobrante (R-34) sobre las mismas tablas.
- * Orden de bloqueo (D-10): cliente → pedido → [exhibidores → piezas, si el pago liquida] → pago.
+ * Orden de bloqueo (D-10, D-24): cliente → pedido → [exhibidores → piezas, si el pago liquida] → pago → saldo.
+ * Con `metodo: 'saldo_favor'` (Plan 3.1, D-20) el pago descuenta del saldo de la clienta: además de `pago` y
+ * `aplicacion_pago` inserta el `uso` en el libro (la BD exige los tres a la vez al confirmar).
  */
 export async function registrarPagoDePedido(db: Ejecutor, d: DatosPagoPedido): Promise<PagoRegistrado> {
   const v = validar(d);
@@ -85,6 +95,11 @@ export async function registrarPagoDePedido(db: Ejecutor, d: DatosPagoPedido): P
               `El pago (${formatoMXN(v.monto)}) supera el saldo del pedido (${formatoMXN(saldo)}).`,
               'monto',
             );
+          // D-20: el saldo se lee con cliente y pedido ya bloqueados, así que nadie más lo cambia en medio.
+          if (v.metodo === 'saldo_favor') {
+            const disponible = numericACentavos(await saldoFavorDeCliente(tx, p.clienteId));
+            if (v.monto > disponible) throw noAlcanza(disponible, v.monto);
+          }
           // Si el pago liquida, exhibidores → piezas ANTES de tocar `pago` (D-10).
           if (v.monto === saldo) await bloquearPiezasDelPedido(tx, p.id);
           const monto = centavosANumeric(v.monto);
@@ -102,7 +117,21 @@ export async function registrarPagoDePedido(db: Ejecutor, d: DatosPagoPedido): P
             })
             .returning({ id: pago.id });
           // R-35: la fecha de cobro de la aplicación es la fecha del pago.
-          await tx.insert(aplicacionPago).values({ pagoId: pg!.id, pedidoId: p.id, monto, fecha });
+          const [ap] = await tx
+            .insert(aplicacionPago)
+            .values({ pagoId: pg!.id, pedidoId: p.id, monto, fecha })
+            .returning({ id: aplicacionPago.id });
+          // El `uso` va al final (D-24): toma el candado consultivo del libro con todo lo demás ya bloqueado.
+          if (v.metodo === 'saldo_favor')
+            await tx.insert(saldoFavorMov).values({
+              clienteId: p.clienteId,
+              tipo: 'uso',
+              monto: `-${monto}`,
+              pedidoId: p.id,
+              aplicacionPagoId: ap!.id,
+              adminId: d.adminId,
+              fecha,
+            });
           const estado = (await liquidarSiSaldoCero(tx, p.id, d.adminId)) as 'abierto' | 'liquidado';
           return { pagoId: pg!.id, estado, saldo: centavosANumeric(saldo - v.monto) };
         },

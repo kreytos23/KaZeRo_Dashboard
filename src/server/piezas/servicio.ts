@@ -7,6 +7,7 @@ import { destinoCorreccion } from '@/domain/correccion';
 import { centavosANumeric } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
 import { MAX_FILAS_LOTE, type FilaLote } from '@/domain/lote';
+import { etiquetaUbicacion, type Ubicacion } from '@/domain/ubicacion';
 import { escaparLike, normalizar } from '@/domain/texto';
 import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
 import { obtenerOCrearCatalogo, resolverCatalogos } from '@/server/catalogos/servicio';
@@ -38,6 +39,10 @@ const filaPieza = {
   categoriaNombre: vPieza.categoriaNombre,
   exhibidorId: vPieza.exhibidorId,
   imagenClave: vPieza.imagenClave,
+  ubicacion: vPieza.ubicacion,
+  exhibidorNombre: vPieza.exhibidorNombre,
+  vendedorCustodiaId: vPieza.vendedorCustodiaId,
+  vendedorCustodiaNombre: vPieza.vendedorCustodiaNombre,
 };
 export type PiezaFila = {
   id: string;
@@ -48,6 +53,11 @@ export type PiezaFila = {
   categoriaNombre: string;
   exhibidorId: string | null;
   imagenClave: string | null;
+  ubicacion: Ubicacion;
+  /** «Kazero», «Exhibidor X», «Con Nelly»… (reunión 2026-10-23, punto 5). */
+  ubicacionEtiqueta: string;
+  vendedorCustodiaId: string | null;
+  vendedorCustodiaNombre: string | null;
 };
 
 export async function sugerirCodigo(db: Ejecutor, prefijo: string): Promise<string> {
@@ -326,7 +336,12 @@ export async function cambiarEstado(
   return conErroresDeNegocio(() =>
     db.transaction(async (tx) => {
       const [actual] = await tx
-        .select({ estado: pieza.estado, version: pieza.version, exhibidorId: pieza.exhibidorId })
+        .select({
+          estado: pieza.estado,
+          version: pieza.version,
+          exhibidorId: pieza.exhibidorId,
+          custodiaId: pieza.vendedorCustodiaId,
+        })
         .from(pieza)
         .where(eq(pieza.id, d.piezaId))
         .for('update');
@@ -341,6 +356,8 @@ export async function cambiarEstado(
           estado: d.aEstado,
           // Al salir de un exhibidor por regalo/defecto/guardada deja de estar ligada a él.
           exhibidorId: actual.estado === 'en_exhibidor' ? null : undefined,
+          // Plan 3.1: tampoco sigue en poder de la vendedora (el CHECK de custodia lo exige).
+          vendedorCustodiaId: actual.custodiaId ? null : undefined,
           version: sql`${pieza.version} + 1`,
         })
         .where(and(eq(pieza.id, d.piezaId), eq(pieza.version, d.version)));
@@ -350,6 +367,7 @@ export async function cambiarEstado(
         deEstado: actual.estado,
         aEstado: d.aEstado,
         exhibidorId: actual.estado === 'en_exhibidor' ? actual.exhibidorId : null,
+        vendedorId: actual.custodiaId, // de quién salió; deshacer (R-07) la deja en Kazero
         nota,
         adminId: d.adminId ?? null,
       });
@@ -461,7 +479,9 @@ export async function obtenerPiezaPorCodigo(db: Ejecutor, codigo: string) {
     .from(vPieza)
     .where(eq(vPieza.codigo, normalizarCodigo(codigo)))
     .limit(1);
-  return f ?? null;
+  return f
+    ? { ...f, ubicacionEtiqueta: etiquetaUbicacion({ ...f, vendedorNombre: f.vendedorCustodiaNombre }) }
+    : null;
 }
 export type FichaPieza = NonNullable<Awaited<ReturnType<typeof obtenerPiezaPorCodigo>>>;
 
@@ -477,6 +497,8 @@ export function historial(db: Ejecutor, piezaId: string) {
       exhibidorNombre: vMovimientoPieza.exhibidorNombre,
       exhibidorId: vMovimientoPieza.exhibidorId,
       exhibidorEstado: vMovimientoPieza.exhibidorEstado,
+      vendedorId: vMovimientoPieza.vendedorId,
+      vendedorNombre: vMovimientoPieza.vendedorNombre,
       adminEmail: vMovimientoPieza.adminEmail,
       pedidoFolio: vMovimientoPieza.pedidoFolio,
     })
@@ -499,7 +521,7 @@ export async function pedidoVigenteDePieza(
 
 export type MovimientoFila = Awaited<ReturnType<typeof historial>>[number];
 
-export function listarPiezas(
+export async function listarPiezas(
   db: Ejecutor,
   o: {
     q?: string;
@@ -507,6 +529,9 @@ export function listarPiezas(
     categoriaId?: string;
     materialId?: string;
     proveedorId?: string;
+    ubicacion?: Ubicacion;
+    /** Con `ubicacion: 'vendedora'`, solo las que tiene esa vendedora. */
+    vendedorId?: string;
     limite?: number;
     offset?: number;
   } = {},
@@ -523,12 +548,18 @@ export function listarPiezas(
     o.categoriaId ? eq(vPieza.categoriaId, o.categoriaId) : undefined,
     o.materialId ? eq(vPieza.materialId, o.materialId) : undefined,
     o.proveedorId ? eq(vPieza.proveedorId, o.proveedorId) : undefined,
+    o.ubicacion ? eq(vPieza.ubicacion, o.ubicacion) : undefined,
+    o.vendedorId ? eq(vPieza.vendedorCustodiaId, o.vendedorId) : undefined,
   ];
-  return db
+  const filas = await db
     .select(filaPieza)
     .from(vPieza)
     .where(and(...filtros))
     .orderBy(asc(vPieza.codigo))
     .limit(Math.min(Math.max(Math.trunc(o.limite ?? 50), 1), 200))
     .offset(Math.max(Math.trunc(o.offset ?? 0), 0));
+  return filas.map((f) => ({
+    ...f,
+    ubicacionEtiqueta: etiquetaUbicacion({ ...f, vendedorNombre: f.vendedorCustodiaNombre }),
+  }));
 }
