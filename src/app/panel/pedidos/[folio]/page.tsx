@@ -11,6 +11,7 @@ import { textoLealtadGuardada } from '@/features/pedidos/texto-lealtad';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPedido } from '@/features/ui/estado-visual';
 import { Fecha } from '@/features/ui/Fecha';
+import { EncabezadoAcciones } from '@/features/ui/MenuAcciones';
 import { Saldo } from '@/features/ui/Saldo';
 import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
@@ -19,7 +20,7 @@ import { obtenerPedidoPorFolio } from '@/server/pedidos/lecturas';
 import { saldoFavorDeCliente } from '@/server/saldo-favor/servicio';
 import { ETIQUETA_METODO_REGISTRADO, fechaCorta } from '../etiquetas';
 import { FormDevolver } from './FormDevolver';
-import { EditarPedido, FormCancelarPedido, FormRegistrarPago } from './FormsPedido';
+import { FormCancelarPedido, FormRegistrarPago } from './FormsPedido';
 
 type Params = Promise<{ folio: string }>;
 
@@ -84,10 +85,29 @@ export default async function FichaPedido({
   return (
     <section className="flex flex-col gap-6">
       <AvisoIndiceSucio version={p.version} />
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold">{formatoFolio(p.folio)}</h1>
-        <EtiquetaEstado vista={vistaEstadoPedido(p.estado)} grande />
-      </div>
+      {/* Lo frecuente (cobrar) queda a la vista; editar y cancelar se abren desde «Más acciones». */}
+      <EncabezadoAcciones
+        acciones={[
+          {
+            id: 'editar',
+            etiqueta: 'Editar pedido',
+            href: `/panel/pedidos/${p.folio}/editar`,
+            oculta: !abierto,
+          },
+          {
+            id: 'cancelar',
+            etiqueta: 'Cancelar pedido',
+            peligro: true,
+            oculta: !abierto,
+            contenido: <FormCancelarPedido {...datosPago} />,
+          },
+        ]}
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold">{formatoFolio(p.folio)}</h1>
+          <EtiquetaEstado vista={vistaEstadoPedido(p.estado)} grande />
+        </div>
+      </EncabezadoAcciones>
       {sp.creado === '1' && (
         <p role="status" className="aviso-exito max-w-3xl">
           Pedido creado.
@@ -265,14 +285,6 @@ export default async function FichaPedido({
               </ul>
             )}
           </section>
-
-          <div className="order-6 lg:order-3">
-            <EditarPedido folio={p.folio} abierto={abierto} />
-          </div>
-
-          <div className="order-8 lg:order-4">
-            <FormCancelarPedido {...datosPago} />
-          </div>
         </div>
       </div>
     </section>

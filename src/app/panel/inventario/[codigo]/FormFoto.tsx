@@ -4,6 +4,7 @@ import { startTransition, useActionState, useEffect, useRef, useState } from 're
 import { SelectorFoto } from '@/features/imagenes/SelectorFoto';
 import { ErroresCampo, useEnfocarPrimerInvalido } from '@/features/ui/errores-campo';
 import type { EstadoAccion } from '@/features/ui/estado';
+import { BotonEnvio } from '@/features/ui/FormAccion';
 import { useHidratado } from '@/features/ui/hidratado';
 import { marcarIndiceSucio } from '@/search/eventos';
 import { accionCambiarImagen } from '../acciones';
@@ -67,13 +68,12 @@ export function FormFoto({
       <p role="status" className={estado.ok ? 'aviso-exito' : undefined}>
         {pendiente ? 'Subiendo…' : estado.ok}
       </p>
-      <button
-        type="submit"
-        disabled={pendiente || !hidratado || !archivo}
-        className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
-      >
-        {textoBotonFoto(tieneFoto)}
-      </button>
+      <BotonEnvio
+        textoBoton={textoBotonFoto(tieneFoto)}
+        pendiente={pendiente}
+        hidratado={hidratado}
+        deshabilitado={!archivo}
+      />
     </form>
   );
 }

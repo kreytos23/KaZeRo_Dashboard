@@ -8,19 +8,21 @@ import { formatoFolio } from '@/domain/pedidos';
 import { describirDestino, destinoCorreccion } from '@/domain/correccion';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { FotoPieza } from '@/features/imagenes/FotoPieza';
-import { Campo, Selector } from '@/features/ui/Campo';
+import { Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPieza, vistaUbicacion } from '@/features/ui/estado-visual';
 import { CampoConLista } from '@/features/ui/CampoConLista';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { Fecha } from '@/features/ui/Fecha';
+import { EncabezadoAcciones } from '@/features/ui/MenuAcciones';
 import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarCatalogo } from '@/server/catalogos/servicio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { historial, obtenerPiezaPorCodigo, pedidoVigenteDePieza } from '@/server/piezas/servicio';
 import { accionCambiarEstado, accionEditarPieza, accionQuitarImagen } from '../acciones';
+import { fechaCorta } from '../../pedidos/etiquetas';
 import { ETIQUETA_ESTADO, destinosManuales, textoMovimiento } from '../etiquetas';
 import { FormDeshacerCambio } from './FormDeshacerCambio';
 import { FormFoto } from './FormFoto';
@@ -99,10 +101,103 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
       </ol>
     </section>
   );
+  const formFoto = (
+    <div className="flex flex-col gap-4">
+      {/* Sin key por versión: así el aviso "Foto guardada." sobrevive al refresco de la ficha. */}
+      <FormFoto piezaId={p.id} version={p.version} tieneFoto={Boolean(p.imagenClave)} />
+      {/* Siempre montado: si se desmontara al quedar sin foto, "Foto quitada." nunca se anunciaría. */}
+      <FormAccion
+        accion={accionQuitarImagen}
+        textoBoton="Quitar foto"
+        className="flex flex-col gap-3"
+        sinControles={!p.imagenClave}
+      >
+        {p.imagenClave && (
+          <Fragment key={p.version}>
+            <input type="hidden" name="piezaId" value={p.id} />
+            <input type="hidden" name="version" value={p.version} />
+            <CampoCasilla name="confirmo" value="si" required>
+              Confirmo que quiero quitar la foto.
+            </CampoCasilla>
+          </Fragment>
+        )}
+      </FormAccion>
+    </div>
+  );
+  const formEditar = (
+    <FormAccion accion={accionEditarPieza} textoBoton="Guardar cambios">
+      {/* key por versión en los campos: refresca los defaultValue sin perder el estado de la acción. */}
+      <Fragment key={p.version}>
+        <input type="hidden" name="piezaId" value={p.id} />
+        <input type="hidden" name="version" value={p.version} />
+        <Campo
+          etiqueta="Descripción"
+          name="descripcion"
+          defaultValue={p.descripcion}
+          required
+          maxLength={300}
+        />
+        <CampoConLista
+          etiqueta="Categoría"
+          name="categoria"
+          opciones={categorias.map((c) => c.nombre)}
+          defaultValue={p.categoriaNombre}
+          required
+          maxLength={80}
+        />
+        <CampoConLista
+          etiqueta="Material"
+          name="material"
+          opciones={materiales.map((c) => c.nombre)}
+          defaultValue={p.materialNombre ?? ''}
+          maxLength={80}
+        />
+        <CampoConLista
+          etiqueta="Proveedor"
+          name="proveedor"
+          opciones={proveedores.map((c) => c.nombre)}
+          defaultValue={p.proveedorNombre ?? ''}
+          maxLength={80}
+        />
+        <Campo etiqueta="Costo" name="costo" inputMode="decimal" defaultValue={p.costo} />
+        <Campo
+          etiqueta="Precio"
+          name="precio"
+          inputMode="decimal"
+          defaultValue={p.precio}
+          required
+          readOnly={precioFijo}
+          aria-describedby={precioFijo ? 'precio-fijo' : undefined}
+        />
+        {precioFijo && (
+          <p id="precio-fijo" className="text-meta text-tinta-suave">
+            El precio lo fijó su pedido: no se cambia mientras la pieza esté{' '}
+            {ETIQUETA_ESTADO[p.estado].toLowerCase()}.
+          </p>
+        )}
+        <CampoMotivo
+          montos={[
+            { name: 'costo', tipo: 'pesos' },
+            { name: 'precio', tipo: 'pesos' },
+          ]}
+        />
+      </Fragment>
+    </FormAccion>
+  );
   return (
     <section className="flex flex-col gap-6">
       <AvisoIndiceSucio version={p.version} />
-      <div>
+      {/* Lo frecuente (cambiar de estado) queda visible; editar y la foto se abren desde «Más acciones». */}
+      <EncabezadoAcciones
+        acciones={[
+          { id: 'editar', etiqueta: 'Editar pieza', contenido: formEditar },
+          {
+            id: 'foto',
+            etiqueta: p.imagenClave ? 'Cambiar o quitar la foto' : 'Agregar foto',
+            contenido: formFoto,
+          },
+        ]}
+      >
         <h1 className="font-mono text-2xl font-semibold">{p.codigo}</h1>
         <p className="text-monto">{p.descripcion}</p>
         {pedido && (
@@ -113,7 +208,7 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
             </Link>
           </p>
         )}
-      </div>
+      </EncabezadoAcciones>
       {/* En pantallas anchas, dos columnas (datos e historial | foto y acciones); en celular, una sola con `order-*`. */}
       <div className="ficha-cols">
         <div className="ficha-col">
@@ -158,7 +253,7 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
             <dt className="font-medium">Costo</dt>
             <dd className="tabular-nums">{formatoMXN(numericACentavos(p.costo))}</dd>
             <dt className="font-medium">Alta</dt>
-            <dd>{p.fechaAlta}</dd>
+            <dd>{fechaCorta(p.fechaAlta)}</dd>
           </dl>
           <div className="order-5">{historialMovimientos}</div>
           <div className="order-6">
@@ -171,99 +266,7 @@ export default async function FichaPieza({ params }: { params: Promise<{ codigo:
               Foto
             </h2>
             <FotoPieza piezaId={p.id} clave={p.imagenClave} alt={p.descripcion} variante="grande" />
-            <details className="tarjeta p-4">
-              <summary className="min-h-11 cursor-pointer content-center font-medium">
-                {p.imagenClave ? 'Cambiar o quitar la foto' : 'Agregar foto'}
-              </summary>
-              <div className="mt-3 flex flex-col gap-4">
-                {/* Sin key por versión: así el aviso "Foto guardada." sobrevive al refresco de la ficha. */}
-                <FormFoto piezaId={p.id} version={p.version} tieneFoto={Boolean(p.imagenClave)} />
-                {/* Siempre montado: si se desmontara al quedar sin foto, "Foto quitada." nunca se anunciaría. */}
-                <FormAccion
-                  accion={accionQuitarImagen}
-                  textoBoton="Quitar foto"
-                  className="flex flex-col gap-3"
-                  sinControles={!p.imagenClave}
-                >
-                  {p.imagenClave && (
-                    <Fragment key={p.version}>
-                      <input type="hidden" name="piezaId" value={p.id} />
-                      <input type="hidden" name="version" value={p.version} />
-                      <label className="flex min-h-11 items-center gap-2">
-                        <input type="checkbox" name="confirmo" value="si" required />
-                        Confirmo que quiero quitar la foto.
-                      </label>
-                    </Fragment>
-                  )}
-                </FormAccion>
-              </div>
-            </details>
           </section>
-          <details className="tarjeta order-4 p-4">
-            <summary className="min-h-11 cursor-pointer content-center font-medium">Editar pieza</summary>
-            <FormAccion
-              accion={accionEditarPieza}
-              textoBoton="Guardar cambios"
-              className="mt-3 flex flex-col gap-3"
-            >
-              {/* key por versión en los campos: refresca los defaultValue sin perder el estado de la acción. */}
-              <Fragment key={p.version}>
-                <input type="hidden" name="piezaId" value={p.id} />
-                <input type="hidden" name="version" value={p.version} />
-                <Campo
-                  etiqueta="Descripción"
-                  name="descripcion"
-                  defaultValue={p.descripcion}
-                  required
-                  maxLength={300}
-                />
-                <CampoConLista
-                  etiqueta="Categoría"
-                  name="categoria"
-                  opciones={categorias.map((c) => c.nombre)}
-                  defaultValue={p.categoriaNombre}
-                  required
-                  maxLength={80}
-                />
-                <CampoConLista
-                  etiqueta="Material"
-                  name="material"
-                  opciones={materiales.map((c) => c.nombre)}
-                  defaultValue={p.materialNombre ?? ''}
-                  maxLength={80}
-                />
-                <CampoConLista
-                  etiqueta="Proveedor"
-                  name="proveedor"
-                  opciones={proveedores.map((c) => c.nombre)}
-                  defaultValue={p.proveedorNombre ?? ''}
-                  maxLength={80}
-                />
-                <Campo etiqueta="Costo" name="costo" inputMode="decimal" defaultValue={p.costo} />
-                <Campo
-                  etiqueta="Precio"
-                  name="precio"
-                  inputMode="decimal"
-                  defaultValue={p.precio}
-                  required
-                  readOnly={precioFijo}
-                  aria-describedby={precioFijo ? 'precio-fijo' : undefined}
-                />
-                {precioFijo && (
-                  <p id="precio-fijo" className="text-meta text-tinta-suave">
-                    El precio lo fijó su pedido: no se cambia mientras la pieza esté{' '}
-                    {ETIQUETA_ESTADO[p.estado].toLowerCase()}.
-                  </p>
-                )}
-                <CampoMotivo
-                  montos={[
-                    { name: 'costo', tipo: 'pesos' },
-                    { name: 'precio', tipo: 'pesos' },
-                  ]}
-                />
-              </Fragment>
-            </FormAccion>
-          </details>
           {destinos.length > 0 && (
             <FormAccion
               accion={accionCambiarEstado}
