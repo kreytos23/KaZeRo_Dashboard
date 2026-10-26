@@ -39,11 +39,18 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await irA(page, '/panel/vendedores');
     const nombre = page.getByLabel('Nombre');
     await escribirEn(page, nombre, `Teclado ${m}`);
-    await tabHacia(page, page.getByLabel('Tipo'));
+    // Select de escritorio: ↓ abre la lista, ↓ baja a la segunda opción y Enter la elige (el foco vuelve al campo).
+    const tipo = page.getByLabel('Tipo');
+    await tabHacia(page, tipo);
     await page.keyboard.press('ArrowDown');
-    await expect(page.getByLabel('Tipo').locator('option:checked')).toHaveText(
-      await page.getByLabel('Tipo').locator('option').nth(1).innerText(),
-    );
+    // La opción vigente recibe el foco al abrir; solo entonces las flechas mueven la selección.
+    await expect(page.getByRole('option', { name: 'Revendedora' })).toBeFocused();
+    await page.keyboard.press('ArrowDown');
+    await expect(page.getByRole('option', { name: 'Negocio a consignación' })).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('listbox')).toHaveCount(0);
+    await expect(tipo).toContainText('Negocio a consignación');
+    await expect(tipo).toBeFocused();
     await tabHacia(page, page.getByLabel('Comisión (%)'));
     await page.keyboard.press('Control+A');
     await page.keyboard.type('15');
@@ -144,8 +151,12 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await irA(page, '/panel/exhibidores');
     const vendedor = page.getByLabel('Vendedor', { exact: true });
     await enfocar(page, vendedor);
+    // El nombre lleva un espacio: con el select abierto (Enter) se escribe para saltar a la opción y Enter la elige.
+    await page.keyboard.press('Enter');
     await page.keyboard.type(`Teclado ${m}`);
-    await expect(vendedor.locator('option:checked')).toHaveText(new RegExp(`Teclado ${m}`));
+    await page.keyboard.press('Enter');
+    await expect(vendedor).toContainText(`Teclado ${m}`);
+    await expect(vendedor).toBeFocused(); // al cerrarse, la lista devuelve el foco al campo
     await tabHacia(page, page.getByLabel('Nombre del exhibidor'));
     await page.keyboard.type(`Exh Teclado ${m}`);
     await page.keyboard.press('Enter');

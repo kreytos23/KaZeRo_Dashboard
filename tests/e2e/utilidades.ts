@@ -61,6 +61,73 @@ export async function irA(page: Page, ruta: string) {
   await esperarHidratado(page);
 }
 
+/** Misma consulta que usa la app (src/features/ui/escritorio.ts) para elegir entre control nativo y de escritorio. */
+const CONSULTA_ESCRITORIO = '(pointer: fine) and (min-width: 1024px)';
+
+async function enEscritorio(page: Page): Promise<boolean> {
+  return page.evaluate((q) => window.matchMedia(q).matches, CONSULTA_ESCRITORIO);
+}
+
+/**
+ * Elige una opción de un select de la app por su texto. En celular es un `<select>` nativo (selectOption); en
+ * escritorio, el listbox de Radix: se abre el disparador y se hace clic en la opción.
+ */
+export async function elegirOpcion(page: Page, etiqueta: string, opcion: string, exacto = false) {
+  const campo = page.getByLabel(etiqueta, { exact: exacto });
+  if (!(await enEscritorio(page))) {
+    await campo.selectOption({ label: opcion });
+    return;
+  }
+  // El select nativo se cambia por el de escritorio justo después de hidratar.
+  await expect(campo).toHaveAttribute('role', 'combobox');
+  await campo.click();
+  await page.getByRole('option', { name: opcion, exact: true }).click();
+  await expect(campo).toContainText(opcion);
+}
+
+/** Textos de las opciones de un select de la app (abre y cierra el listbox de escritorio). */
+export async function textosDeOpciones(page: Page, etiqueta: string): Promise<string[]> {
+  const campo = page.getByLabel(etiqueta, { exact: true });
+  if (!(await enEscritorio(page))) return campo.locator('option').allInnerTexts();
+  await expect(campo).toHaveAttribute('role', 'combobox');
+  await campo.click();
+  const textos = await page.getByRole('option').allInnerTexts();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('option')).toHaveCount(0);
+  return textos.map((t) => t.trim());
+}
+
+/** "2026-10-12" → "12/10/2026". */
+function dmy(iso: string) {
+  return iso.split('-').reverse().join('/');
+}
+
+/**
+ * Escribe una fecha (aaaa-mm-dd, o '' para vaciarla) en un campo de fecha de la app: `<input type=date>` en
+ * celular, texto dd/mm/aaaa con calendario en escritorio.
+ */
+export async function fijarFecha(page: Page, etiqueta: string, iso: string, exacto = false) {
+  const campo = page.getByLabel(etiqueta, { exact: exacto });
+  if (!(await enEscritorio(page))) {
+    await campo.fill(iso);
+    return;
+  }
+  await expect(campo).toHaveAttribute('placeholder', 'dd/mm/aaaa');
+  await campo.fill(iso ? dmy(iso) : '');
+}
+
+/** Abre una acción secundaria del menú «Más acciones» de una ficha (cancelar pedido, editar pieza, foto…). */
+export async function abrirAccion(page: Page, accion: string) {
+  const boton = page.getByRole('button', { name: 'Más acciones' });
+  const opcion = page.getByRole('menuitem', { name: accion, exact: true });
+  // Hasta hidratar, el clic en el botón no abre nada: se reintenta hasta ver el menú.
+  await expect(async () => {
+    if (!(await opcion.isVisible())) await boton.click();
+    await opcion.click({ timeout: 2_000 });
+  }).toPass();
+  await expect(page.getByRole('region', { name: accion, exact: true })).toBeVisible();
+}
+
 // ---------------------------------------------------------------------------------------------------------------
 // Siembra de datos de prueba con los servicios reales (nunca datos reales; las altas por UI ya las cubre
 // panel.spec.ts). Se conectan como dueño a la rama de prueba de este proyecto.

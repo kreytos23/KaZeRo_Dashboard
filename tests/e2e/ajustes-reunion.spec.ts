@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
-  RUTA_ESTADO,
+  elegirOpcion,
   irA,
+  RUTA_ESTADO,
   sembrarCliente,
   sembrarCompras,
   sembrarPedidoAbierto,
@@ -80,7 +81,7 @@ test('pieza con vendedora: se entrega desde su ficha, aparece filtrada en el inv
 
   await irA(page, '/panel/pedidos/nuevo');
   await elegirCliente(page, `Cliente V ${m}`);
-  await page.getByLabel('Vendedor').selectOption({ label: nombre });
+  await elegirOpcion(page, 'Vendedor', nombre);
   await agregarPieza(page, codigo);
   await expect(page.getByRole('list', { name: 'Piezas del pedido' })).toContainText(`Con ${nombre}`);
   await page.getByRole('button', { name: 'Crear pedido' }).click();
@@ -122,7 +123,7 @@ test('devolver una pieza de un pedido liquidado da saldo a favor, que se usa en 
 
   // Usar parte del saldo en el segundo pedido.
   await irA(page, `/panel/pedidos/${segundo.folio}`);
-  await page.getByLabel('Método').selectOption({ label: 'Saldo a favor (disponible $149.00)' });
+  await elegirOpcion(page, 'Método', 'Saldo a favor (disponible $149.00)');
   await page.getByLabel('Monto', { exact: true }).fill('100');
   await page.getByRole('button', { name: 'Registrar pago' }).click();
   await expect(estadoCon(page, 'Pago registrado.')).toBeVisible();
