@@ -90,10 +90,16 @@ jobs:
           retention-days: 1
 
   e2e:
-    needs: [build, integracion]
+    # No espera a integracion: corren en paralelo y el despliegue exige ambas.
+    needs: [build]
     # Mismo guarda que integracion (sin secretos en forks ni Dependabot).
     if: github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]')
     runs-on: ubuntu-latest
+    # Imagen oficial de Playwright con Chromium y sus dependencias del sistema ya instaladas: instalar las
+    # dependencias con apt en cada corrida costaba ~5 min. La versión debe coincidir con @playwright/test.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
+      options: --ipc=host
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -104,16 +110,6 @@ jobs:
       - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with: { name: next-build }
       - run: tar -xf next-build.tar && rm next-build.tar
-      - name: Cache de navegadores de Playwright
-        id: cache-pw
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-      - if: steps.cache-pw.outputs.cache-hit != 'true'
-        run: pnpm exec playwright install --with-deps chromium
-      - if: steps.cache-pw.outputs.cache-hit == 'true'
-        run: pnpm exec playwright install-deps chromium
       - run: pnpm test:e2e
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -123,7 +119,7 @@ jobs:
         with: { name: playwright-report, path: playwright-report, retention-days: 7 }
 
   deploy-preview:
-    needs: [e2e]
+    needs: [e2e, integracion]
     # Depende de e2e, que se omite en forks y Dependabot; se repite el guarda por claridad.
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
@@ -184,7 +180,7 @@ jobs:
             });
 
   deploy-produccion:
-    needs: [e2e]
+    needs: [e2e, integracion]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
