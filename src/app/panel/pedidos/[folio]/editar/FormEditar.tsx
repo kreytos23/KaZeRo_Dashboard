@@ -63,7 +63,7 @@ export function FormEditar(p: Props) {
           />
           <AreaTexto etiqueta="Notas" name="notas" rows={2} maxLength={500} defaultValue={p.notas} />
           <fieldset className="flex flex-col gap-1">
-            <legend className="text-sm font-medium">Piezas del pedido</legend>
+            <legend className="text-meta font-medium">Piezas del pedido</legend>
             {p.piezas.map((x) => (
               <label key={x.codigo} className="flex min-h-11 items-center gap-2">
                 <input type="checkbox" name="quitar" value={x.codigo} />
@@ -81,7 +81,7 @@ export function FormEditar(p: Props) {
             placeholder="Códigos separados por línea, espacio o coma"
           />
           <AreaTexto etiqueta="Motivo del cambio" name="motivo" rows={2} maxLength={200} />
-          <p className="text-sm text-tinta-suave">El motivo es obligatorio si cambia el total.</p>
+          <p className="text-meta text-tinta-suave">El motivo es obligatorio si cambia el total.</p>
         </Fragment>
       </FormAccion>
     </div>

@@ -49,7 +49,7 @@ function CamposPago(p: Props) {
     opciones.push({ valor: 'saldo_favor', texto: `Saldo a favor (disponible ${p.saldoFavorTexto})` });
   return (
     <>
-      <p className="text-sm text-tinta-suave">Saldo pendiente: {p.saldoTexto}</p>
+      <p className="text-monto font-semibold tabular-nums">Saldo pendiente: {p.saldoTexto}</p>
       <Selector
         etiqueta="Método"
         name="metodo"
@@ -72,7 +72,9 @@ function CamposPago(p: Props) {
         <>
           {/* El saldo a favor es de la clienta: el pagador no se elige. */}
           <input type="hidden" name="pagador" value="cliente" />
-          <p className="text-sm text-tinta-suave">Paga: {p.clienteNombre} (cliente), con su saldo a favor.</p>
+          <p className="text-dato text-tinta-suave">
+            Paga: {p.clienteNombre} (cliente), con su saldo a favor.
+          </p>
         </>
       ) : (
         <Selector
@@ -93,71 +95,72 @@ function CamposPago(p: Props) {
 /**
  * Los FormAccion siguen montados cuando el pedido deja de estar abierto (solo cambian sus hijos): así el aviso
  * "Pago registrado." / "Pedido cancelado." no desaparece con el formulario (región role=status siempre montada).
+ * La ficha los coloca por separado (registrar pago arriba en la columna lateral, cancelar al final).
  */
-export function FormsPedido(p: Props) {
+export function FormRegistrarPago(p: Props) {
   // La llave del Fragment cambia con la versión y con lo pagado: refresca valores y regenera la llave de idempotencia.
   const marca = `${p.version}-${p.saldo}`;
   return (
-    <div className="flex flex-col gap-6">
-      <section aria-labelledby="registrar-pago" className="flex flex-col gap-2">
-        {p.abierto && (
-          <h2 id="registrar-pago" className="text-lg font-semibold">
-            Registrar pago
-          </h2>
-        )}
-        <FormAccion accion={accionRegistrarPago} textoBoton="Registrar pago" sinControles={!p.abierto}>
-          {p.abierto && (
-            <Fragment key={marca}>
-              <input type="hidden" name="pedidoId" value={p.pedidoId} />
-              <input type="hidden" name="folio" value={p.folio} />
-              <CampoKey />
-              <CamposPago {...p} />
-            </Fragment>
-          )}
-        </FormAccion>
-      </section>
-
+    <section aria-labelledby="registrar-pago" className="flex flex-col gap-2">
       {p.abierto && (
-        <Link
-          href={`/panel/pedidos/${p.folio}/editar`}
-          className="flex min-h-11 items-center self-start rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
-        >
-          Editar pedido
-        </Link>
+        <h2 id="registrar-pago" className="text-lg font-semibold">
+          Registrar pago
+        </h2>
       )}
-
-      <section aria-labelledby="cancelar-pedido" className="flex flex-col gap-2">
+      <FormAccion accion={accionRegistrarPago} textoBoton="Registrar pago" sinControles={!p.abierto}>
         {p.abierto && (
-          <h2 id="cancelar-pedido" className="text-lg font-semibold">
-            Cancelar pedido
-          </h2>
+          <Fragment key={marca}>
+            <input type="hidden" name="pedidoId" value={p.pedidoId} />
+            <input type="hidden" name="folio" value={p.folio} />
+            <CampoKey />
+            <CamposPago {...p} />
+          </Fragment>
         )}
-        <FormAccion accion={accionCancelarPedido} textoBoton="Cancelar pedido" sinControles={!p.abierto}>
-          {p.abierto && (
-            <Fragment key={marca}>
-              <input type="hidden" name="pedidoId" value={p.pedidoId} />
-              <input type="hidden" name="folio" value={p.folio} />
-              <input type="hidden" name="version" value={p.version} />
-              <CampoKey />
-              <p className="aviso-atencion">
-                Se {p.piezas === 1 ? 'liberará 1 pieza' : `liberarán ${p.piezas} piezas`}
-                {p.hayPagado ? ` y ${p.pagadoTexto} quedará como saldo a favor` : ''}. Esta acción no se puede
-                deshacer.
-              </p>
-              <AreaTexto
-                etiqueta="Motivo de la cancelación"
-                name="motivo"
-                rows={2}
-                maxLength={200}
-                required
-              />
-              <label className="flex min-h-11 items-center gap-2">
-                <input type="checkbox" name="confirmo" required /> Entiendo que cancelar no se puede deshacer
-              </label>
-            </Fragment>
-          )}
-        </FormAccion>
-      </section>
-    </div>
+      </FormAccion>
+    </section>
+  );
+}
+
+export function EditarPedido({ folio, abierto }: { folio: number; abierto: boolean }) {
+  if (!abierto) return null;
+  return (
+    <Link
+      href={`/panel/pedidos/${folio}/editar`}
+      className="flex min-h-11 items-center self-start rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
+    >
+      Editar pedido
+    </Link>
+  );
+}
+
+export function FormCancelarPedido(p: Props) {
+  const marca = `${p.version}-${p.saldo}`;
+  return (
+    <section aria-labelledby="cancelar-pedido" className="flex flex-col gap-2">
+      {p.abierto && (
+        <h2 id="cancelar-pedido" className="text-lg font-semibold">
+          Cancelar pedido
+        </h2>
+      )}
+      <FormAccion accion={accionCancelarPedido} textoBoton="Cancelar pedido" sinControles={!p.abierto}>
+        {p.abierto && (
+          <Fragment key={marca}>
+            <input type="hidden" name="pedidoId" value={p.pedidoId} />
+            <input type="hidden" name="folio" value={p.folio} />
+            <input type="hidden" name="version" value={p.version} />
+            <CampoKey />
+            <p className="aviso-atencion">
+              Se {p.piezas === 1 ? 'liberará 1 pieza' : `liberarán ${p.piezas} piezas`}
+              {p.hayPagado ? ` y ${p.pagadoTexto} quedará como saldo a favor` : ''}. Esta acción no se puede
+              deshacer.
+            </p>
+            <AreaTexto etiqueta="Motivo de la cancelación" name="motivo" rows={2} maxLength={200} required />
+            <label className="flex min-h-11 items-center gap-2">
+              <input type="checkbox" name="confirmo" required /> Entiendo que cancelar no se puede deshacer
+            </label>
+          </Fragment>
+        )}
+      </FormAccion>
+    </section>
   );
 }

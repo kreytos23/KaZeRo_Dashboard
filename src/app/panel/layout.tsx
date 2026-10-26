@@ -7,9 +7,9 @@ import { MenuMovil } from './MenuMovil';
 import { NavPanel } from './NavPanel';
 
 const BOTON_SESION =
-  'min-h-11 rounded-full px-3 text-sm text-tinta-suave hover:bg-rubor-suave hover:text-tinta';
+  'min-h-11 rounded-full px-3 text-meta text-tinta-suave hover:bg-rubor-suave hover:text-tinta';
 const BOTON_SESION_MOVIL =
-  'min-h-11 w-full rounded-full px-4 text-left text-sm text-tinta-suave hover:bg-rubor-suave hover:text-tinta';
+  'min-h-11 w-full rounded-full px-4 text-left text-meta text-tinta-suave hover:bg-rubor-suave hover:text-tinta';
 
 /** Las dos acciones de sesión: el celular las muestra dentro del menú y el escritorio en la cabecera. */
 function AccionesSesion({ clase }: { clase: string }) {
@@ -35,7 +35,7 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
           aria-hidden="true"
           className="h-1 bg-linear-to-r from-marca-terracota via-marca-durazno to-marca-salvia"
         />
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-2 md:pt-3">
+        <div className="mx-auto flex w-full max-w-[90rem] flex-col gap-3 px-4 py-2 md:pt-3">
           {/* < md: una sola fila (logo, búsqueda, botón de menú). ≥ md: cabecera completa. */}
           <div className="flex items-center gap-3 md:flex-wrap md:justify-between md:gap-x-4 md:gap-y-2">
             <Link href="/panel" className="flex shrink-0 items-center rounded-lg">
@@ -64,7 +64,7 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:py-8">{children}</main>
+      <main className="mx-auto w-full max-w-[90rem] px-4 py-6 sm:py-8">{children}</main>
     </div>
   );
 }
