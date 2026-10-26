@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
 import { hoyMX } from '@/domain/fechas';
 import { Campo, Selector } from '@/features/ui/Campo';
+import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
+import { vistaEstadoExhibidor } from '@/features/ui/estado-visual';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarExhibidores } from '@/server/exhibidores/servicio';
@@ -31,7 +33,7 @@ export default async function PaginaExhibidores({
     <section className="flex max-w-3xl flex-col gap-6">
       <h1 className="text-2xl font-semibold">Exhibidores</h1>
       {activos.length === 0 ? (
-        <p className="text-sm text-tinta-suave">
+        <p className="text-meta text-tinta-suave">
           Primero agrega un vendedor activo en{' '}
           <Link href="/panel/vendedores" className="enlace">
             Vendedores
@@ -69,21 +71,25 @@ export default async function PaginaExhibidores({
       </form>
       <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4">
         {exhibidores.map((e) => (
-          <li key={e.id} className="py-2">
-            <Link href={`/panel/exhibidores/${e.id}`} className="enlace">
+          <li key={e.id} className="relative flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-dato">
+            {/* Enlace extendido a toda la fila: el toque no exige apuntar al nombre. */}
+            <Link
+              href={`/panel/exhibidores/${e.id}`}
+              className="enlace text-monto font-semibold after:absolute after:inset-0 after:content-['']"
+            >
               {e.nombre}
             </Link>
-            <span className="text-tinta-suave">
-              {' '}
-              · {e.vendedorNombre} · {e.fechaEnvio} · {e.estado === 'abierto' ? 'Abierto' : 'Cerrado'} ·{' '}
-              {e.piezasActuales} {e.piezasActuales === 1 ? 'pieza' : 'piezas'}
+            <EtiquetaEstado vista={vistaEstadoExhibidor(e.estado)} />
+            <span className="basis-full text-meta text-tinta-suave">
+              {e.vendedorNombre} · {e.fechaEnvio} · {e.piezasActuales}{' '}
+              {e.piezasActuales === 1 ? 'pieza' : 'piezas'}
               {e.piezasApartadas > 0 &&
                 ` · ${e.piezasApartadas} ${e.piezasApartadas === 1 ? 'apartada' : 'apartadas'}`}
             </span>
           </li>
         ))}
       </ul>
-      {exhibidores.length === 0 && <p className="text-sm text-tinta-suave">No hay exhibidores.</p>}
+      {exhibidores.length === 0 && <p className="text-meta text-tinta-suave">No hay exhibidores.</p>}
     </section>
   );
 }

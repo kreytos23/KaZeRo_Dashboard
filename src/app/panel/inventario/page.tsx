@@ -4,6 +4,8 @@ import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { FotoPieza } from '@/features/imagenes/FotoPieza';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { CampoConLista } from '@/features/ui/CampoConLista';
+import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
+import { vistaEstadoPieza, vistaUbicacion } from '@/features/ui/estado-visual';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarCatalogo } from '@/server/catalogos/servicio';
 import { listarPiezas } from '@/server/piezas/servicio';
@@ -130,46 +132,97 @@ export default async function PaginaInventario({
           Filtrar
         </button>
       </form>
-      <div className="tarjeta overflow-x-auto px-4">
-        <table className="w-full min-w-[46rem] text-left text-sm">
-          <caption className="sr-only">Piezas del inventario</caption>
-          <thead>
-            <tr>
-              <th scope="col" className="py-2">
-                Foto
-              </th>
-              <th scope="col">Código</th>
-              <th scope="col">Descripción</th>
-              <th scope="col">Categoría</th>
-              <th scope="col">Precio</th>
-              <th scope="col">Estado</th>
-              <th scope="col">Ubicación</th>
-            </tr>
-          </thead>
-          <tbody>
+      {piezas.length === 0 ? (
+        <p className="tarjeta p-4 text-dato text-tinta-suave">No hay piezas con esos filtros.</p>
+      ) : (
+        <>
+          {/* < md: una tarjeta por pieza con código, descripción, precio, estado y ubicación a la vista. */}
+          <ul aria-label="Piezas del inventario" className="flex flex-col gap-2 md:hidden">
             {piezas.map((p) => (
-              <tr key={p.id} className="border-t border-borde">
-                <td className="py-2">
-                  <FotoPieza piezaId={p.id} clave={p.imagenClave} alt="" variante="mini" />
-                </td>
-                <td className="py-2 font-mono">
-                  <Link href={`/panel/inventario/${encodeURIComponent(p.codigo)}`} className="enlace">
-                    {p.codigo}
-                  </Link>
-                </td>
-                <td>{p.descripcion}</td>
-                <td>{p.categoriaNombre}</td>
-                <td>{formatoMXN(numericACentavos(p.precio))}</td>
-                <td>{ETIQUETA_ESTADO[p.estado]}</td>
-                <td>{p.ubicacionEtiqueta}</td>
-              </tr>
+              <li key={p.id} className="tarjeta relative flex gap-3 p-3">
+                <FotoPieza piezaId={p.id} clave={p.imagenClave} alt="" variante="mini" />
+                <div className="flex min-w-0 flex-1 flex-col gap-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    {/* Enlace extendido a toda la tarjeta: el toque no exige apuntar al texto. */}
+                    <Link
+                      href={`/panel/inventario/${encodeURIComponent(p.codigo)}`}
+                      className="enlace font-mono text-monto font-semibold after:absolute after:inset-0 after:content-['']"
+                    >
+                      {p.codigo}
+                    </Link>
+                    <span className="text-monto font-semibold tabular-nums">
+                      {formatoMXN(numericACentavos(p.precio))}
+                    </span>
+                  </div>
+                  <p className="text-dato">{p.descripcion}</p>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    <EtiquetaEstado vista={vistaEstadoPieza(p.estado)} />
+                    <EtiquetaEstado vista={vistaUbicacion(p.ubicacion, p.ubicacionEtiqueta)} />
+                  </div>
+                </div>
+              </li>
             ))}
-          </tbody>
-        </table>
-        {piezas.length === 0 && (
-          <p className="py-4 text-sm text-tinta-suave">No hay piezas con esos filtros.</p>
-        )}
-      </div>
+          </ul>
+          <div className="tarjeta hidden overflow-x-auto px-2 md:block">
+            <table className="w-full text-left text-dato">
+              <caption className="sr-only">Piezas del inventario</caption>
+              <thead className="text-meta font-semibold text-tinta-suave">
+                <tr>
+                  <th scope="col" className="px-3 py-3">
+                    Foto
+                  </th>
+                  <th scope="col" className="px-3 py-3">
+                    Código
+                  </th>
+                  <th scope="col" className="px-3 py-3">
+                    Descripción
+                  </th>
+                  <th scope="col" className="px-3 py-3">
+                    Categoría
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-right">
+                    Precio
+                  </th>
+                  <th scope="col" className="px-3 py-3">
+                    Estado
+                  </th>
+                  <th scope="col" className="px-3 py-3">
+                    Ubicación
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {piezas.map((p) => (
+                  <tr key={p.id} className="border-t border-borde">
+                    <td className="px-3 py-2">
+                      <FotoPieza piezaId={p.id} clave={p.imagenClave} alt="" variante="mini" />
+                    </td>
+                    <td className="px-3 py-2 font-mono text-monto font-semibold">
+                      <Link
+                        href={`/panel/inventario/${encodeURIComponent(p.codigo)}`}
+                        className="enlace inline-flex min-h-11 items-center"
+                      >
+                        {p.codigo}
+                      </Link>
+                    </td>
+                    <td className="px-3 py-2">{p.descripcion}</td>
+                    <td className="px-3 py-2">{p.categoriaNombre}</td>
+                    <td className="px-3 py-2 text-right text-monto font-semibold tabular-nums">
+                      {formatoMXN(numericACentavos(p.precio))}
+                    </td>
+                    <td className="px-3 py-2">
+                      <EtiquetaEstado vista={vistaEstadoPieza(p.estado)} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <EtiquetaEstado vista={vistaUbicacion(p.ubicacion, p.ubicacionEtiqueta)} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
       <nav aria-label="Páginas" className="flex gap-2">
         {f.pagina > 1 && (
           <Link href={conPagina(f.pagina - 1)} className="flex min-h-11 items-center px-3 enlace">

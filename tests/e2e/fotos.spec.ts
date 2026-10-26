@@ -108,7 +108,8 @@ test('la miniatura aparece en el listado y en el buscador global', async ({ page
   await altaPieza(page, codigo, `Collar miniatura ${m}`, true);
 
   await irA(page, `/panel/inventario?q=${codigo}`);
-  const fila = page.getByRole('row').filter({ hasText: codigo });
+  // Escritorio: fila de la tabla; celular: tarjeta de la lista.
+  const fila = page.getByRole('row').or(page.getByRole('listitem')).filter({ hasText: codigo });
   const mini = fila.locator('img');
   await expect(mini).toHaveAttribute('src', /&t=mini$/);
   await expect

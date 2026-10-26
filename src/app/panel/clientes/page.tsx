@@ -32,8 +32,12 @@ export default async function PaginaClientes({
       </form>
       <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4">
         {clientes.map((c) => (
-          <li key={c.id} className="py-2">
-            <Link href={`/panel/clientes/${c.id}`} className="enlace">
+          <li key={c.id} className="relative flex min-h-14 flex-wrap items-center gap-x-2 py-2 text-dato">
+            {/* Enlace extendido a toda la fila: el toque no exige apuntar al nombre. */}
+            <Link
+              href={`/panel/clientes/${c.id}`}
+              className="enlace text-monto font-semibold after:absolute after:inset-0 after:content-['']"
+            >
               {c.nombre}
             </Link>
             {c.referencia && <span className="text-tinta-suave"> · {c.referencia}</span>}

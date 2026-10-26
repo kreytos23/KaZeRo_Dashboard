@@ -21,30 +21,39 @@ export default async function PaginaVendedores() {
         <Selector etiqueta="Tipo" name="tipo" opciones={TIPOS} />
         <Campo etiqueta="Comisión (%)" name="comision" inputMode="decimal" defaultValue="0" required />
       </FormAccion>
-      <div className="tarjeta overflow-x-auto px-4">
-        <table className="w-full text-left text-sm">
+      <div className="tarjeta overflow-x-auto px-2">
+        <table className="w-full text-left text-dato">
           <caption className="sr-only">Lista de vendedores</caption>
-          <thead>
+          <thead className="text-meta font-semibold text-tinta-suave">
             <tr>
-              <th scope="col" className="py-2">
+              <th scope="col" className="px-3 py-3">
                 Nombre
               </th>
-              <th scope="col">Tipo</th>
-              <th scope="col">Comisión</th>
-              <th scope="col">Estado</th>
+              <th scope="col" className="px-3 py-3">
+                Tipo
+              </th>
+              <th scope="col" className="px-3 py-3">
+                Comisión
+              </th>
+              <th scope="col" className="px-3 py-3">
+                Estado
+              </th>
             </tr>
           </thead>
           <tbody>
             {vendedores.map((v) => (
               <tr key={v.id} className="border-t border-borde">
-                <td className="py-2">
-                  <Link href={`/panel/vendedores/${v.id}`} className="enlace">
+                <td className="px-3 py-1">
+                  <Link
+                    href={`/panel/vendedores/${v.id}`}
+                    className="enlace inline-flex min-h-11 items-center"
+                  >
                     {v.nombre}
                   </Link>
                 </td>
-                <td>{TIPOS.find((t) => t.valor === v.tipo)?.texto}</td>
-                <td>{porcentajeLegible(v.comisionPct)}%</td>
-                <td>{v.activo ? 'Activo' : 'Inactivo'}</td>
+                <td className="px-3 py-1">{TIPOS.find((t) => t.valor === v.tipo)?.texto}</td>
+                <td className="px-3 py-1 tabular-nums">{porcentajeLegible(v.comisionPct)}%</td>
+                <td className="px-3 py-1">{v.activo ? 'Activo' : 'Inactivo'}</td>
               </tr>
             ))}
           </tbody>

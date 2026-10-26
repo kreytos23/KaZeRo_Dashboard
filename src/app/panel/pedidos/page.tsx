@@ -3,6 +3,9 @@ import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { formatoFolio } from '@/domain/pedidos';
 import { Campo, Selector } from '@/features/ui/Campo';
+import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
+import { vistaEstadoPedido } from '@/features/ui/estado-visual';
+import { Saldo } from '@/features/ui/Saldo';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarClientes, obtenerCliente } from '@/server/clientes/servicio';
 import { listarPedidos } from '@/server/pedidos/lecturas';
@@ -111,46 +114,61 @@ export default async function PaginaPedidos({
       </p>
 
       {pedidos.length === 0 ? (
-        <p className="tarjeta p-4 text-sm text-tinta-suave">No hay pedidos con esos filtros.</p>
+        <p className="tarjeta p-4 text-dato text-tinta-suave">No hay pedidos con esos filtros.</p>
       ) : (
         <>
           <ul aria-label="Pedidos" className="flex flex-col gap-2 md:hidden">
             {pedidos.map((p) => (
-              <li key={p.id} className="tarjeta flex flex-col gap-1 p-4">
-                <div className="flex items-baseline justify-between gap-2">
-                  <Link href={`/panel/pedidos/${p.folio}`} className="enlace font-semibold">
+              <li key={p.id} className="tarjeta relative flex flex-col gap-1 p-4">
+                <div className="flex items-center justify-between gap-2">
+                  {/* Enlace extendido a toda la tarjeta: el toque no exige apuntar al folio. */}
+                  <Link
+                    href={`/panel/pedidos/${p.folio}`}
+                    className="enlace text-monto font-semibold after:absolute after:inset-0 after:content-['']"
+                  >
                     {formatoFolio(p.folio)}
                   </Link>
-                  <span className="text-sm">{ETIQUETA_ESTADO_PEDIDO[p.estado]}</span>
+                  <EtiquetaEstado vista={vistaEstadoPedido(p.estado)} />
                 </div>
-                <p>{p.clienteNombre}</p>
-                <p className="text-sm text-tinta-suave">
+                <p className="text-dato">{p.clienteNombre}</p>
+                <p className="text-meta text-tinta-suave">
                   {fechaCorta(p.fecha)} · {p.vendedorNombre}
                 </p>
-                <p className="text-sm">
-                  Total {mxn(p.total)} · Saldo {mxn(p.saldo)}
-                </p>
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+                  <p className="text-meta text-tinta-suave">
+                    Total <span className="text-dato tabular-nums text-tinta">{mxn(p.total)}</span>
+                  </p>
+                  <p className="flex items-center gap-2 text-meta text-tinta-suave">
+                    Saldo <Saldo estado={p.estado} saldo={p.saldo} />
+                  </p>
+                </div>
               </li>
             ))}
           </ul>
-          <div className="tarjeta hidden overflow-x-auto px-4 md:block">
-            <table className="w-full text-left text-sm">
+          <div className="tarjeta hidden overflow-x-auto px-2 md:block">
+            <table className="w-full text-left text-dato">
               <caption className="sr-only">Pedidos</caption>
-              <thead>
+              <thead className="text-meta font-semibold text-tinta-suave">
                 <tr>
-                  <th scope="col" className="py-2">
+                  <th scope="col" className="px-3 py-3">
                     Folio
                   </th>
-                  <th scope="col">Fecha</th>
-                  <th scope="col">Cliente</th>
-                  <th scope="col">Vendedor</th>
-                  <th scope="col" className="text-right">
+                  <th scope="col" className="px-3 py-3">
+                    Fecha
+                  </th>
+                  <th scope="col" className="px-3 py-3">
+                    Cliente
+                  </th>
+                  <th scope="col" className="px-3 py-3">
+                    Vendedor
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-right">
                     Total
                   </th>
-                  <th scope="col" className="text-right">
+                  <th scope="col" className="px-3 py-3 text-right">
                     Saldo
                   </th>
-                  <th scope="col" className="pl-4">
+                  <th scope="col" className="px-3 py-3">
                     Estado
                   </th>
                 </tr>
@@ -158,17 +176,24 @@ export default async function PaginaPedidos({
               <tbody>
                 {pedidos.map((p) => (
                   <tr key={p.id} className="border-t border-borde">
-                    <td className="py-2">
-                      <Link href={`/panel/pedidos/${p.folio}`} className="enlace">
+                    <td className="px-3 py-2 text-monto font-semibold">
+                      <Link
+                        href={`/panel/pedidos/${p.folio}`}
+                        className="enlace inline-flex min-h-11 items-center"
+                      >
                         {formatoFolio(p.folio)}
                       </Link>
                     </td>
-                    <td>{fechaCorta(p.fecha)}</td>
-                    <td>{p.clienteNombre}</td>
-                    <td>{p.vendedorNombre}</td>
-                    <td className="text-right">{mxn(p.total)}</td>
-                    <td className="text-right">{mxn(p.saldo)}</td>
-                    <td className="pl-4">{ETIQUETA_ESTADO_PEDIDO[p.estado]}</td>
+                    <td className="px-3 py-2">{fechaCorta(p.fecha)}</td>
+                    <td className="px-3 py-2">{p.clienteNombre}</td>
+                    <td className="px-3 py-2">{p.vendedorNombre}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{mxn(p.total)}</td>
+                    <td className="px-3 py-2 text-right">
+                      <Saldo estado={p.estado} saldo={p.saldo} />
+                    </td>
+                    <td className="px-3 py-2">
+                      <EtiquetaEstado vista={vistaEstadoPedido(p.estado)} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
