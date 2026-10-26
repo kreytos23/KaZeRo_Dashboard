@@ -153,6 +153,8 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await enfocar(page, vendedor);
     // El nombre lleva un espacio: con el select abierto (Enter) se escribe para saltar a la opción y Enter la elige.
     await page.keyboard.press('Enter');
+    // Hasta que una opción recibe el foco, lo que se teclee se pierde: se espera a la lista abierta.
+    await expect(page.locator('[role="option"][data-highlighted]')).toBeVisible();
     await page.keyboard.type(`Teclado ${m}`);
     await page.keyboard.press('Enter');
     await expect(vendedor).toContainText(`Teclado ${m}`);
