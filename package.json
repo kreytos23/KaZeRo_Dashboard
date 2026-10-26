@@ -29,6 +29,9 @@
   "dependencies": {
     "@neondatabase/serverless": "1.2.0",
     "@node-rs/argon2": "2.2.2",
+    "@radix-ui/react-dropdown-menu": "2.1.24",
+    "@radix-ui/react-popover": "1.1.23",
+    "@radix-ui/react-select": "2.3.7",
     "@vercel/blob": "2.8.0",
     "drizzle-orm": "0.45.3",
     "minisearch": "7.2.0",
@@ -36,6 +39,7 @@
     "otpauth": "9.5.2",
     "qrcode": "1.5.4",
     "react": "19.3.0",
+    "react-day-picker": "10.0.2",
     "react-dom": "19.3.0",
     "server-only": "0.0.1",
     "sharp": "0.35.5",
