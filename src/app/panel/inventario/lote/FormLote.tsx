@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useEffect, useRef } from 'react';
 import { AreaTexto } from '@/features/ui/Campo';
+import { BotonEnvio } from '@/features/ui/FormAccion';
 import { useHidratado } from '@/features/ui/hidratado';
 import { marcarIndiceSucio } from '@/search/eventos';
 import { accionAltaLote } from '../acciones';
@@ -49,13 +50,7 @@ export function FormLote() {
       <p role="status" className={estado.ok ? 'aviso-exito' : undefined}>
         {estado.ok}
       </p>
-      <button
-        type="submit"
-        disabled={pendiente || !hidratado}
-        className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
-      >
-        Dar de alta el lote
-      </button>
+      <BotonEnvio textoBoton="Dar de alta el lote" pendiente={pendiente} hidratado={hidratado} />
     </form>
   );
 }

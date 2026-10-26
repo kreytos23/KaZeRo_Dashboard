@@ -14,11 +14,7 @@ export default function ErrorPanel({
       <p className="text-tinta-suave">
         No se pudo cargar esta sección.{error.digest ? ` Código: ${error.digest}.` : ''}
       </p>
-      <button
-        type="button"
-        onClick={reset}
-        className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white hover:bg-primario-fuerte"
-      >
+      <button type="button" onClick={reset} className="boton-primario self-start">
         Reintentar
       </button>
     </section>

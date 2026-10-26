@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { BotonEnvio } from '@/features/ui/FormAccion';
 import { accionLogin, type EstadoForm } from './acciones';
 
 export function FormLogin() {
@@ -17,7 +18,7 @@ export function FormLogin() {
           autoCapitalize="none"
           spellCheck={false}
           required
-          className="min-h-11 rounded-lg border border-borde-campo bg-white px-3"
+          className="campo"
         />
       </label>
       <label className="flex flex-col gap-1 text-meta font-medium">
@@ -28,7 +29,7 @@ export function FormLogin() {
           type="password"
           autoComplete="current-password"
           required
-          className="min-h-11 rounded-lg border border-borde-campo bg-white px-3"
+          className="campo"
         />
       </label>
       {estado.error && (
@@ -36,13 +37,7 @@ export function FormLogin() {
           {estado.error}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={pendiente}
-        className="min-h-11 rounded-lg bg-primario font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
-      >
-        Continuar
-      </button>
+      <BotonEnvio textoBoton="Continuar" pendiente={pendiente} className="boton-primario" />
     </form>
   );
 }

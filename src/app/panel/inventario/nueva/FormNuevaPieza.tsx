@@ -16,6 +16,7 @@ import { Campo } from '@/features/ui/Campo';
 import { CampoConLista } from '@/features/ui/CampoConLista';
 import { ErroresCampo, useEnfocarPrimerInvalido } from '@/features/ui/errores-campo';
 import type { EstadoAccion } from '@/features/ui/estado';
+import { BotonEnvio } from '@/features/ui/FormAccion';
 import { useHidratado } from '@/features/ui/hidratado';
 import { marcarIndiceSucio } from '@/search/eventos';
 import { accionAltaPieza, accionSugerirCodigo } from '../acciones';
@@ -40,6 +41,8 @@ export function FormNuevaPieza({
   const [ronda, setRonda] = useState(0);
   const [aviso, setAviso] = useState<string | null>(null);
   const [sugiriendo, setSugiriendo] = useState(false);
+  // Cuál de los dos botones envió, para mostrar «Guardando…» solo en ese.
+  const [conOtra, setConOtra] = useState(false);
   const form = useRef<HTMLFormElement>(null);
   const foco = useRef<'codigo' | 'descripcion' | null>(null);
   const hidratado = useHidratado();
@@ -121,6 +124,7 @@ export function FormNuevaPieza({
         if (enviando) return;
         // El botón que envió ("Guardar y agregar otra" lleva name=siguiente value=otra) entra en los datos.
         const datos = new FormData(e.currentTarget, e.nativeEvent.submitter);
+        setConOtra(datos.get('siguiente') === 'otra');
         if (foto) datos.set('imagen', foto);
         startTransition(() => despachar(datos));
       }}
@@ -140,7 +144,7 @@ export function FormNuevaPieza({
             onClick={sugerir}
             disabled={sugiriendo}
             aria-busy={sugiriendo}
-            className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario enabled:hover:bg-secundario-suave disabled:opacity-60"
+            className="boton-secundario"
           >
             Sugerir código
           </button>
@@ -199,22 +203,22 @@ export function FormNuevaPieza({
         )}
       </p>
       <div className="flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={enviando || !hidratado}
-          className="min-h-11 rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
-        >
-          Guardar pieza
-        </button>
-        <button
-          type="submit"
+        <BotonEnvio
+          textoBoton="Guardar pieza"
+          pendiente={enviando && !conOtra}
+          deshabilitado={enviando}
+          hidratado={hidratado}
+          className="boton-primario"
+        />
+        <BotonEnvio
+          textoBoton="Guardar y agregar otra"
           name="siguiente"
           value="otra"
-          disabled={enviando || !hidratado}
-          className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario enabled:hover:bg-secundario-suave disabled:opacity-60"
-        >
-          Guardar y agregar otra
-        </button>
+          pendiente={enviando && conOtra}
+          deshabilitado={enviando}
+          hidratado={hidratado}
+          className="boton-secundario"
+        />
       </div>
     </form>
   );

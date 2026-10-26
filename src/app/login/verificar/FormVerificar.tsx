@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
+import { BotonEnvio } from '@/features/ui/FormAccion';
 import { accionVerificar, type EstadoForm } from '../acciones';
 
 export function FormVerificar() {
@@ -15,7 +16,7 @@ export function FormVerificar() {
           autoComplete="one-time-code"
           required
           autoFocus
-          className="min-h-11 rounded-lg border border-borde-campo bg-white px-3 tracking-widest"
+          className="campo tracking-widest"
         />
       </label>
       <p className="text-meta text-tinta-suave">
@@ -26,13 +27,7 @@ export function FormVerificar() {
           {estado.error}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={pendiente}
-        className="min-h-11 rounded-lg bg-primario font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
-      >
-        Entrar
-      </button>
+      <BotonEnvio textoBoton="Entrar" pendiente={pendiente} className="boton-primario" />
     </form>
   );
 }

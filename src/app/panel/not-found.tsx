@@ -10,10 +10,7 @@ export default function RegistroNoEncontrado() {
       <p className="text-tinta-suave">
         Puede que el enlace esté mal escrito. Usa el buscador (tecla /) para encontrarlo.
       </p>
-      <Link
-        href="/panel"
-        className="flex min-h-11 items-center self-start rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
-      >
+      <Link href="/panel" className="boton-secundario self-start">
         Volver al panel
       </Link>
     </section>

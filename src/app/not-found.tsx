@@ -10,10 +10,7 @@ export default function NoEncontrado() {
         <Image src="/marca/logo-k.webp" alt="" width={43} height={64} unoptimized className="h-16 w-auto" />
         <h1 className="text-2xl font-semibold">No encontramos esa página</h1>
         <p className="text-tinta-suave">Revisa la dirección o vuelve al inicio.</p>
-        <Link
-          href="/panel"
-          className="flex min-h-11 items-center self-start rounded-lg bg-primario px-4 font-medium text-white hover:bg-primario-fuerte"
-        >
+        <Link href="/panel" className="boton-primario self-start">
           Ir al panel
         </Link>
       </div>

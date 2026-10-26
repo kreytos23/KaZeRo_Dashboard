@@ -17,11 +17,7 @@ export default function ErrorGlobal({
         <h1 className="text-2xl font-semibold">Algo salió mal</h1>
         {/* Nunca error.message: podría traer detalles internos. */}
         <p>Intenta de nuevo.{error.digest ? ` Código: ${error.digest}.` : ''}</p>
-        <button
-          type="button"
-          onClick={reset}
-          className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white hover:bg-primario-fuerte"
-        >
+        <button type="button" onClick={reset} className="boton-primario self-start">
           Reintentar
         </button>
       </body>
