@@ -9,6 +9,50 @@ import type { EstadoAccion } from './estado';
 type Accion = (prev: EstadoAccion, fd: FormData) => Promise<EstadoAccion>;
 
 /**
+ * Botón de envío con «Guardando…» y un indicador discreto mientras la acción está en curso. Lo comparten
+ * todos los formularios para que el aviso de que algo se está guardando se vea igual en toda la app.
+ */
+export function BotonEnvio({
+  textoBoton,
+  pendiente,
+  hidratado = true,
+  deshabilitado = false,
+  className = 'boton-primario self-start',
+  name,
+  value,
+}: {
+  textoBoton: string;
+  /** Se está guardando: muestra «Guardando…» con el indicador. */
+  pendiente: boolean;
+  /** Hasta hidratar, el botón no envía (un envío nativo pondría los campos en la URL). */
+  hidratado?: boolean;
+  /** Apagado sin indicador (p. ej. el otro botón de envío mientras uno guarda). */
+  deshabilitado?: boolean;
+  className?: string;
+  name?: string;
+  value?: string;
+}) {
+  return (
+    <button
+      type="submit"
+      name={name}
+      value={value}
+      disabled={pendiente || deshabilitado || !hidratado}
+      className={className}
+    >
+      {pendiente ? (
+        <>
+          <span aria-hidden="true" className="indicador-carga" />
+          Guardando…
+        </>
+      ) : (
+        textoBoton
+      )}
+    </button>
+  );
+}
+
+/**
  * Se despacha con onSubmit + startTransition en vez del prop `action`: React 19 reinicia el formulario
  * tras cualquier `action`, y con un error el usuario perdería lo que escribió.
  */
@@ -61,19 +105,11 @@ export function FormAccion({
           {estado.campos ? 'Revisa los campos marcados.' : estado.error}
         </p>
       )}
-      {/* Siempre montado: una región que nace con texto no se anuncia. */}
+      {/* Siempre montado: una región que nace con texto no se anuncia. Al guardar, el aviso dibuja su palomita. */}
       <p role="status" className={estado.ok ? 'aviso-exito' : undefined}>
         {estado.ok}
       </p>
-      {!sinControles && (
-        <button
-          type="submit"
-          disabled={pendiente || !hidratado}
-          className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
-        >
-          {textoBoton}
-        </button>
-      )}
+      {!sinControles && <BotonEnvio textoBoton={textoBoton} pendiente={pendiente} hidratado={hidratado} />}
     </form>
   );
 }

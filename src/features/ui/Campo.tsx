@@ -1,17 +1,19 @@
 'use client';
 
-import { useContext, useId, type InputHTMLAttributes } from 'react';
+import { useContext, useId, type InputHTMLAttributes, type ReactNode } from 'react';
+import { CampoFecha } from './CampoFecha';
 import { ErroresCampo } from './errores-campo';
+import { Seleccion } from './Seleccion';
 
-export const ESTILO =
-  'min-h-11 rounded-lg border border-borde-campo bg-white px-3 aria-invalid:border-2 aria-invalid:border-error';
+/** Vocabulario único de campos (utilidad `campo` de globals.css): reposo, hover, foco, deshabilitado, solo lectura y error. */
+export const ESTILO = 'campo';
 export const ESTILO_ETIQUETA = 'text-meta font-medium';
 
 /** Error de un campo: fuera del `<label>` para que no forme parte del nombre accesible del control. */
 export function MensajeError({ idControl, error }: { idControl: string; error?: string }) {
   if (!error) return null;
   return (
-    <span id={`${idControl}-error`} className="text-meta font-normal text-error">
+    <span id={`${idControl}-error`} className="mensaje-error text-meta font-normal text-error">
       {error}
     </span>
   );
@@ -39,10 +41,26 @@ export function Campo({
   const { error, aria } = useErrorDe(props.name, idControl);
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id ?? propio} className={ESTILO_ETIQUETA}>
+      <label htmlFor={idControl} className={ESTILO_ETIQUETA}>
         {etiqueta}
       </label>
-      <input id={id ?? propio} className={ESTILO} {...aria} {...props} />
+      {props.type === 'date' ? (
+        // Fecha «mixto»: nativa en celular, dd/mm/aaaa con calendario en escritorio. Envía aaaa-mm-dd como siempre.
+        <CampoFecha
+          id={idControl}
+          name={props.name}
+          etiqueta={etiqueta}
+          defaultValue={props.defaultValue === undefined ? '' : String(props.defaultValue)}
+          min={props.min === undefined ? undefined : String(props.min)}
+          max={props.max === undefined ? undefined : String(props.max)}
+          required={props.required}
+          disabled={props.disabled}
+          readOnly={props.readOnly}
+          {...aria}
+        />
+      ) : (
+        <input id={idControl} className={ESTILO} {...aria} {...props} />
+      )}
       <MensajeError idControl={idControl} error={error} />
     </div>
   );
@@ -74,22 +92,16 @@ export function Selector({
       <label htmlFor={id} className={ESTILO_ETIQUETA}>
         {etiqueta}
       </label>
-      <select
+      <Seleccion
         id={id}
         name={name}
+        opciones={opciones}
         defaultValue={defaultValue}
         value={value}
-        onChange={onChange ? (e) => onChange(e.target.value) : undefined}
+        onChange={onChange}
         required={required}
-        className={ESTILO}
         {...aria}
-      >
-        {opciones.map((o) => (
-          <option key={o.valor} value={o.valor}>
-            {o.texto}
-          </option>
-        ))}
-      </select>
+      />
       <MensajeError idControl={id} error={error} />
     </div>
   );
@@ -127,9 +139,40 @@ export function AreaTexto({
         required={required}
         placeholder={placeholder}
         maxLength={maxLength}
-        className="rounded-lg border border-borde-campo bg-white px-3 py-2 font-mono aria-invalid:border-2 aria-invalid:border-error"
+        className="campo py-2 font-mono"
         {...aria}
       />
+      <MensajeError idControl={id} error={error} />
+    </div>
+  );
+}
+
+/**
+ * Casilla de verificación: caja propia con la palomita que se dibuja (receta «checkbox» de transitions.dev) sobre
+ * un `<input type="checkbox">` nativo, así que `required`, FormData y el teclado funcionan como siempre. La fila
+ * mide 44 px de alto y todo el renglón es el objetivo táctil. El error del servidor se pinta bajo la casilla.
+ */
+export function CampoCasilla({
+  name,
+  children,
+  ...props
+}: { name: string; children: ReactNode } & Omit<
+  InputHTMLAttributes<HTMLInputElement>,
+  'type' | 'id' | 'name'
+>) {
+  const id = useId();
+  const { error, aria } = useErrorDe(name, id);
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="casilla-fila text-dato">
+        <span className="casilla-caja">
+          <input id={id} type="checkbox" name={name} {...aria} {...props} />
+          <svg aria-hidden="true" focusable="false" viewBox="0 0 12 12">
+            <path d="M2 6.4 4.8 9 10 3.2" />
+          </svg>
+        </span>
+        <span>{children}</span>
+      </label>
       <MensajeError idControl={id} error={error} />
     </div>
   );
