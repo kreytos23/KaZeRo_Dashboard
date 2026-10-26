@@ -29,7 +29,7 @@ export function NavPanel({ vertical = false, alElegir }: { vertical?: boolean; a
             href={href}
             onClick={alElegir}
             aria-current={activa ? 'page' : undefined}
-            className={`flex min-h-11 items-center rounded-full px-4 text-sm transition-colors motion-reduce:transition-none ${
+            className={`flex min-h-11 items-center rounded-full px-4 text-meta transition-colors motion-reduce:transition-none ${
               activa
                 ? 'bg-rubor-suave font-semibold text-primario shadow-[inset_0_0_0_1px_var(--color-marca-rubor)]'
                 : 'text-tinta-suave hover:bg-rubor-suave hover:text-tinta'

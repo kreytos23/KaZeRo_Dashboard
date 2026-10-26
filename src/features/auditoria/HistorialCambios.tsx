@@ -21,9 +21,9 @@ export function HistorialCambios({
         {titulo}
       </Titulo>
       {entradas.length === 0 ? (
-        <p className="text-sm text-tinta-suave">Sin cambios registrados.</p>
+        <p className="text-meta text-tinta-suave">Sin cambios registrados.</p>
       ) : (
-        <ol className="flex flex-col gap-3 text-sm">
+        <ol className="flex flex-col gap-3 text-dato">
           {entradas.map((e) => (
             <li key={e.id} className="border-l-2 border-marca-rubor pl-3">
               <p className="text-tinta-suave">

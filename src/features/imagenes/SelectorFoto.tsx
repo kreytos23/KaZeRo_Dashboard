@@ -50,7 +50,7 @@ export function SelectorFoto({
 
   return (
     <fieldset className="flex flex-col gap-2" aria-describedby={mensaje ? `${id}-error` : undefined}>
-      <legend className="text-sm font-medium">{etiqueta}</legend>
+      <legend className="text-meta font-medium">{etiqueta}</legend>
       <div className="flex flex-wrap gap-2">
         <label className={BOTON}>
           Tomar foto
@@ -68,7 +68,7 @@ export function SelectorFoto({
           <input type="file" accept="image/*" className="sr-only" onChange={elegir} />
         </label>
       </div>
-      <p role="status" className="text-sm text-tinta-suave">
+      <p role="status" className="text-meta text-tinta-suave">
         {preparando ? 'Preparando foto…' : ''}
       </p>
       {vista && (
@@ -82,7 +82,7 @@ export function SelectorFoto({
         />
       )}
       {mensaje && (
-        <span id={`${id}-error`} className="text-sm text-error">
+        <span id={`${id}-error`} className="text-meta text-error">
           {mensaje}
         </span>
       )}

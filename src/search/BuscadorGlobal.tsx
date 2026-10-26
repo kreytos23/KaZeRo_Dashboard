@@ -127,7 +127,7 @@ export function BuscadorGlobal() {
       <div
         role="status"
         aria-live="polite"
-        className={aviso && !visible ? 'mt-1 text-xs text-tinta-suave' : 'sr-only'}
+        className={aviso && !visible ? 'mt-1 text-meta text-tinta-suave' : 'sr-only'}
       >
         {aviso}
       </div>
@@ -172,11 +172,11 @@ export function BuscadorGlobal() {
                     />
                   ))}
                 <span className="min-w-0">
-                  <span className="block text-xs font-semibold uppercase tracking-wide text-tinta-suave">
+                  <span className="block text-meta font-semibold uppercase tracking-wide text-tinta-suave">
                     {ETIQUETA_TIPO[r.tipo]}
                   </span>
-                  <span className="block text-sm font-medium">{r.titulo}</span>
-                  <span className="block text-xs text-tinta-suave">{r.subtitulo}</span>
+                  <span className="block text-dato font-medium">{r.titulo}</span>
+                  <span className="block text-meta text-tinta-suave">{r.subtitulo}</span>
                 </span>
               </span>
             </li>
