@@ -25,6 +25,15 @@ async function escribirEn(page: Page, destino: Locator, texto: string) {
 }
 
 /** Pone el foco en un campo con Tab y comprueba que la siguiente parada es la esperada (orden visual). */
+/** Con la lista del select abierta, baja con ↓ hasta que la opción buscada tiene el foco (determinista en CI lento). */
+async function bajarHasta(page: Page, opcion: Locator, maximo = 30) {
+  for (let i = 0; i < maximo; i++) {
+    if (await opcion.evaluate((el) => el === document.activeElement)) return;
+    await page.keyboard.press('ArrowDown');
+  }
+  throw new Error('Opción inalcanzable con flechas');
+}
+
 async function tabHacia(page: Page, siguiente: Locator) {
   await page.keyboard.press('Tab');
   await expect(siguiente).toBeFocused();
@@ -36,9 +45,11 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
 
   test('alta de vendedor: orden de Tab, selector con flechas y Enter envía', async ({ page }, info) => {
     const m = marca(info.project.name);
+    // El reintento de CI no puede repetir el nombre: el primer intento pudo haber creado ya al vendedor.
+    const vendedor = `Teclado ${m}${info.retry ? ` r${info.retry}` : ''}`;
     await irA(page, '/panel/vendedores');
     const nombre = page.getByLabel('Nombre');
-    await escribirEn(page, nombre, `Teclado ${m}`);
+    await escribirEn(page, nombre, vendedor);
     // Select de escritorio: ↓ abre la lista, ↓ baja a la segunda opción y Enter la elige (el foco vuelve al campo).
     const tipo = page.getByLabel('Tipo');
     await tabHacia(page, tipo);
@@ -59,8 +70,9 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await expect(comision).toHaveValue('15');
     await expect(page.getByRole('button', { name: 'Agregar vendedor' })).toBeEnabled();
     await page.keyboard.press('Enter');
-    await expect(estadoCon(page, 'Vendedor agregado.')).toBeVisible();
-    await expect(page.getByRole('link', { name: `Teclado ${m}` })).toBeVisible();
+    // La acción del servidor contra la rama de Neon de CI puede pasar de los 5 s por defecto.
+    await expect(estadoCon(page, 'Vendedor agregado.')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('link', { name: vendedor })).toBeVisible();
   });
 
   test('alta de cliente con Enter y edición de su ficha sin ratón', async ({ page }, info) => {
@@ -155,13 +167,13 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await irA(page, '/panel/exhibidores');
     const vendedor = page.getByLabel('Vendedor', { exact: true });
     await enfocar(page, vendedor);
-    // Con el select abierto (Enter) se escribe un prefijo único para saltar a la opción y Enter la elige. Sin
-    // espacios: si la búsqueda por tecleo caduca (CI lento), un espacio elige la opción resaltada en vez de buscar.
+    // Con el select abierto (Enter) se baja con flechas hasta la opción y Enter la elige. La búsqueda por tecleo
+    // de la lista caduca en CI lento (y un espacio elige la opción resaltada), así que no se usa aquí.
     await page.keyboard.press('Enter');
     // Hasta que una opción recibe el foco, lo que se teclee se pierde: se espera a la lista abierta.
     await expect(page.locator('[role="option"][data-highlighted]')).toBeVisible();
-    await page.keyboard.type('Teclado');
-    await expect(page.getByRole('option', { name: `Teclado ${m}` })).toBeFocused();
+    const opcion = page.getByRole('option', { name: new RegExp(`^Teclado ${m}`) }).first();
+    await bajarHasta(page, opcion);
     await page.keyboard.press('Enter');
     await expect(vendedor).toContainText(`Teclado ${m}`);
     await expect(vendedor).toBeFocused(); // al cerrarse, la lista devuelve el foco al campo
