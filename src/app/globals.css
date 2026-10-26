@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* Calendario de escritorio (react-day-picker): en la capa de componentes para que las utilidades lo puedan ajustar. */
+@import 'react-day-picker/style.css' layer(components);
 
 /*
  * Identidad de KaZeRo. Los tonos claros de la marca (terracota, durazno, salvia, menta, rubor) NO
@@ -67,6 +69,50 @@
   --font-sans: var(--font-marca), ui-sans-serif, system-ui, sans-serif;
 }
 
+/*
+ * Tokens de movimiento de transitions.dev (https://transitions.dev; licencia de uso libre): solo los que
+ * usa la app. Toda transición o animación pasa por estos nombres. Producto, no marca: 150–250 ms en casi
+ * todo, curvas de salida suaves y nada de rebotes.
+ */
+:root {
+  --duration-micro: 80ms; /* tramo corto de la sacudida de error */
+  --duration-quick: 150ms; /* hover, color, cierre de menús, texto que cambia */
+  --duration-fast: 250ms; /* apertura de menús y paneles, entrada de avisos */
+  --duration-medium: 350ms; /* trazo de la palomita */
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1); /* abrir/cerrar, entradas, presión */
+  --ease-in-out: ease-in-out; /* pulso del esqueleto */
+  --ease-linear: linear; /* indicador de «Guardando…» */
+  --scale-medium: 0.97; /* menú recién abierto */
+  --scale-small: 0.98; /* botón presionado */
+  --scale-tiny: 0.99; /* menú al cerrarse */
+  --distance-micro: 4px; /* entrada de avisos y mensajes de error */
+  --distance-small: 6px; /* sacudida de error */
+  --blur-small: 2px; /* entrada de avisos y paneles */
+  /* Acordeón (21) */
+  --acc-expand: var(--duration-fast);
+  --acc-collapse: var(--duration-fast);
+  /* Casilla (25) */
+  --check-box: var(--duration-quick);
+  --check-draw: var(--duration-medium);
+  --check-uncheck: var(--duration-quick);
+  /* Sacudida de error (12): 80 + 60 + 80 + 60 ms */
+  --shake-distance: var(--distance-small);
+  --shake-overshoot: 4px;
+  --shake-dur-a: var(--duration-micro);
+  --shake-dur-b: 60ms;
+  /* Esqueleto (14) */
+  --pulse-dur: 1000ms;
+  --pulse-min: 0.5;
+  /* Transición común de controles: color, borde, sombra y presión. */
+  --transicion-control:
+    color var(--duration-quick) var(--ease-smooth-out),
+    background-color var(--duration-quick) var(--ease-smooth-out),
+    border-color var(--duration-quick) var(--ease-smooth-out),
+    box-shadow var(--duration-quick) var(--ease-smooth-out),
+    opacity var(--duration-quick) var(--ease-smooth-out),
+    transform var(--duration-quick) var(--ease-smooth-out), scale var(--duration-quick) var(--ease-smooth-out);
+}
+
 @layer base {
   body {
     background-color: var(--color-crema);
@@ -120,6 +166,69 @@
   /* El gris por defecto de Tailwind (tinta al 50 %) queda en ~3:1; este cálido llega a 4.9:1 sobre blanco. */
   ::placeholder {
     color: #7e6c64;
+  }
+
+  /* Enlaces y nav: el color cambia con la misma transición que el resto de los controles. */
+  a[href] {
+    transition: var(--transicion-control);
+  }
+
+  /* Botones: presión sutil (0.98) en todos; el foco y los colores los pone cada variante. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    transition: var(--transicion-control);
+  }
+  button:not(:disabled):active,
+  [role='button']:not([aria-disabled='true']):active {
+    transform: scale(var(--scale-small));
+  }
+
+  /* Filas de tabla: realce al pasar el puntero para seguir la fila con la vista (solo con puntero real). */
+  tbody tr {
+    transition: background-color var(--duration-quick) var(--ease-smooth-out);
+  }
+  @media (hover: hover) {
+    tbody tr:hover {
+      background-color: color-mix(in oklab, var(--color-rubor-suave) 55%, transparent);
+    }
+  }
+
+  /* Desplegables nativos (<details>): sin marcador del navegador y con un chevron que gira. */
+  summary {
+    position: relative;
+    list-style: none;
+    padding-inline-end: --spacing(8);
+    border-radius: var(--radius-lg);
+    transition: color var(--duration-quick) var(--ease-smooth-out);
+  }
+  summary::-webkit-details-marker {
+    display: none;
+  }
+  summary::after {
+    content: '';
+    position: absolute;
+    inset-inline-end: --spacing(2);
+    top: 50%;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: translateY(-70%) rotate(45deg);
+    transition: transform var(--duration-fast) var(--ease-smooth-out);
+  }
+  details[open] > summary::after {
+    transform: translateY(-30%) rotate(-135deg);
+  }
+  @media (hover: hover) {
+    summary:hover {
+      color: var(--color-primario);
+    }
+  }
+
+  /* El selector de fecha nativo (celular) conserva su icono, pero más legible y con la mano. */
+  input[type='date']::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 0.75;
   }
 
   ::selection {
@@ -184,33 +293,693 @@
   }
 }
 
-/* Mensajes de estado: color + fondo + filete, así no dependen solo del tono. */
+/* ------------------------------------------------------------------------------------------------ */
+/* Botones: un solo vocabulario (reposo, hover, presión 0.98, foco global, deshabilitado).           */
+/* ------------------------------------------------------------------------------------------------ */
+
+@utility boton-primario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: --spacing(2);
+  min-height: --spacing(11);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-primario);
+  padding-inline: --spacing(4);
+  font-weight: 500;
+  color: #fff;
+  transition: var(--transicion-control);
+  @media (hover: hover) {
+    &:not(:disabled, [aria-disabled='true']):hover {
+      background-color: var(--color-primario-fuerte);
+    }
+  }
+  &:not(:disabled, [aria-disabled='true']):active {
+    background-color: var(--color-primario-fuerte);
+    transform: scale(var(--scale-small));
+  }
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+@utility boton-secundario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: --spacing(2);
+  min-height: --spacing(11);
+  border: 1px solid var(--color-secundario);
+  border-radius: var(--radius-lg);
+  background-color: #fff;
+  padding-inline: --spacing(4);
+  font-weight: 500;
+  color: var(--color-secundario);
+  transition: var(--transicion-control);
+  @media (hover: hover) {
+    &:not(:disabled, [aria-disabled='true']):hover {
+      background-color: var(--color-secundario-suave);
+      border-color: var(--color-secundario-fuerte);
+    }
+  }
+  &:not(:disabled, [aria-disabled='true']):active {
+    background-color: var(--color-secundario-suave);
+    transform: scale(var(--scale-small));
+  }
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
+/* Botón sin caja (cerrar un panel, acciones de baja jerarquía): solo texto con realce al pasar. */
+@utility boton-texto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: --spacing(2);
+  min-height: --spacing(11);
+  border-radius: var(--radius-lg);
+  padding-inline: --spacing(3);
+  font-weight: 500;
+  color: var(--color-tinta-suave);
+  transition: var(--transicion-control);
+  @media (hover: hover) {
+    &:not(:disabled):hover {
+      background-color: var(--color-rubor-suave);
+      color: var(--color-tinta);
+    }
+  }
+  &:not(:disabled):active {
+    transform: scale(var(--scale-small));
+  }
+}
+
+/* Tarjeta de lista cuyo enlace cubre toda la tarjeta: realce al pasar y presión al tocar. */
+@utility fila-enlace {
+  transition: background-color var(--duration-quick) var(--ease-smooth-out);
+  @media (hover: hover) {
+    &:hover {
+      background-color: color-mix(in oklab, var(--color-rubor-suave) 55%, transparent);
+    }
+  }
+  &:has(a:focus-visible) {
+    outline: 2px solid var(--color-primario);
+    outline-offset: -2px;
+  }
+}
+
+@utility tarjeta-enlace {
+  transition: var(--transicion-control);
+  @media (hover: hover) {
+    &:hover {
+      border-color: var(--color-marca-rubor);
+      background-color: var(--color-marca-crema);
+      box-shadow: 0 2px 6px rgb(165 78 41 / 0.1);
+    }
+  }
+  &:active {
+    transform: scale(var(--scale-tiny));
+  }
+  &:has(a:focus-visible) {
+    outline: 2px solid var(--color-primario);
+    outline-offset: 2px;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* Campos: texto, número, fecha, área, select nativo y disparador del select de escritorio.          */
+/* Estados: reposo, hover, foco, deshabilitado, solo lectura y error (borde doble sin mover el texto). */
+/* ------------------------------------------------------------------------------------------------ */
+
+@utility campo {
+  min-height: --spacing(11);
+  width: 100%;
+  border: 1px solid var(--color-borde-campo);
+  border-radius: var(--radius-lg);
+  background-color: #fff;
+  padding-inline: --spacing(3);
+  color: var(--color-tinta);
+  transition: var(--transicion-control);
+  @media (hover: hover) {
+    &:not(:disabled, [readonly], [aria-invalid='true']):hover {
+      border-color: var(--color-tinta-suave);
+    }
+  }
+  &:focus {
+    border-color: var(--color-primario);
+  }
+  &[readonly] {
+    background-color: var(--color-marca-crema);
+    border-style: dashed;
+  }
+  &:disabled {
+    background-color: var(--color-marca-crema);
+    border-color: var(--color-borde);
+    color: var(--color-tinta-suave);
+  }
+  /* Borde de 2 px con sombra interior: el contenido no se desplaza al marcar el error. */
+  &[aria-invalid='true'] {
+    border-color: var(--color-error);
+    box-shadow: inset 0 0 0 1px var(--color-error);
+  }
+}
+
+/* Select nativo (celular): mismo aspecto que el resto de los campos, con chevron propio. */
+@utility campo-select {
+  appearance: none;
+  padding-inline-end: --spacing(10);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%234d6a37' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5.5 8l4.5 4.5L14.5 8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right --spacing(3) center;
+  background-size: 1.25rem;
+}
+
+/* Disparador del select de escritorio (botón con el valor y el chevron). */
+@utility campo-disparador {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: --spacing(2);
+  text-align: left;
+  &[data-placeholder] {
+    color: #7e6c64;
+  }
+  &[data-state='open'] {
+    border-color: var(--color-primario);
+  }
+  & .chevron {
+    flex: none;
+    color: var(--color-secundario);
+    transition: transform var(--duration-fast) var(--ease-smooth-out);
+  }
+  &[data-state='open'] .chevron {
+    transform: rotate(180deg);
+  }
+}
+
+@layer components {
+  /* ---- Casilla (25-checkbox-check de transitions.dev): la caja se rellena y la palomita se dibuja. ---- */
+  .casilla-fila {
+    display: flex;
+    align-items: center;
+    gap: --spacing(3);
+    min-height: --spacing(11);
+    border-radius: var(--radius-lg);
+    padding-inline: --spacing(1);
+    transition: background-color var(--duration-quick) var(--ease-smooth-out);
+  }
+  @media (hover: hover) {
+    .casilla-fila:hover:not(:has(input:disabled)) {
+      background-color: color-mix(in oklab, var(--color-rubor-suave) 55%, transparent);
+    }
+  }
+  .casilla-caja {
+    position: relative;
+    display: inline-grid;
+    flex: none;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+  .casilla-caja > input {
+    appearance: none;
+    position: absolute;
+    inset: 0;
+    margin: 0;
+    border: 1.5px solid var(--color-borde-campo);
+    border-radius: 0.4rem;
+    background-color: #fff;
+    transition:
+      background-color var(--check-box) var(--ease-smooth-out),
+      border-color var(--check-box) var(--ease-smooth-out),
+      box-shadow var(--check-box) var(--ease-smooth-out),
+      transform var(--duration-quick) var(--ease-smooth-out);
+  }
+  @media (hover: hover) {
+    .casilla-fila:hover input:not(:disabled, :checked, [aria-invalid='true']) {
+      border-color: var(--color-tinta-suave);
+    }
+  }
+  .casilla-caja > input:checked {
+    background-color: var(--color-primario);
+    border-color: var(--color-primario);
+  }
+  .casilla-caja > input[aria-invalid='true'] {
+    border-color: var(--color-error);
+    box-shadow: 0 0 0 1px var(--color-error);
+  }
+  .casilla-fila:active input:not(:disabled) {
+    transform: scale(var(--scale-small));
+  }
+  .casilla-caja > input:disabled {
+    background-color: var(--color-marca-crema);
+    border-color: var(--color-borde);
+  }
+  .casilla-caja > svg {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    fill: none;
+    stroke: #fff;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  /* Largo del trazo medido (≈ 11.6): se redondea hacia arriba, como pide la receta. */
+  .casilla-caja > svg path {
+    stroke-dasharray: 12;
+    stroke-dashoffset: 12;
+    transition: stroke-dashoffset var(--check-uncheck) var(--ease-smooth-out);
+  }
+  .casilla-caja > input:checked ~ svg path {
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset var(--check-draw) var(--ease-smooth-out);
+  }
+
+  /* ---- Menús flotantes (05-menu-dropdown): crecen desde el disparador (origen según el lado). ---- */
+  .menu-flotante {
+    z-index: 30;
+    min-width: 12rem;
+    max-height: min(24rem, var(--radix-popper-available-height, 24rem));
+    overflow: auto;
+    border: 1px solid var(--color-borde);
+    border-radius: var(--radius-xl);
+    background-color: #fff;
+    padding: --spacing(1);
+    box-shadow:
+      0 8px 24px rgb(43 33 28 / 0.12),
+      0 1px 3px rgb(43 33 28 / 0.08);
+    transform-origin: var(
+      --radix-select-content-transform-origin,
+      var(
+        --radix-dropdown-menu-content-transform-origin,
+        var(--radix-popover-content-transform-origin, top left)
+      )
+    );
+  }
+  .menu-flotante[data-state='open'] {
+    animation: menu-entra var(--duration-fast) var(--ease-smooth-out);
+  }
+  .menu-flotante[data-state='closed'] {
+    animation: menu-sale var(--duration-quick) var(--ease-smooth-out) forwards;
+  }
+  .menu-select {
+    min-width: var(--radix-select-trigger-width);
+  }
+  /* Listas de los combobox (cliente, pieza, catálogo, buscador): aparecen con la misma entrada que los menús. */
+  .lista-combo {
+    transform-origin: top;
+    animation: menu-entra var(--duration-fast) var(--ease-smooth-out);
+  }
+
+  .opcion-menu {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: --spacing(2);
+    min-height: --spacing(10);
+    border-radius: var(--radius-lg);
+    padding: --spacing(2) --spacing(3);
+    padding-inline-end: --spacing(9);
+    color: var(--color-tinta);
+    outline: none;
+    user-select: none;
+    transition: background-color var(--duration-quick) var(--ease-smooth-out);
+  }
+  .opcion-menu[data-highlighted] {
+    background-color: var(--color-rubor-suave);
+  }
+  .opcion-menu[data-state='checked'] {
+    font-weight: 600;
+  }
+  .opcion-menu[data-disabled] {
+    color: var(--color-tinta-suave);
+    opacity: 0.6;
+  }
+  .opcion-menu[data-peligro] {
+    color: var(--color-error);
+  }
+  .opcion-menu[data-peligro][data-highlighted] {
+    background-color: var(--color-error-fondo);
+  }
+  .opcion-menu .marca {
+    position: absolute;
+    inset-inline-end: --spacing(3);
+    color: var(--color-primario);
+  }
+
+  /* ---- Acordeón (21-accordion): el panel crece por filas de la cuadrícula, sin medir en JS. ---- */
+  .panel-colapsable {
+    display: grid;
+    grid-template-rows: 0fr;
+    visibility: hidden;
+    transition:
+      grid-template-rows var(--acc-collapse) var(--ease-smooth-out),
+      visibility 0s linear var(--acc-collapse);
+  }
+  .panel-colapsable[data-abierto='true'] {
+    grid-template-rows: 1fr;
+    visibility: visible;
+    transition:
+      grid-template-rows var(--acc-expand) var(--ease-smooth-out),
+      visibility 0s linear 0s;
+  }
+  .panel-colapsable > .interior {
+    min-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    filter: blur(var(--blur-small));
+    transition:
+      opacity var(--acc-collapse) var(--ease-smooth-out),
+      filter var(--acc-collapse) var(--ease-smooth-out);
+  }
+  .panel-colapsable[data-abierto='true'] > .interior {
+    opacity: 1;
+    filter: blur(0);
+    transition:
+      opacity var(--acc-expand) var(--ease-smooth-out),
+      filter var(--acc-expand) var(--ease-smooth-out);
+  }
+
+  /* Chevron del disparador de un desplegable (gira como en la receta del acordeón). */
+  .chevron-giro {
+    flex: none;
+    transition: transform var(--duration-fast) var(--ease-smooth-out);
+  }
+  [aria-expanded='true'] > .chevron-giro,
+  [aria-expanded='true'] .chevron-giro {
+    transform: rotate(180deg);
+  }
+
+  /* ---- Calendario de escritorio (react-day-picker) con la paleta de KaZeRo. ---- */
+  .calendario.rdp-root {
+    --rdp-accent-color: var(--color-primario);
+    --rdp-accent-background-color: var(--color-rubor-suave);
+    --rdp-day-height: 2.5rem;
+    --rdp-day-width: 2.5rem;
+    --rdp-day_button-height: 2.375rem;
+    --rdp-day_button-width: 2.375rem;
+    --rdp-day_button-border-radius: var(--radius-lg);
+    --rdp-nav_button-height: 2.5rem;
+    --rdp-nav_button-width: 2.5rem;
+    --rdp-nav-height: 2.5rem;
+    --rdp-disabled-opacity: 0.4;
+    --rdp-outside-opacity: 0.55;
+    --rdp-today-color: var(--color-primario);
+    --rdp-animation_duration: var(--duration-fast);
+    --rdp-animation_timing: var(--ease-smooth-out);
+    font-size: var(--text-dato);
+    color: var(--color-tinta);
+  }
+  .calendario .rdp-selected .rdp-day_button {
+    background-color: var(--color-primario);
+    border-color: var(--color-primario);
+    color: #fff;
+    font-weight: 600;
+  }
+  .calendario .rdp-today:not(.rdp-selected) .rdp-day_button {
+    font-weight: 700;
+    border-color: var(--color-marca-rubor);
+  }
+  .calendario .rdp-day_button,
+  .calendario .rdp-button_previous,
+  .calendario .rdp-button_next {
+    transition: var(--transicion-control);
+  }
+  @media (hover: hover) {
+    .calendario .rdp-day:not(.rdp-selected, .rdp-disabled) .rdp-day_button:hover {
+      background-color: var(--color-rubor-suave);
+    }
+    .calendario .rdp-button_previous:hover:not(:disabled),
+    .calendario .rdp-button_next:hover:not(:disabled) {
+      background-color: var(--color-rubor-suave);
+      border-radius: var(--radius-lg);
+    }
+  }
+  .calendario .rdp-day_button:active:not(:disabled) {
+    transform: scale(var(--scale-small));
+  }
+  .calendario .rdp-month_caption {
+    font-weight: 600;
+    text-transform: capitalize;
+  }
+  .calendario .rdp-weekday {
+    font-weight: 600;
+    color: var(--color-tinta-suave);
+    text-transform: capitalize;
+  }
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* Avisos: fondo teñido, borde completo de 1 px e icono (sin filete lateral). El éxito dibuja su      */
+/* palomita (10-success-check, versión ligera); error y atención solo aparecen.                       */
+/* ------------------------------------------------------------------------------------------------ */
+
+:root {
+  --icono-exito: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 10.5l4 4 8-9'/%3E%3C/svg%3E");
+  --icono-error: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='10' cy='10' r='7.5'/%3E%3Cpath d='M7.3 7.3l5.4 5.4M12.7 7.3l-5.4 5.4'/%3E%3C/svg%3E");
+  --icono-atencion: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M10 2.8l7.6 13.4H2.4z'/%3E%3Cpath d='M10 8v3.6M10 14.1v.1'/%3E%3C/svg%3E");
+}
+
 @utility aviso-error {
-  border-left: 4px solid var(--color-error);
+  position: relative;
+  border: 1px solid color-mix(in oklab, var(--color-error) 40%, transparent);
   border-radius: var(--radius-lg);
   background: var(--color-error-fondo);
-  padding: --spacing(2) --spacing(3);
+  padding: --spacing(2) --spacing(3) --spacing(2) --spacing(10);
   color: var(--color-error);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
+  font-size: var(--text-meta);
+  line-height: var(--text-meta--line-height);
+  animation: aviso-entra var(--duration-fast) var(--ease-smooth-out);
+  &::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: --spacing(3);
+    top: 0.5625rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    background-color: currentColor;
+    -webkit-mask: var(--icono-error) center / contain no-repeat;
+    mask: var(--icono-error) center / contain no-repeat;
+  }
 }
 
 @utility aviso-exito {
-  border-left: 4px solid var(--color-exito);
+  position: relative;
+  border: 1px solid color-mix(in oklab, var(--color-exito) 40%, transparent);
   border-radius: var(--radius-lg);
   background: var(--color-exito-fondo);
-  padding: --spacing(2) --spacing(3);
+  padding: --spacing(2) --spacing(3) --spacing(2) --spacing(10);
   color: var(--color-exito);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
+  font-size: var(--text-meta);
+  line-height: var(--text-meta--line-height);
+  animation: aviso-entra var(--duration-fast) var(--ease-smooth-out);
+  &::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: --spacing(3);
+    top: 0.5625rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    background-color: currentColor;
+    -webkit-mask: var(--icono-exito) center / contain no-repeat;
+    mask: var(--icono-exito) center / contain no-repeat;
+    animation: palomita-dibuja var(--duration-medium) var(--ease-smooth-out) var(--duration-quick) backwards;
+  }
 }
 
 @utility aviso-atencion {
-  border-left: 4px solid var(--color-aviso-borde);
+  position: relative;
+  border: 1px solid var(--color-aviso-borde);
   border-radius: var(--radius-lg);
   background: var(--color-aviso-fondo);
-  padding: --spacing(2) --spacing(3);
+  padding: --spacing(2) --spacing(3) --spacing(2) --spacing(10);
   color: var(--color-aviso);
-  font-size: var(--text-sm);
-  line-height: var(--text-sm--line-height);
+  font-size: var(--text-meta);
+  line-height: var(--text-meta--line-height);
+  animation: aviso-entra var(--duration-fast) var(--ease-smooth-out);
+  &::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: --spacing(3);
+    top: 0.5625rem;
+    width: 1.25rem;
+    height: 1.25rem;
+    background-color: currentColor;
+    -webkit-mask: var(--icono-atencion) center / contain no-repeat;
+    mask: var(--icono-atencion) center / contain no-repeat;
+  }
+}
+
+/* Mensaje de error de un campo: entra con un fundido corto (la sacudida del campo va aparte). */
+@utility mensaje-error {
+  animation: aviso-entra var(--duration-fast) var(--ease-smooth-out);
+}
+
+/* ------------------------------------------------------------------------------------------------ */
+/* Carga: indicador de «Guardando…» y esqueletos (14-skeleton-reveal: pulso, solo con movimiento).    */
+/* ------------------------------------------------------------------------------------------------ */
+
+@utility indicador-carga {
+  display: inline-block;
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 9999px;
+  animation: giro 700ms var(--ease-linear) infinite;
+}
+
+@utility esqueleto {
+  border-radius: var(--radius-md);
+  background-color: color-mix(in oklab, var(--color-marca-rubor) 60%, transparent);
+  @media (prefers-reduced-motion: no-preference) {
+    animation: esqueleto-pulso var(--pulse-dur) var(--ease-in-out) infinite alternate;
+  }
+}
+
+/* Sacudida de un campo con error (12-error-state-shake): cuatro tramos con su propia curva. */
+@utility sacudida {
+  animation: sacudir calc(var(--shake-dur-a) * 2 + var(--shake-dur-b) * 2) var(--ease-linear);
+}
+
+@keyframes menu-entra {
+  from {
+    opacity: 0;
+    transform: scale(var(--scale-medium));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes menu-sale {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(var(--scale-tiny));
+  }
+}
+@keyframes aviso-entra {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--distance-micro) * -1));
+    filter: blur(var(--blur-small));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+@keyframes palomita-dibuja {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 0 0);
+    transform: translateY(var(--distance-micro)) rotate(-8deg);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+    transform: translateY(0) rotate(0);
+  }
+}
+@keyframes giro {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes esqueleto-pulso {
+  to {
+    opacity: var(--pulse-min);
+  }
+}
+@keyframes sacudir {
+  0% {
+    transform: translateX(0);
+    animation-timing-function: var(--ease-smooth-out);
+  }
+  28.57% {
+    transform: translateX(var(--shake-distance));
+    animation-timing-function: var(--ease-smooth-out);
+  }
+  57.14% {
+    transform: translateX(calc(var(--shake-distance) * -1));
+    animation-timing-function: var(--ease-smooth-out);
+  }
+  78.57% {
+    transform: translateX(var(--shake-overshoot));
+    animation-timing-function: var(--ease-smooth-out);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+@keyframes fundido {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes fundido-sale {
+  to {
+    opacity: 0;
+  }
+}
+
+/*
+ * «Menos movimiento»: los menús y avisos solo hacen un fundido; la sacudida, el trazo de la palomita,
+ * el giro y las transiciones de acordeón/casilla se eliminan (el estado ya se ve por texto e icono).
+ */
+@media (prefers-reduced-motion: reduce) {
+  /* Colores, bordes y paneles cambian al instante (sin transición). */
+  *,
+  ::before,
+  ::after {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+  .menu-flotante[data-state='open'],
+  .lista-combo,
+  .aviso-error,
+  .aviso-exito,
+  .aviso-atencion,
+  .mensaje-error {
+    animation: fundido var(--duration-quick) linear;
+  }
+  .menu-flotante[data-state='closed'] {
+    animation: fundido-sale var(--duration-quick) linear forwards;
+  }
+  .aviso-exito::before,
+  .sacudida,
+  .indicador-carga {
+    animation: none;
+  }
+  .panel-colapsable,
+  .panel-colapsable > .interior,
+  .casilla-caja > input,
+  .casilla-caja > svg path,
+  .chevron,
+  .chevron-giro,
+  summary::after {
+    transition: none !important;
+  }
+  .panel-colapsable > .interior {
+    filter: none !important;
+  }
+  button:not(:disabled):active,
+  [role='button']:not([aria-disabled='true']):active,
+  .boton-primario:active,
+  .boton-secundario:active,
+  .boton-texto:active,
+  .tarjeta-enlace:active {
+    transform: none !important;
+  }
 }
