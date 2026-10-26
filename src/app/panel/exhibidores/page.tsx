@@ -3,12 +3,14 @@ import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
 import { hoyMX } from '@/domain/fechas';
 import { Campo, Selector } from '@/features/ui/Campo';
+import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoExhibidor } from '@/features/ui/estado-visual';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarExhibidores } from '@/server/exhibidores/servicio';
 import { listarVendedores } from '@/server/vendedores/servicio';
+import { fechaCorta } from '../pedidos/etiquetas';
 import { accionCrearExhibidor } from './acciones';
 
 export const metadata = { title: 'Exhibidores' };
@@ -65,13 +67,14 @@ export default async function PaginaExhibidores({
           defaultValue={vendedorId ?? ''}
           opciones={[{ valor: '', texto: 'Todos' }, ...todos.map((v) => ({ valor: v.id, texto: v.nombre }))]}
         />
-        <button className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave">
-          Filtrar
-        </button>
+        <button className="boton-secundario">Filtrar</button>
       </form>
       <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4">
         {exhibidores.map((e) => (
-          <li key={e.id} className="relative flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-dato">
+          <li
+            key={e.id}
+            className="fila-enlace relative flex flex-wrap items-center gap-x-3 gap-y-1 py-3 text-dato"
+          >
             {/* Enlace extendido a toda la fila: el toque no exige apuntar al nombre. */}
             <Link
               href={`/panel/exhibidores/${e.id}`}
@@ -81,7 +84,7 @@ export default async function PaginaExhibidores({
             </Link>
             <EtiquetaEstado vista={vistaEstadoExhibidor(e.estado)} />
             <span className="basis-full text-meta text-tinta-suave">
-              {e.vendedorNombre} · {e.fechaEnvio} · {e.piezasActuales}{' '}
+              {e.vendedorNombre} · {fechaCorta(e.fechaEnvio)} · {e.piezasActuales}{' '}
               {e.piezasActuales === 1 ? 'pieza' : 'piezas'}
               {e.piezasApartadas > 0 &&
                 ` · ${e.piezasApartadas} ${e.piezasApartadas === 1 ? 'apartada' : 'apartadas'}`}
@@ -89,7 +92,22 @@ export default async function PaginaExhibidores({
           </li>
         ))}
       </ul>
-      {exhibidores.length === 0 && <p className="text-meta text-tinta-suave">No hay exhibidores.</p>}
+      {exhibidores.length === 0 &&
+        (vendedorId ? (
+          <EstadoVacio
+            titulo="Esa vendedora aún no tiene exhibidores."
+            accion={{ href: '/panel/exhibidores', texto: 'Ver todos' }}
+          />
+        ) : (
+          <EstadoVacio
+            titulo="Aún no hay exhibidores."
+            detalle={
+              activos.length > 0
+                ? 'Crea el primero con el formulario de arriba.'
+                : 'Primero agrega un vendedor activo y luego crea el exhibidor.'
+            }
+          />
+        ))}
     </section>
   );
 }

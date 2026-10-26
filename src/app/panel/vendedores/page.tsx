@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { conDbLectura } from '@/db/client';
 import { porcentajeLegible } from '@/domain/dinero';
 import { Campo, Selector } from '@/features/ui/Campo';
+import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarVendedores } from '@/server/vendedores/servicio';
@@ -21,44 +22,52 @@ export default async function PaginaVendedores() {
         <Selector etiqueta="Tipo" name="tipo" opciones={TIPOS} />
         <Campo etiqueta="Comisión (%)" name="comision" inputMode="decimal" defaultValue="0" required />
       </FormAccion>
-      <div className="tarjeta overflow-x-auto px-2">
-        <table className="w-full text-left text-dato">
-          <caption className="sr-only">Lista de vendedores</caption>
-          <thead className="text-meta font-semibold text-tinta-suave">
-            <tr>
-              <th scope="col" className="px-3 py-3">
-                Nombre
-              </th>
-              <th scope="col" className="px-3 py-3">
-                Tipo
-              </th>
-              <th scope="col" className="px-3 py-3">
-                Comisión
-              </th>
-              <th scope="col" className="px-3 py-3">
-                Estado
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {vendedores.map((v) => (
-              <tr key={v.id} className="border-t border-borde">
-                <td className="px-3 py-1">
-                  <Link
-                    href={`/panel/vendedores/${v.id}`}
-                    className="enlace inline-flex min-h-11 items-center"
-                  >
-                    {v.nombre}
-                  </Link>
-                </td>
-                <td className="px-3 py-1">{TIPOS.find((t) => t.valor === v.tipo)?.texto}</td>
-                <td className="px-3 py-1 tabular-nums">{porcentajeLegible(v.comisionPct)}%</td>
-                <td className="px-3 py-1">{v.activo ? 'Activo' : 'Inactivo'}</td>
+      <div className="tarjeta overflow-x-auto px-2 empty:hidden">
+        {vendedores.length > 0 && (
+          <table className="w-full text-left text-dato">
+            <caption className="sr-only">Lista de vendedores</caption>
+            <thead className="text-meta font-semibold text-tinta-suave">
+              <tr>
+                <th scope="col" className="px-3 py-3">
+                  Nombre
+                </th>
+                <th scope="col" className="px-3 py-3">
+                  Tipo
+                </th>
+                <th scope="col" className="px-3 py-3">
+                  Comisión
+                </th>
+                <th scope="col" className="px-3 py-3">
+                  Estado
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {vendedores.map((v) => (
+                <tr key={v.id} className="border-t border-borde">
+                  <td className="px-3 py-1">
+                    <Link
+                      href={`/panel/vendedores/${v.id}`}
+                      className="enlace inline-flex min-h-11 items-center"
+                    >
+                      {v.nombre}
+                    </Link>
+                  </td>
+                  <td className="px-3 py-1">{TIPOS.find((t) => t.valor === v.tipo)?.texto}</td>
+                  <td className="px-3 py-1 tabular-nums">{porcentajeLegible(v.comisionPct)}%</td>
+                  <td className="px-3 py-1">{v.activo ? 'Activo' : 'Inactivo'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
+      {vendedores.length === 0 && (
+        <EstadoVacio
+          titulo="Aún no hay vendedores."
+          detalle="Agrega el primero con el formulario de arriba para poder entregarle piezas y registrar sus ventas."
+        />
+      )}
     </section>
   );
 }

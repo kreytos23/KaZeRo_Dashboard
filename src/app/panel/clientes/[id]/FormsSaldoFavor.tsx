@@ -2,7 +2,7 @@
 
 import { Fragment } from 'react';
 import { CampoKey } from '@/features/pedidos/CampoKey';
-import { AreaTexto, Campo } from '@/features/ui/Campo';
+import { AreaTexto, Campo, CampoCasilla } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { accionRetirarSaldoFavor } from '../acciones';
 
@@ -39,9 +39,9 @@ export function FormsSaldoFavor({ clienteId, saldo, saldoTexto, hayInicial }: Pr
             autoComplete="off"
           />
           <AreaTexto etiqueta="Nota del retiro" name="nota" rows={2} maxLength={200} required />
-          <label className="flex min-h-11 items-center gap-2">
-            <input type="checkbox" name="confirmo" required /> Confirmo que entregué el efectivo
-          </label>
+          <CampoCasilla name="confirmo" required>
+            Confirmo que entregué el efectivo
+          </CampoCasilla>
         </Fragment>
       )}
     </FormAccion>

@@ -6,7 +6,7 @@ import { conDbLectura } from '@/db/client';
 import { formatoFolio } from '@/domain/pedidos';
 import { formatoMXN, numericACentavos, porcentajeLegible } from '@/domain/dinero';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
-import { Campo, Selector } from '@/features/ui/Campo';
+import { Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoExhibidor } from '@/features/ui/estado-visual';
@@ -128,9 +128,9 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
                   defaultValue={porcentajeLegible(v.comisionPct)}
                   required
                 />
-                <label className="flex min-h-11 items-center gap-2 text-meta font-medium">
-                  <input type="checkbox" name="activo" defaultChecked={v.activo} className="size-5" /> Activo
-                </label>
+                <CampoCasilla name="activo" defaultChecked={v.activo}>
+                  Activo
+                </CampoCasilla>
                 <CampoMotivo montos={[{ name: 'comision', tipo: 'porcentaje' }]} />
               </Fragment>
             </FormAccion>

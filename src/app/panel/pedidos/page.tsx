@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { formatoFolio } from '@/domain/pedidos';
-import { Campo, Selector } from '@/features/ui/Campo';
+import { Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
+import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPedido } from '@/features/ui/estado-visual';
 import { Saldo } from '@/features/ui/Saldo';
@@ -49,6 +50,9 @@ export default async function PaginaPedidos({
       .concat(clientes)
       .map((c) => ({ valor: c.id, texto: c.nombre })),
   ];
+  const filtrado = Boolean(
+    f.q || f.estado || f.vendedor || f.cliente || f.desde || f.hasta || f.conSaldo || f.pagina > 1,
+  );
   const rangoInvertido = Boolean(f.desde && f.hasta && f.desde > f.hasta);
   const conPagina = (p: number) => {
     const qs = new URLSearchParams();
@@ -66,10 +70,7 @@ export default async function PaginaPedidos({
     <section className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Pedidos</h1>
-        <Link
-          href="/panel/pedidos/nuevo"
-          className="flex min-h-11 items-center rounded-lg bg-primario px-4 font-medium text-white hover:bg-primario-fuerte"
-        >
+        <Link href="/panel/pedidos/nuevo" className="boton-primario">
           Nuevo pedido
         </Link>
       </div>
@@ -101,12 +102,10 @@ export default async function PaginaPedidos({
         />
         <Campo etiqueta="Desde" name="desde" type="date" defaultValue={f.desde ?? ''} />
         <Campo etiqueta="Hasta" name="hasta" type="date" defaultValue={f.hasta ?? ''} />
-        <label className="flex min-h-11 items-center gap-2">
-          <input type="checkbox" name="saldo" value="1" defaultChecked={f.conSaldo} /> Con saldo pendiente
-        </label>
-        <button className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave">
-          Filtrar
-        </button>
+        <CampoCasilla name="saldo" value="1" defaultChecked={f.conSaldo}>
+          Con saldo pendiente
+        </CampoCasilla>
+        <button className="boton-secundario">Filtrar</button>
       </form>
 
       <p role="status" className={rangoInvertido ? 'aviso-atencion' : undefined}>
@@ -114,12 +113,25 @@ export default async function PaginaPedidos({
       </p>
 
       {pedidos.length === 0 ? (
-        <p className="tarjeta p-4 text-dato text-tinta-suave">No hay pedidos con esos filtros.</p>
+        filtrado ? (
+          <EstadoVacio
+            titulo="No hay pedidos con esos filtros."
+            detalle="Prueba con otros datos o quita los filtros para ver todos."
+            accion={{ href: '/panel/pedidos', texto: 'Quitar filtros' }}
+          />
+        ) : (
+          <EstadoVacio
+            titulo="Aún no hay pedidos."
+            detalle="Cuando captures la primera nota de pedido aparecerá aquí."
+            accion={{ href: '/panel/pedidos/nuevo', texto: 'Crear pedido' }}
+            principal
+          />
+        )
       ) : (
         <>
           <ul aria-label="Pedidos" className="flex flex-col gap-2 md:hidden">
             {pedidos.map((p) => (
-              <li key={p.id} className="tarjeta relative flex flex-col gap-1 p-4">
+              <li key={p.id} className="tarjeta tarjeta-enlace relative flex flex-col gap-1 p-4">
                 <div className="flex items-center justify-between gap-2">
                   {/* Enlace extendido a toda la tarjeta: el toque no exige apuntar al folio. */}
                   <Link

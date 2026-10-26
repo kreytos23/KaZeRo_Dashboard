@@ -29,6 +29,13 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
   await requerirSesion();
   return (
     <div className="min-h-dvh">
+      {/* Primera parada de Tab: salta el logo, el buscador y la navegación (WCAG 2.4.1). */}
+      <a
+        href="#contenido"
+        className="boton-primario sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:shadow-lg"
+      >
+        Saltar al contenido
+      </a>
       <header className="relative border-b border-borde bg-white">
         {/* Filete con el degradado del monograma: el toque de marca sin cargar imágenes. */}
         <div
@@ -64,7 +71,13 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-[90rem] px-4 py-6 sm:py-8">{children}</main>
+      <main
+        id="contenido"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-[90rem] px-4 py-6 outline-none sm:py-8"
+      >
+        {children}
+      </main>
     </div>
   );
 }

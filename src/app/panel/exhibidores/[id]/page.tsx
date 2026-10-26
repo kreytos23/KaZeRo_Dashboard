@@ -6,7 +6,7 @@ import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { formatoFolio } from '@/domain/pedidos';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
-import { AreaTexto, Campo } from '@/features/ui/Campo';
+import { AreaTexto, Campo, CampoCasilla } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoExhibidor } from '@/features/ui/estado-visual';
@@ -16,6 +16,7 @@ import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { obtenerExhibidor } from '@/server/exhibidores/servicio';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
+import { fechaCorta } from '../../pedidos/etiquetas';
 import { accionCerrar, accionEditarExhibidor, accionEnviar, accionRegresar } from '../acciones';
 
 export const metadata = { title: 'Exhibidor' };
@@ -47,7 +48,7 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
           <Link href={`/panel/vendedores/${e.vendedorId}`} className="enlace">
             {e.vendedorNombre}
           </Link>{' '}
-          · {e.fechaEnvio}
+          · {fechaCorta(e.fechaEnvio)}
         </p>
       </div>
       {!abierto && (
@@ -156,10 +157,9 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
           <Fragment key={e.version}>
             <input type="hidden" name="exhibidorId" value={e.id} />
             <input type="hidden" name="version" value={e.version} />
-            <label className="flex min-h-11 items-center gap-2 text-meta font-medium">
-              <input type="checkbox" name="confirmo" value="si" required className="size-5" />
+            <CampoCasilla name="confirmo" value="si" required>
               Confirmo que quiero cerrar este exhibidor; no se puede reabrir.
-            </label>
+            </CampoCasilla>
           </Fragment>
           <p className="text-meta text-tinta-suave">
             Las piezas apartadas (listadas arriba) impiden cerrar el exhibidor: hay que resolver sus pedidos
