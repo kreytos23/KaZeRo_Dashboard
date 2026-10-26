@@ -51,9 +51,13 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await expect(page.getByRole('listbox')).toHaveCount(0);
     await expect(tipo).toContainText('Negocio a consignación');
     await expect(tipo).toBeFocused();
-    await tabHacia(page, page.getByLabel('Comisión (%)'));
+    const comision = page.getByLabel('Comisión (%)');
+    await tabHacia(page, comision);
     await page.keyboard.press('Control+A');
     await page.keyboard.type('15');
+    // En CI el tecleo puede ir por delante del estado del formulario: se confirma el valor y el botón listo antes de Enter.
+    await expect(comision).toHaveValue('15');
+    await expect(page.getByRole('button', { name: 'Agregar vendedor' })).toBeEnabled();
     await page.keyboard.press('Enter');
     await expect(estadoCon(page, 'Vendedor agregado.')).toBeVisible();
     await expect(page.getByRole('link', { name: `Teclado ${m}` })).toBeVisible();
@@ -151,11 +155,13 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await irA(page, '/panel/exhibidores');
     const vendedor = page.getByLabel('Vendedor', { exact: true });
     await enfocar(page, vendedor);
-    // El nombre lleva un espacio: con el select abierto (Enter) se escribe para saltar a la opción y Enter la elige.
+    // Con el select abierto (Enter) se escribe un prefijo único para saltar a la opción y Enter la elige. Sin
+    // espacios: si la búsqueda por tecleo caduca (CI lento), un espacio elige la opción resaltada en vez de buscar.
     await page.keyboard.press('Enter');
     // Hasta que una opción recibe el foco, lo que se teclee se pierde: se espera a la lista abierta.
     await expect(page.locator('[role="option"][data-highlighted]')).toBeVisible();
-    await page.keyboard.type(`Teclado ${m}`);
+    await page.keyboard.type('Teclado');
+    await expect(page.getByRole('option', { name: `Teclado ${m}` })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(vendedor).toContainText(`Teclado ${m}`);
     await expect(vendedor).toBeFocused(); // al cerrarse, la lista devuelve el foco al campo
