@@ -8,6 +8,8 @@ import { formatoFolio } from '@/domain/pedidos';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { AreaTexto, Campo } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
+import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
+import { vistaEstadoExhibidor } from '@/features/ui/estado-visual';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
@@ -37,12 +39,15 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
     <section className="flex max-w-3xl flex-col gap-6">
       <AvisoIndiceSucio version={e.version} />
       <div>
-        <h1 className="text-2xl font-semibold">{e.nombre}</h1>
-        <p className="text-tinta-suave">
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold">{e.nombre}</h1>
+          <EtiquetaEstado vista={vistaEstadoExhibidor(e.estado)} grande />
+        </div>
+        <p className="text-dato text-tinta-suave">
           <Link href={`/panel/vendedores/${e.vendedorId}`} className="enlace">
             {e.vendedorNombre}
           </Link>{' '}
-          · {e.fechaEnvio} · {abierto ? 'Abierto' : 'Cerrado'}
+          · {e.fechaEnvio}
         </p>
       </div>
       {!abierto && (
@@ -79,7 +84,7 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
           </FormAccion>
         </details>
       ) : (
-        <p className="text-sm text-tinta-suave">
+        <p className="text-meta text-tinta-suave">
           Un exhibidor cerrado es un registro histórico: su nombre y su fecha de envío ya no se editan.
         </p>
       )}
@@ -103,28 +108,36 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
         </div>
       )}
       <h2 className="text-lg font-semibold">Piezas en el exhibidor ({e.piezasActuales})</h2>
-      <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4 text-sm">
+      <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4 text-dato">
         {e.piezas.map((p) => (
           <li key={p.id} className="py-2">
-            <Link href={`/panel/inventario/${encodeURIComponent(p.codigo)}`} className="font-mono enlace">
+            <Link
+              href={`/panel/inventario/${encodeURIComponent(p.codigo)}`}
+              className="enlace inline-flex min-h-11 items-center font-mono text-monto font-semibold"
+            >
               {p.codigo}
             </Link>{' '}
             · {p.descripcion} · {formatoMXN(numericACentavos(p.precio))}
           </li>
         ))}
       </ul>
-      {e.piezas.length === 0 && <p className="text-sm text-tinta-suave">No hay piezas en este exhibidor.</p>}
+      {e.piezas.length === 0 && (
+        <p className="text-meta text-tinta-suave">No hay piezas en este exhibidor.</p>
+      )}
       <section aria-labelledby="apartadas-exhibidor" className="flex flex-col gap-2">
         <h2 id="apartadas-exhibidor" className="text-lg font-semibold">
           Apartadas ({e.apartadas.length})
         </h2>
         {e.apartadas.length === 0 ? (
-          <p className="text-sm text-tinta-suave">No hay piezas apartadas de este exhibidor.</p>
+          <p className="text-meta text-tinta-suave">No hay piezas apartadas de este exhibidor.</p>
         ) : (
-          <ul className="tarjeta flex flex-col divide-y divide-borde px-4 text-sm">
+          <ul className="tarjeta flex flex-col divide-y divide-borde px-4 text-dato">
             {e.apartadas.map((a) => (
               <li key={a.codigo} className="py-2">
-                <Link href={`/panel/inventario/${encodeURIComponent(a.codigo)}`} className="font-mono enlace">
+                <Link
+                  href={`/panel/inventario/${encodeURIComponent(a.codigo)}`}
+                  className="enlace inline-flex min-h-11 items-center font-mono text-monto font-semibold"
+                >
                   {a.codigo}
                 </Link>{' '}
                 · {a.descripcion} ·{' '}
@@ -143,12 +156,12 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
           <Fragment key={e.version}>
             <input type="hidden" name="exhibidorId" value={e.id} />
             <input type="hidden" name="version" value={e.version} />
-            <label className="flex min-h-11 items-center gap-2 text-sm font-medium">
+            <label className="flex min-h-11 items-center gap-2 text-meta font-medium">
               <input type="checkbox" name="confirmo" value="si" required className="size-5" />
               Confirmo que quiero cerrar este exhibidor; no se puede reabrir.
             </label>
           </Fragment>
-          <p className="text-sm text-tinta-suave">
+          <p className="text-meta text-tinta-suave">
             Las piezas apartadas (listadas arriba) impiden cerrar el exhibidor: hay que resolver sus pedidos
             primero.
           </p>

@@ -23,7 +23,7 @@ export function FotoPieza({
       : 'size-12 rounded border border-borde bg-white object-cover';
   if (!clave)
     return variante === 'grande' ? (
-      <div className={`${caja} flex items-center justify-center text-sm text-tinta-suave`}>Sin foto</div>
+      <div className={`${caja} flex items-center justify-center text-meta text-tinta-suave`}>Sin foto</div>
     ) : (
       <span aria-hidden="true" className={`${caja} inline-block`} />
     );

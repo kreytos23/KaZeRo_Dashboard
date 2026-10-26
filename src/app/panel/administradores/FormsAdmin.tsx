@@ -20,24 +20,24 @@ function Enrolamiento({
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-aviso-borde bg-aviso-fondo p-4">
       <h3 className="text-lg font-semibold">Escanea este código</h3>
-      <p className="text-sm">Cuenta: {e.email}. Agrégala en la app autenticadora.</p>
+      <p className="text-meta">Cuenta: {e.email}. Agrégala en la app autenticadora.</p>
       {/* eslint-disable-next-line @next/next/no-img-element -- data URL generada en el servidor, no hay nada que optimizar */}
       <img src={e.qr} alt="Código QR para la app autenticadora" width={220} height={220} />
-      <p className="text-sm">
+      <p className="text-meta">
         Clave manual: <code className="break-all">{e.secreto}</code>
       </p>
-      <p className="text-sm font-medium">
+      <p className="text-meta font-medium">
         Códigos de recuperación (guárdalos fuera de la computadora; cada uno sirve una sola vez):
       </p>
-      <ol aria-label="Códigos de recuperación" className="grid grid-cols-2 gap-1 font-mono text-sm">
+      <ol aria-label="Códigos de recuperación" className="grid grid-cols-2 gap-1 font-mono text-meta">
         {e.codigos.map((c) => (
           <li key={c}>{c}</li>
         ))}
       </ol>
-      <p role="status" className="text-sm font-semibold">
+      <p role="status" className="text-meta font-semibold">
         Guárdalos ahora; no se volverán a mostrar.
       </p>
-      <p className="text-sm">{nota}</p>
+      <p className="text-meta">{nota}</p>
       <button
         type="button"
         onClick={onOcultar}
@@ -172,7 +172,7 @@ function Regenerar({ onOcultar, emailActual }: { onOcultar: () => void; emailAct
       aria-busy={pendiente}
       className="flex max-w-md flex-col gap-3"
     >
-      <p className="text-sm text-tinta-suave">
+      <p className="text-meta text-tinta-suave">
         Úsalo si perdiste el teléfono. Tu TOTP y códigos actuales dejan de servir y se cierran tus demás
         sesiones.
       </p>

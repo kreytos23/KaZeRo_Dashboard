@@ -99,7 +99,7 @@ export function SelectorCliente({
   const mensaje = errorAlta || errorCampo;
   return (
     <div className="relative flex flex-col gap-1">
-      <label htmlFor={`${id}-q`} className="text-sm font-medium">
+      <label htmlFor={`${id}-q`} className="text-meta font-medium">
         Cliente
       </label>
       <input type="hidden" name="clienteId" value={elegido?.id ?? ''} />
@@ -171,8 +171,8 @@ export function SelectorCliente({
               }}
               className={`min-h-11 cursor-pointer px-3 py-2 ${i === sel ? 'bg-rubor-suave' : ''}`}
             >
-              <span className="block text-sm font-medium">{o.titulo}</span>
-              <span className="block text-xs text-tinta-suave">{o.subtitulo}</span>
+              <span className="block text-dato font-medium">{o.titulo}</span>
+              <span className="block text-meta text-tinta-suave">{o.subtitulo}</span>
             </li>
           ))}
       </ul>
@@ -180,7 +180,7 @@ export function SelectorCliente({
         <span
           id={`${id}-error`}
           role={errorAlta ? 'alert' : undefined}
-          className="text-sm font-normal text-error"
+          className="text-meta font-normal text-error"
         >
           {mensaje}
         </span>

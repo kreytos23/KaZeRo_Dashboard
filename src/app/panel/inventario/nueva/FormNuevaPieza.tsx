@@ -184,7 +184,7 @@ export function FormNuevaPieza({
           {estado.campos ? 'Revisa los campos marcados.' : estado.error}
         </p>
       )}
-      <p role="status" className="text-sm text-tinta-suave">
+      <p role="status" className="text-meta text-tinta-suave">
         {enviando && foto ? 'Subiendo…' : ''}
       </p>
       {/* Siempre montado: una región que nace con texto no se anuncia. */}

@@ -46,6 +46,20 @@
   --color-secundario: var(--color-marca-salvia-700);
   --color-secundario-fuerte: var(--color-marca-salvia-800);
   --color-secundario-suave: var(--color-marca-salvia-suave);
+
+  /*
+   * Escala tipográfica de datos (razón ≈ 1.125 entre peldaños). Ningún dato operativo baja de
+   * «meta» (15 px); montos, códigos y folios usan «dato» o más. Los títulos siguen la escala base
+   * de Tailwind (lg 18 px, 2xl 24 px).
+   */
+  --text-meta: 0.9375rem; /* 15 px: fechas, subtítulos, metadatos */
+  --text-meta--line-height: 1.4;
+  --text-dato: 1rem; /* 16 px: cuerpo y datos de tablas y fichas */
+  --text-dato--line-height: 1.5;
+  --text-monto: 1.125rem; /* 18 px: montos, códigos y folios */
+  --text-monto--line-height: 1.4;
+  --text-destacado: 1.375rem; /* 22 px: el saldo pendiente y el total a cobrar */
+  --text-destacado--line-height: 1.25;
 }
 
 /* La fuente la sirve next/font/local desde src/app/fonts (layout.tsx) y expone esta variable; inline para resolverla en uso. */
@@ -139,6 +153,35 @@
     radial-gradient(40rem 28rem at 0% 0%, rgb(242 207 200 / 0.55), transparent 70%),
     radial-gradient(36rem 26rem at 100% 100%, rgb(195 217 180 / 0.45), transparent 70%),
     radial-gradient(24rem 18rem at 100% 0%, rgb(235 179 105 / 0.18), transparent 70%);
+}
+
+/*
+ * Ficha en dos columnas en pantallas anchas: la columna principal (datos, piezas, montos) a la izquierda
+ * y la lateral (acciones, formularios, historiales) a la derecha. En celular los hijos de las dos columnas
+ * se apilan en un solo flujo y se ordenan con `order-*`, así lo más frecuente queda arriba.
+ */
+@utility ficha-cols {
+  display: flex;
+  flex-direction: column;
+  gap: --spacing(6);
+  @media (width >= 64rem) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+    align-items: start;
+    column-gap: --spacing(8);
+  }
+  @media (width >= 80rem) {
+    grid-template-columns: minmax(0, 1fr) minmax(24rem, 30rem);
+  }
+}
+
+@utility ficha-col {
+  display: contents;
+  @media (width >= 64rem) {
+    display: flex;
+    flex-direction: column;
+    gap: --spacing(6);
+  }
 }
 
 /* Mensajes de estado: color + fondo + filete, así no dependen solo del tono. */

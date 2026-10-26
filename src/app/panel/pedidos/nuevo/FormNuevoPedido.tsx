@@ -30,7 +30,7 @@ function ErrorCodigos({ id }: { id: string }) {
   const error = useContext(ErroresCampo).codigos;
   if (!error) return null;
   return (
-    <p id={id} className="text-sm text-error">
+    <p id={id} className="text-meta text-error">
       {error}
     </p>
   );
@@ -178,7 +178,7 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
                     className="size-10 shrink-0 rounded border border-borde bg-white"
                   />
                 )}
-                <span className="min-w-0 flex-1 text-sm">
+                <span className="min-w-0 flex-1 text-dato">
                   <span className="font-mono font-medium">{c}</span>
                   {' · '}
                   {p

@@ -7,7 +7,7 @@ export function FormLogin() {
   const [estado, accion, pendiente] = useActionState<EstadoForm, FormData>(accionLogin, {});
   return (
     <form action={accion} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label className="flex flex-col gap-1 text-meta font-medium">
         Correo
         <input
           id="login-correo"
@@ -20,7 +20,7 @@ export function FormLogin() {
           className="min-h-11 rounded-lg border border-borde-campo bg-white px-3"
         />
       </label>
-      <label className="flex flex-col gap-1 text-sm font-medium">
+      <label className="flex flex-col gap-1 text-meta font-medium">
         Contraseña
         <input
           id="login-password"

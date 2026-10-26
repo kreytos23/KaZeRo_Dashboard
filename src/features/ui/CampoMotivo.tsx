@@ -47,7 +47,7 @@ export function CampoMotivo({ montos = [] }: { montos?: readonly MontoVigilado[]
         maxLength={200}
         required={obligatorio}
       />
-      {obligatorio && <p className="text-sm text-tinta-suave">Cambiaste un monto: explica por qué.</p>}
+      {obligatorio && <p className="text-meta text-tinta-suave">Cambiaste un monto: explica por qué.</p>}
     </div>
   );
 }

@@ -5,13 +5,13 @@ import { ErroresCampo } from './errores-campo';
 
 export const ESTILO =
   'min-h-11 rounded-lg border border-borde-campo bg-white px-3 aria-invalid:border-2 aria-invalid:border-error';
-export const ESTILO_ETIQUETA = 'text-sm font-medium';
+export const ESTILO_ETIQUETA = 'text-meta font-medium';
 
 /** Error de un campo: fuera del `<label>` para que no forme parte del nombre accesible del control. */
 export function MensajeError({ idControl, error }: { idControl: string; error?: string }) {
   if (!error) return null;
   return (
-    <span id={`${idControl}-error`} className="text-sm font-normal text-error">
+    <span id={`${idControl}-error`} className="text-meta font-normal text-error">
       {error}
     </span>
   );

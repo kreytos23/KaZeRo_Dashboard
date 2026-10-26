@@ -35,7 +35,7 @@ export default async function PaginaCatalogos() {
             <input type="hidden" name="tipo" value={s.tipo} />
             <Campo etiqueta={s.etiqueta} name="nombre" required maxLength={80} />
           </FormAccion>
-          <ul className="text-sm">
+          <ul className="text-dato">
             {listas[i]!.map((c) => (
               <li key={c.id}>
                 <details>

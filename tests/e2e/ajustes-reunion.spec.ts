@@ -74,7 +74,9 @@ test('pieza con vendedora: se entrega desde su ficha, aparece filtrada en el inv
   ).toBeVisible();
 
   await irA(page, `/panel/inventario?ubicacion=vendedora&vendedor=${vendedoraId}`);
-  await expect(page.getByRole('row').filter({ hasText: codigo })).toContainText(`Con ${nombre}`);
+  await expect(
+    page.getByRole('row').or(page.getByRole('listitem')).filter({ hasText: codigo }),
+  ).toContainText(`Con ${nombre}`);
 
   await irA(page, '/panel/pedidos/nuevo');
   await elegirCliente(page, `Cliente V ${m}`);

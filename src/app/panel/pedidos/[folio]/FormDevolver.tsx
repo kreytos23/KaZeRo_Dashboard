@@ -21,7 +21,7 @@ interface Props {
 export function FormDevolver({ pedidoId, folio, itemId, codigo, montoTexto, hoy, fechaPedido }: Props) {
   return (
     <details className="py-1">
-      <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-secundario">
+      <summary className="flex min-h-11 cursor-pointer items-center text-dato font-medium text-secundario">
         Devolver por defecto
       </summary>
       <FormAccion

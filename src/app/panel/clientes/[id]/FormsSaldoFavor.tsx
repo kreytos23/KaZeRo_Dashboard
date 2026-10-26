@@ -27,7 +27,7 @@ export function FormsSaldoFavor({ clienteId, saldo, saldoTexto, hayInicial }: Pr
         <Fragment key={saldo}>
           <input type="hidden" name="clienteId" value={clienteId} />
           <CampoKey />
-          <p className="text-sm text-tinta-suave">
+          <p className="text-meta text-tinta-suave">
             Disponible para devolver: {saldoTexto}. Puedes devolver solo una parte.
           </p>
           <Campo

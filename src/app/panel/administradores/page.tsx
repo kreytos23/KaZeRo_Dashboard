@@ -18,7 +18,7 @@ export default async function PaginaAdministradores() {
   return (
     <section className="flex max-w-3xl flex-col gap-8">
       <h1 className="text-2xl font-semibold">Administradores</h1>
-      <ul className="flex flex-col gap-1 text-sm">
+      <ul className="flex flex-col gap-1 text-dato">
         {admins.map((a) => (
           <li key={a.id}>
             {a.email} · desde {FECHA.format(a.createdAt)}
