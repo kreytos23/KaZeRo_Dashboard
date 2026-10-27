@@ -521,23 +521,23 @@ export async function pedidoVigenteDePieza(
 
 export type MovimientoFila = Awaited<ReturnType<typeof historial>>[number];
 
-export async function listarPiezas(
-  db: Ejecutor,
-  o: {
-    q?: string;
-    estado?: EstadoPieza;
-    categoriaId?: string;
-    materialId?: string;
-    proveedorId?: string;
-    ubicacion?: Ubicacion;
-    /** Con `ubicacion: 'vendedora'`, solo las que tiene esa vendedora. */
-    vendedorId?: string;
-    limite?: number;
-    offset?: number;
-  } = {},
-): Promise<PiezaFila[]> {
+export interface FiltrosPiezas {
+  q?: string;
+  estado?: EstadoPieza;
+  categoriaId?: string;
+  materialId?: string;
+  proveedorId?: string;
+  ubicacion?: Ubicacion;
+  /** Con `ubicacion: 'vendedora'`, solo las que tiene esa vendedora. */
+  vendedorId?: string;
+  limite?: number;
+  offset?: number;
+}
+
+/** Un solo armado del WHERE: el listado y el conteo no pueden discrepar. */
+function condicionesPiezas(o: FiltrosPiezas) {
   const q = normalizar(o.q ?? '');
-  const filtros = [
+  return and(
     q
       ? or(
           sql`${vPieza.codigo} LIKE ${escaparLike(normalizarCodigo(q)) + '%'} ESCAPE '\\'`,
@@ -550,11 +550,23 @@ export async function listarPiezas(
     o.proveedorId ? eq(vPieza.proveedorId, o.proveedorId) : undefined,
     o.ubicacion ? eq(vPieza.ubicacion, o.ubicacion) : undefined,
     o.vendedorId ? eq(vPieza.vendedorCustodiaId, o.vendedorId) : undefined,
-  ];
+  );
+}
+
+/** Total de piezas que cumplen los filtros (ignora `limite` y `offset`). */
+export async function contarPiezas(db: Ejecutor, o: FiltrosPiezas = {}): Promise<number> {
+  const [r] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(vPieza)
+    .where(condicionesPiezas(o));
+  return r?.n ?? 0;
+}
+
+export async function listarPiezas(db: Ejecutor, o: FiltrosPiezas = {}): Promise<PiezaFila[]> {
   const filas = await db
     .select(filaPieza)
     .from(vPieza)
-    .where(and(...filtros))
+    .where(condicionesPiezas(o))
     .orderBy(asc(vPieza.codigo))
     .limit(Math.min(Math.max(Math.trunc(o.limite ?? 50), 1), 200))
     .offset(Math.max(Math.trunc(o.offset ?? 0), 0));

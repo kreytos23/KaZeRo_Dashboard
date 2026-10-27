@@ -169,7 +169,8 @@ function fechaFiltro(t: string | undefined, campo: 'desde' | 'hasta'): string | 
   return f;
 }
 
-export async function listarPedidos(db: Ejecutor, f: FiltrosPedidos = {}): Promise<PedidoFila[]> {
+/** Un solo armado del WHERE: el listado y el conteo no pueden discrepar. */
+function condicionesPedidos(f: FiltrosPedidos) {
   const desde = fechaFiltro(f.desde, 'desde');
   const hasta = fechaFiltro(f.hasta, 'hasta');
   const q = normalizar(f.q ?? '');
@@ -177,22 +178,33 @@ export async function listarPedidos(db: Ejecutor, f: FiltrosPedidos = {}): Promi
   const porNombre = q
     ? sql`kz_normalizar(${vPedido.clienteNombre}) LIKE ${'%' + escaparLike(q) + '%'} ESCAPE '\\'`
     : undefined;
+  return and(
+    folio !== null
+      ? or(eq(vPedido.folio, folio), sql`${vPedido.folio}::text LIKE ${String(folio) + '%'}`, porNombre)
+      : porNombre,
+    f.estado ? eq(vPedido.estado, f.estado) : undefined,
+    f.vendedorId ? eq(vPedido.vendedorId, f.vendedorId) : undefined,
+    f.clienteId ? eq(vPedido.clienteId, f.clienteId) : undefined,
+    f.conSaldo ? and(eq(vPedido.estado, 'abierto'), gt(vPedido.saldo, '0')) : undefined,
+    desde ? gte(vPedido.fecha, desde) : undefined,
+    hasta ? lte(vPedido.fecha, hasta) : undefined,
+  );
+}
+
+/** Total de pedidos que cumplen los filtros (ignora `limite` y `offset`). */
+export async function contarPedidos(db: Ejecutor, f: FiltrosPedidos = {}): Promise<number> {
+  const [r] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(vPedido)
+    .where(condicionesPedidos(f));
+  return r?.n ?? 0;
+}
+
+export async function listarPedidos(db: Ejecutor, f: FiltrosPedidos = {}): Promise<PedidoFila[]> {
   return db
     .select(filaPedido)
     .from(vPedido)
-    .where(
-      and(
-        folio !== null
-          ? or(eq(vPedido.folio, folio), sql`${vPedido.folio}::text LIKE ${String(folio) + '%'}`, porNombre)
-          : porNombre,
-        f.estado ? eq(vPedido.estado, f.estado) : undefined,
-        f.vendedorId ? eq(vPedido.vendedorId, f.vendedorId) : undefined,
-        f.clienteId ? eq(vPedido.clienteId, f.clienteId) : undefined,
-        f.conSaldo ? and(eq(vPedido.estado, 'abierto'), gt(vPedido.saldo, '0')) : undefined,
-        desde ? gte(vPedido.fecha, desde) : undefined,
-        hasta ? lte(vPedido.fecha, hasta) : undefined,
-      ),
-    )
+    .where(condicionesPedidos(f))
     .orderBy(desc(vPedido.folio))
     .limit(Math.min(Math.max(Math.trunc(f.limite ?? 50), 1), 200))
     .offset(Math.max(Math.trunc(f.offset ?? 0), 0));

@@ -247,6 +247,42 @@
   }
 }
 
+/* Enlace de la paginación numerada: blanco con contorno salvia; la página actual va rellena. */
+@utility pagina-enlace {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: --spacing(11);
+  min-height: --spacing(11);
+  border: 1px solid var(--color-borde-campo);
+  border-radius: var(--radius-lg);
+  background-color: #fff;
+  padding-inline: --spacing(3);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-tinta);
+  transition: var(--transicion-control);
+  @media (hover: hover) {
+    &:not([aria-current='page']):hover {
+      background-color: var(--color-secundario-suave);
+      border-color: var(--color-secundario-fuerte);
+    }
+  }
+  &:not([aria-current='page']):active {
+    background-color: var(--color-secundario-suave);
+    transform: scale(var(--scale-small));
+  }
+  &[aria-current='page'] {
+    border-color: var(--color-primario);
+    background-color: var(--color-primario);
+    font-weight: 600;
+    color: #fff;
+  }
+  &[aria-disabled='true'] {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
 /* Superficie de tablas y listas: blanco con borde rubor apenas visible (decorativo, no delimita controles). */
 @utility tarjeta {
   border: 1px solid var(--color-borde);
@@ -979,6 +1015,7 @@
   .boton-primario:active,
   .boton-secundario:active,
   .boton-texto:active,
+  .pagina-enlace:active,
   .tarjeta-enlace:active {
     transform: none !important;
   }

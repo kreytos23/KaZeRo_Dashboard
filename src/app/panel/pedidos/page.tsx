@@ -1,15 +1,17 @@
 import Link from 'next/link';
 import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
+import { acotarPagina } from '@/domain/paginacion';
 import { formatoFolio } from '@/domain/pedidos';
 import { Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
+import { Paginacion } from '@/features/ui/Paginacion';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPedido } from '@/features/ui/estado-visual';
 import { Saldo } from '@/features/ui/Saldo';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarClientes, obtenerCliente } from '@/server/clientes/servicio';
-import { listarPedidos } from '@/server/pedidos/lecturas';
+import { contarPedidos, listarPedidos } from '@/server/pedidos/lecturas';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { ETIQUETA_ESTADO_PEDIDO, fechaCorta } from './etiquetas';
 import { POR_PAGINA, leerFiltrosPedidos } from './filtros';
@@ -25,25 +27,31 @@ export default async function PaginaPedidos({
 }) {
   await requerirSesion();
   const f = leerFiltrosPedidos(await searchParams);
-  const [pedidos, vendedores, clientes, elegido] = await conDbLectura((db) =>
-    Promise.all([
-      listarPedidos(db, {
-        q: f.q,
-        estado: f.estado,
-        vendedorId: f.vendedor,
-        clienteId: f.cliente,
-        desde: f.desde,
-        hasta: f.hasta,
-        conSaldo: f.conSaldo,
-        limite: POR_PAGINA,
-        offset: (f.pagina - 1) * POR_PAGINA,
-      }),
+  const [pedidos, vendedores, clientes, elegido, total, pagina] = await conDbLectura(async (db) => {
+    const filtros = {
+      q: f.q,
+      estado: f.estado,
+      vendedorId: f.vendedor,
+      clienteId: f.cliente,
+      desde: f.desde,
+      hasta: f.hasta,
+      conSaldo: f.conSaldo,
+    };
+    const pedir = (pag: number) =>
+      listarPedidos(db, { ...filtros, limite: POR_PAGINA, offset: (pag - 1) * POR_PAGINA });
+    // Total y página en paralelo (mismo WHERE); si la página pedida se pasa de la última, se vuelve a pedir.
+    const [n, primera, vs, cs, el] = await Promise.all([
+      contarPedidos(db, filtros),
+      pedir(f.pagina),
       listarVendedores(db),
       // Hasta 200 clientes en el selector; si el filtrado no está entre ellos se trae aparte.
       listarClientes(db, { limite: 200 }),
       f.cliente ? obtenerCliente(db, f.cliente) : Promise.resolve(null),
-    ]),
-  );
+    ]);
+    const pag = acotarPagina(f.pagina, n, POR_PAGINA);
+    const pds = pag === f.pagina ? primera : await pedir(pag);
+    return [pds, vs, cs, el, n, pag] as const;
+  });
   const opcionesCliente = [
     { valor: '', texto: 'Todos' },
     ...(elegido && !clientes.some((c) => c.id === elegido.id) ? [elegido] : [])
@@ -51,21 +59,9 @@ export default async function PaginaPedidos({
       .map((c) => ({ valor: c.id, texto: c.nombre })),
   ];
   const filtrado = Boolean(
-    f.q || f.estado || f.vendedor || f.cliente || f.desde || f.hasta || f.conSaldo || f.pagina > 1,
+    f.q || f.estado || f.vendedor || f.cliente || f.desde || f.hasta || f.conSaldo || pagina > 1,
   );
   const rangoInvertido = Boolean(f.desde && f.hasta && f.desde > f.hasta);
-  const conPagina = (p: number) => {
-    const qs = new URLSearchParams();
-    if (f.q) qs.set('q', f.q);
-    if (f.estado) qs.set('estado', f.estado);
-    if (f.vendedor) qs.set('vendedor', f.vendedor);
-    if (f.cliente) qs.set('cliente', f.cliente);
-    if (f.desde) qs.set('desde', f.desde);
-    if (f.hasta) qs.set('hasta', f.hasta);
-    if (f.conSaldo) qs.set('saldo', '1');
-    qs.set('pagina', String(p));
-    return `?${qs}`;
-  };
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -213,18 +209,20 @@ export default async function PaginaPedidos({
           </div>
         </>
       )}
-      <nav aria-label="Páginas" className="flex gap-2">
-        {f.pagina > 1 && (
-          <Link href={conPagina(f.pagina - 1)} className="flex min-h-11 items-center px-3 enlace">
-            Anterior
-          </Link>
-        )}
-        {pedidos.length === POR_PAGINA && (
-          <Link href={conPagina(f.pagina + 1)} className="flex min-h-11 items-center px-3 enlace">
-            Siguiente
-          </Link>
-        )}
-      </nav>
+      <Paginacion
+        pagina={pagina}
+        total={total}
+        porPagina={POR_PAGINA}
+        parametros={{
+          q: f.q,
+          estado: f.estado,
+          vendedor: f.vendedor,
+          cliente: f.cliente,
+          desde: f.desde,
+          hasta: f.hasta,
+          saldo: f.conSaldo ? '1' : undefined,
+        }}
+      />
     </section>
   );
 }
