@@ -1,24 +1,8 @@
-import { mesCerrable, mesSiguiente, nombreMes } from './comisiones';
+import { MESES, mesCerrable, mesSiguiente, nombreMes } from './comisiones';
+import { diasEntre } from './fechas';
 
-const MESES = [
-  'enero',
-  'febrero',
-  'marzo',
-  'abril',
-  'mayo',
-  'junio',
-  'julio',
-  'agosto',
-  'septiembre',
-  'octubre',
-  'noviembre',
-  'diciembre',
-];
-
-const utc = (iso: string) =>
-  Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
-
-const diaMes = (iso: string) => `${Number(iso.slice(8, 10))} de ${MESES[Number(iso.slice(5, 7)) - 1]}`;
+const diaMes = (iso: string) =>
+  `${Number(iso.slice(8, 10))} de ${MESES[Number(iso.slice(5, 7)) - 1]!.toLowerCase()}`;
 
 /** El reporte de deudores toca los días 12 y 26 de cada mes (hoy cuenta si coincide). */
 export function proximoReporteDeudores(hoy: string): { fecha: string; dias: number } {
@@ -29,7 +13,7 @@ export function proximoReporteDeudores(hoy: string): { fecha: string; dias: numb
       : dia <= 26
         ? `${hoy.slice(0, 7)}-26`
         : `${mesSiguiente(`${hoy.slice(0, 7)}-01`).slice(0, 7)}-12`;
-  return { fecha, dias: Math.round((utc(fecha) - utc(hoy)) / 86_400_000) };
+  return { fecha, dias: diasEntre(hoy, fecha) };
 }
 
 export function textoReporteDeudores(hoy: string): string {

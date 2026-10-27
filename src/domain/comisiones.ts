@@ -2,7 +2,7 @@
 
 export type Mes = string; // 'AAAA-MM-01'
 
-const MESES = [
+export const MESES = [
   'Enero',
   'Febrero',
   'Marzo',

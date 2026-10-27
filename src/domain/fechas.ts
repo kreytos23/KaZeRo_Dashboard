@@ -18,3 +18,10 @@ const DIA_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City
 export function hoyMX(ahora = new Date()): string {
   return DIA_MX.format(ahora);
 }
+
+/** Días de calendario de `a` a `b` (fechas de negocio 'AAAA-MM-DD'; negativo si `b` es anterior). */
+export function diasEntre(a: string, b: string): number {
+  const utc = (iso: string) =>
+    Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
+  return Math.round((utc(b) - utc(a)) / 86_400_000);
+}
