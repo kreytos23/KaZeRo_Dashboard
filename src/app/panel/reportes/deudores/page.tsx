@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
 import { centavosANumeric, formatoMXN } from '@/domain/dinero';
+import { fechaCorta } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
@@ -9,7 +10,6 @@ import { Saldo } from '@/features/ui/Saldo';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { reporteDeudores } from '@/server/reportes/deudores';
 import { listarVendedores } from '@/server/vendedores/servicio';
-import { fechaCorta } from '../../pedidos/etiquetas';
 import { FiltroVendedora } from './FiltroVendedora';
 
 export const metadata = { title: 'Deudores' };

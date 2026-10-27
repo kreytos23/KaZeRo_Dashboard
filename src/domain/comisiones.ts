@@ -58,6 +58,8 @@ export function comisionCentavos(baseCentavos: number, pctNumeric: string): numb
   return Number((num + 5000n) / 10000n); // half-up, base y pct no negativos
 }
 
+export type EstadoPagoComision = 'pendiente' | 'pagado' | 'sin_comision' | 'estimado';
+
 export interface LineaComision {
   vendedorId: string;
   vendedorNombre: string;

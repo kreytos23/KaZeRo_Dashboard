@@ -1,23 +1,16 @@
 import { Document, Page, Text, View } from '@react-pdf/renderer';
+import { ETIQUETA_METODO } from '@/app/panel/pedidos/etiquetas';
 import { formatoMXN, porcentajeLegible } from '@/domain/dinero';
-import { hoyMX } from '@/domain/fechas';
+import { fechaCorta, hoyMX } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
+import { vistaEstadoPago } from '@/features/ui/estado-visual';
 import type { ReporteComisiones, VendedoraComision } from '@/server/comisiones/lecturas';
-import { fechaCorta } from './DeudoresPdf';
 import { Encabezado, Fila, Pie, estilos } from './estilos';
-
-const METODO = { efectivo: 'efectivo', transferencia: 'transferencia', otro: 'otro método' } as const;
-const ESTADO = {
-  estimado: 'Estimado',
-  pendiente: 'Pendiente de pago',
-  sin_comision: 'Sin comisión',
-  pagado: 'Pagado',
-} as const;
 
 const estadoPago = (v: VendedoraComision) =>
   v.estadoPago === 'pagado' && v.pago
-    ? `Pagado el ${fechaCorta(v.pago.fecha)} (${METODO[v.pago.metodo]})`
-    : ESTADO[v.estadoPago];
+    ? `Pagado el ${fechaCorta(v.pago.fecha)} (${ETIQUETA_METODO[v.pago.metodo]})`
+    : vistaEstadoPago(v.estadoPago).texto;
 
 const A_RESUMEN = [34, 8, 12, 23, 23];
 const L_RESUMEN: ('l' | 'r')[] = ['l', 'r', 'r', 'r', 'r'];

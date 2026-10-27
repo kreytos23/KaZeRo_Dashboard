@@ -9,10 +9,11 @@ import {
   mesSiguiente,
   nombreMes,
   resumenPorVendedora,
+  type EstadoPagoComision,
   type ResumenVendedora,
 } from '@/domain/comisiones';
 import { numericACentavos } from '@/domain/dinero';
-import { hoyMX } from '@/domain/fechas';
+import { fechaCorta, hoyMX } from '@/domain/fechas';
 import { ErrorNegocio } from '@/server/errores';
 
 export interface PedidoComisionable {
@@ -30,7 +31,7 @@ export interface PedidoComisionable {
 export interface PagoComisionVista {
   id: string;
   fecha: string;
-  metodo: 'efectivo' | 'transferencia' | 'otro';
+  metodo: (typeof pagoComision.$inferSelect)['metodo'];
   nota: string | null;
   montoCentavos: number;
 }
@@ -39,7 +40,7 @@ export interface VendedoraComision extends ResumenVendedora {
   pct: string | null;
   pedidosDetalle: PedidoComisionable[];
   pago: PagoComisionVista | null;
-  estadoPago: 'pendiente' | 'pagado' | 'sin_comision' | 'estimado';
+  estadoPago: EstadoPagoComision;
 }
 
 export interface ReporteComisiones {
@@ -55,8 +56,6 @@ export interface ReporteComisiones {
   totalCentavos: number;
   numPedidos: number;
 }
-
-const fechaCorta = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
 export const mensajeNoTerminado = (mes: string) =>
   `${nombreMes(mes)} termina el ${fechaCorta(finDeMes(mes))}; podrás cerrarlo desde el ${fechaCorta(mesSiguiente(mes))}.`;

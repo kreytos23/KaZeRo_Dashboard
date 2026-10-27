@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
 import { nombreMes } from '@/domain/comisiones';
 import { formatoMXN, porcentajeLegible } from '@/domain/dinero';
-import { hoyMX } from '@/domain/fechas';
+import { fechaCorta, hoyMX } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
 import { Selector } from '@/features/ui/Campo';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
@@ -14,7 +14,7 @@ import { requerirSesion } from '@/server/auth/sesion-actual';
 import { mesesComisiones, reporteComisiones } from '@/server/comisiones/lecturas';
 import { ErrorNegocio } from '@/server/errores';
 import { listarVendedores } from '@/server/vendedores/servicio';
-import { ETIQUETA_METODO, fechaCorta } from '../../pedidos/etiquetas';
+import { ETIQUETA_METODO } from '../../pedidos/etiquetas';
 import { FormCerrarMes, FormRegistrarPagoComision, PagoRegistrado } from './FormsComisiones';
 
 export const metadata = { title: 'Comisiones' };
@@ -25,8 +25,7 @@ const AVISOS = new Map([
   ['pagado', 'Pago registrado.'],
   ['deshecho', 'Pago deshecho.'],
 ]);
-const fechaMX = (iso: string) =>
-  fechaCorta(new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }));
+const fechaMX = (iso: string) => fechaCorta(hoyMX(new Date(iso)));
 
 export default async function Comisiones({
   searchParams,

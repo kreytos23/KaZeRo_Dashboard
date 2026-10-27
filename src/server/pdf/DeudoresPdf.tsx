@@ -1,12 +1,11 @@
 import { Document, Page, Text, View } from '@react-pdf/renderer';
 import { formatoMXN } from '@/domain/dinero';
+import { fechaCorta } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
 import type { reporteDeudores } from '@/server/reportes/deudores';
 import { Encabezado, Fila, Pie, estilos } from './estilos';
 
 type Reporte = Awaited<ReturnType<typeof reporteDeudores>>;
-
-export const fechaCorta = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`;
 
 const ANCHOS = [9, 20, 14, 12, 14, 14, 14, 8];
 const ALINEAR: ('l' | 'r')[] = ['l', 'l', 'l', 'l', 'r', 'r', 'r', 'r'];
