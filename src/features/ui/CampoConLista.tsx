@@ -72,7 +72,7 @@ export function CampoConLista({
       <label htmlFor={`${id}-q`} className={ESTILO_ETIQUETA}>
         {etiqueta}
       </label>
-      <div className="relative flex rounded-lg border border-borde-campo bg-white focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primario has-[input[aria-expanded=true]]:rounded-b-none has-[input[aria-invalid=true]]:border-error">
+      <div className="relative flex rounded-lg border border-borde-campo bg-superficie focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primario has-[input[aria-expanded=true]]:rounded-b-none has-[input[aria-invalid=true]]:border-error has-[input[aria-invalid=true]]:shadow-[inset_0_0_0_1px_var(--color-error)]">
         <input
           id={`${id}-q`}
           ref={entrada}
@@ -140,7 +140,7 @@ export function CampoConLista({
           tabIndex={-1}
           aria-label={`Opciones de ${etiqueta}`}
           hidden={!cb.visible}
-          className="lista-combo absolute inset-x-0 top-full z-30 max-h-60 overflow-auto rounded-b-lg border border-t-0 border-borde-campo bg-white shadow"
+          className="lista-combo absolute inset-x-0 top-full z-30 max-h-60 overflow-auto rounded-b-lg border border-t-0 border-borde-campo bg-superficie shadow"
         >
           {cb.visible &&
             lista.map((o, i) => (
