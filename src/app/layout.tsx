@@ -21,7 +21,12 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export const viewport: Viewport = { width: 'device-width', initialScale: 1, themeColor: '#fcf6f0' };
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: '#fcf6f0',
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

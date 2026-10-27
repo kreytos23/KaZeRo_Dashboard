@@ -1042,3 +1042,9 @@
     transform: none !important;
   }
 }
+
+@media (max-width: 47.99rem) {
+  html {
+    scroll-padding-bottom: 6rem;
+  }
+}

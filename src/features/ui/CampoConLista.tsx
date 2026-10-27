@@ -140,7 +140,7 @@ export function CampoConLista({
           tabIndex={-1}
           aria-label={`Opciones de ${etiqueta}`}
           hidden={!cb.visible}
-          className="lista-combo absolute inset-x-0 top-full z-10 max-h-60 overflow-auto rounded-b-lg border border-t-0 border-borde-campo bg-white shadow"
+          className="lista-combo absolute inset-x-0 top-full z-30 max-h-60 overflow-auto rounded-b-lg border border-t-0 border-borde-campo bg-white shadow"
         >
           {cb.visible &&
             lista.map((o, i) => (

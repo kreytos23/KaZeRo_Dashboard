@@ -40,7 +40,7 @@ export function BarraInferior() {
                 href={href}
                 aria-current={activa ? 'page' : undefined}
                 aria-label={icono ? undefined : 'Nuevo pedido'}
-                className={`${BASE} ${activa ? 'font-semibold text-primario' : 'text-tinta-suave'}`}
+                className={`${BASE} ${icono ? '' : 'group focus-visible:outline-none'} ${activa ? 'font-semibold text-primario' : 'text-tinta-suave'}`}
               >
                 {icono ? (
                   <svg aria-hidden="true" viewBox="0 0 24 24" className="size-[22px]" {...ICONO}>
@@ -49,7 +49,7 @@ export function BarraInferior() {
                 ) : (
                   <span
                     aria-hidden="true"
-                    className="-mt-6 flex size-14 items-center justify-center rounded-full bg-primario text-3xl leading-none text-white shadow-md"
+                    className="-mt-6 flex size-14 items-center justify-center rounded-full bg-primario text-3xl leading-none text-white shadow-md group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primario"
                   >
                     +
                   </span>
