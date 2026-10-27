@@ -7,6 +7,7 @@ import { EMAIL_ADMIN_MIGRACION } from '../../scripts/migrar-excel/aplicar';
 import { conDbUrl } from '@/db/pool';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { crearCliente } from '@/server/clientes/servicio';
+import { crearExhibidor, enviarPiezas } from '@/server/exhibidores/servicio';
 import { crearPedido } from '@/server/pedidos/servicio';
 import { entregarAVendedora } from '@/server/piezas/custodia';
 import { altaPieza } from '@/server/piezas/servicio';
@@ -275,5 +276,59 @@ describe('importar notas KZR', () => {
   it('un error en una nota no deja escribir las demás (todo o nada)', async () => {
     const filas = [fila(2), fila(3, { nota: 'KZR-9', id: 'NOEXISTE', cliente: 'Beto Díaz' })];
     expect(await erroresDe(filas)).toEqual(['pieza_faltante']);
+  });
+
+  it('la secuencia nunca baja: con setval(N, false) mayor que max+1, el siguiente folio sigue siendo N', async () => {
+    await owner((db) => db.execute(sql`SELECT setval(pg_get_serial_sequence('pedido', 'folio'), 50, false)`));
+    const r = await aplicar([fila(2)]); // folio 8
+    expect(r.siguienteFolio).toBe(50);
+    const siguiente = await app((db) =>
+      crearPedido(db, {
+        key: randomUUID(),
+        adminId,
+        clienteId: ids.beto,
+        vendedorId: ids.vendA,
+        codigos: ['ZZ04'],
+        cuentaTarjeta: true,
+        descuentoManualCentavos: 0,
+      }),
+    );
+    expect(siguiente.folio).toBe(50);
+  });
+
+  it('pieza en exhibidor: se aparta como en crearPedido, conservando el exhibidor y su movimiento', async () => {
+    const exhibidorId = await app((db) =>
+      crearExhibidor(db, { vendedorId: ids.vendA, nombre: 'Vitrina', fechaEnvio: '2026-10-01' }),
+    );
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['ZZ01'] }));
+    const r = await aplicar([fila(2)]);
+    expect(r.insertados).toMatchObject({ pedidos: 1, piezasApartadas: 1 });
+    const p = (
+      await owner((db) =>
+        db.execute(sql`SELECT p.estado, p.exhibidor_id::text AS ex,
+          (SELECT de_estado FROM movimiento_pieza WHERE pieza_id = p.id AND tipo = 'apartado') AS de
+          FROM pieza p WHERE codigo = 'ZZ01'`),
+      )
+    ).rows[0];
+    expect(p).toEqual({ estado: 'apartada', ex: exhibidorId, de: 'en_exhibidor' });
+  });
+
+  it('la tarjeta cruza de vuelta: lugares 9, 10, 1 (por fecha) quedan en las vueltas 1, 1 y 2', async () => {
+    const r = await aplicar([
+      fila(2, { nota: 'KZR-1', id: 'ZZ01', tarjeta: '9 01/09/2026' }),
+      fila(3, { nota: 'KZR-2', id: 'ZZ02', tarjeta: '10 02/09/2026' }),
+      fila(4, { nota: 'KZR-3', id: 'ZZ03', tarjeta: '1 03/09/2026' }),
+    ]);
+    expect(r.insertados.pedidos).toBe(3);
+    const rows = (
+      await owner((db) =>
+        db.execute(sql`SELECT ciclo_tarjeta AS c, posicion_tarjeta AS p FROM pedido ORDER BY folio`),
+      )
+    ).rows;
+    expect(rows).toEqual([
+      { c: 1, p: 9 },
+      { c: 1, p: 10 },
+      { c: 2, p: 1 },
+    ]);
   });
 });

@@ -15,7 +15,7 @@ import { parseArgs } from 'node:util';
 import { hoyMX } from '../../src/domain/fechas';
 import { GuardaBdError, hostNormalizado, prepararDestinoDetallado } from '../lib/guarda-bd';
 import { autorizarLimpieza } from '../lib/limpieza';
-import { listarRamas } from '../lib/neon';
+import { cadenaConexion, listarRamasDetalle, type RamaNeon } from '../lib/neon';
 import { exigirIgnoradoGit, RUTA_ENV_LOCAL } from '../migrar-excel/cli';
 import {
   aplicarKzr,
@@ -87,6 +87,32 @@ export function parsearArgumentos(argv: string[]): Argumentos {
   };
 }
 
+export const HORAS_RESPALDO = 24;
+
+/**
+ * El respaldo debe ser de verdad un respaldo reciente de producción: del mismo proyecto Neon que el destino
+ * (el host de la rama production del proyecto coincide con el del destino), con production como padre y
+ * creado en las últimas 24 h. (Neon no dice si el respaldo tiene los datos actuales: eso lo garantiza que sea
+ * reciente y que nadie haya escrito en producción después; ver el informe.)
+ */
+export function validarRespaldo(
+  ramas: readonly RamaNeon[],
+  nombre: string,
+  c: { ahora: Date; hostDestino: string; hostProduccionNeon: string },
+): void {
+  if (hostNormalizado(c.hostDestino) !== hostNormalizado(c.hostProduccionNeon, 'host de production'))
+    throw new GuardaBdError('El destino no pertenece al proyecto Neon de las ramas consultadas.');
+  const rama = ramas.find((r) => r.name === nombre);
+  if (!rama) throw new GuardaBdError(`La rama de respaldo "${nombre}" no existe en Neon.`);
+  const padre = ramas.find((r) => r.id === rama.parentId);
+  if (padre?.name !== 'production')
+    throw new GuardaBdError(`La rama de respaldo "${nombre}" no se creó a partir de production.`);
+  const creada = rama.createdAt ? Date.parse(rama.createdAt) : NaN;
+  const edadHoras = (c.ahora.getTime() - creada) / 3_600_000;
+  if (!Number.isFinite(edadHoras) || edadHoras < -0.1 || edadHoras > HORAS_RESPALDO)
+    throw new GuardaBdError(`La rama de respaldo "${nombre}" no se creó en las últimas ${HORAS_RESPALDO} h.`);
+}
+
 /** Lo que deja un ensayo correcto para su destino (sin secretos ni datos personales). */
 export interface EnsayoGuardado {
   hashPlan: string;
@@ -101,7 +127,10 @@ export interface Dependencias {
   ) => { url: string; esProduccion: boolean; host: string; baseDatos: string };
   simular: typeof simular;
   aplicar: typeof aplicarKzr;
-  ramas: () => string[];
+  /** Ramas del proyecto Neon (con padre y fecha de creación) y host de su rama de producción. */
+  ramas: () => RamaNeon[];
+  hostProduccionNeon: () => string;
+  ahora: () => Date;
   leerEnsayo: (ruta: string) => Promise<EnsayoGuardado | null>;
   guardarEnsayo: (ruta: string, datos: EnsayoGuardado) => Promise<void>;
   exigirIgnorado: (ruta: string) => void;
@@ -115,7 +144,9 @@ export const dependenciasReales: Dependencias = {
     prepararDestinoDetallado(variable, accion, RUTA_ENV_LOCAL, { exigirHostProduccion: true }),
   simular,
   aplicar: aplicarKzr,
-  ramas: listarRamas,
+  ramas: listarRamasDetalle,
+  hostProduccionNeon: () => cadenaConexion('production'),
+  ahora: () => new Date(),
   leerEnsayo: async (ruta) => {
     try {
       const x = JSON.parse(await readFile(ruta, 'utf8')) as Partial<EnsayoGuardado>;
@@ -178,22 +209,23 @@ async function correr(a: Argumentos, d: Dependencias): Promise<number> {
     return plan.errores.length ? 6 : 0;
   }
 
-  // Producción exige las dos llaves (bandera + rama de respaldo que exista) para aplicar; el ensayo hace ROLLBACK.
+  // Producción exige las dos llaves (bandera + rama de respaldo) para aplicar; el ensayo hace ROLLBACK.
   if (a.modo === 'aplicar' && destino.esProduccion) {
     try {
+      const ramas = a.confirmoProduccion && a.respaldo ? d.ramas() : [];
       autorizarLimpieza(
-        {
-          esProduccion: true,
-          esDevelopment: false,
-          otraBd: false,
-          ramas: a.confirmoProduccion && a.respaldo ? d.ramas() : [],
-        },
+        { esProduccion: true, esDevelopment: false, otraBd: false, ramas: ramas.map((r) => r.name) },
         { confirmoProduccion: a.confirmoProduccion, confirmoDevelopment: false, respaldo: a.respaldo },
       );
+      validarRespaldo(ramas, a.respaldo!, {
+        ahora: d.ahora(),
+        hostDestino: destino.host,
+        hostProduccionNeon: d.hostProduccionNeon(),
+      });
     } catch (e) {
       if (!(e instanceof GuardaBdError)) throw e;
       d.log(
-        `${e.message} (aplicar en producción exige --confirmo-produccion y --respaldo=<rama Neon existente>).`,
+        `${e.message} (aplicar en producción exige --confirmo-produccion y --respaldo=<rama Neon creada en las últimas 24 h a partir de production>).`,
       );
       return 4;
     }

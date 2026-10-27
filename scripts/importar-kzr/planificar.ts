@@ -4,8 +4,8 @@
  * lealtad, totales). No toca la BD: al aplicar se vuelve a planificar bajo los bloqueos y el hash debe coincidir.
  */
 import { createHash } from 'node:crypto';
-import { descuentoLealtad } from '../../src/domain/lealtad';
-import { calcularTotales } from '../../src/domain/pedidos';
+import { REGLAS_LEALTAD, descuentoLealtad } from '../../src/domain/lealtad';
+import { MAX_PIEZAS_PEDIDO, calcularTotales } from '../../src/domain/pedidos';
 import { formatoMXN } from '../../src/domain/dinero';
 import { normalizar } from '../../src/domain/texto';
 import { jsonCanonico } from '../migrar-excel/ids';
@@ -20,7 +20,6 @@ import {
 } from './parsear';
 import {
   LOTE_KZR,
-  type ItemPlan,
   type NotaPlan,
   type PiezaSnapshot,
   type PlanKzr,
@@ -50,18 +49,23 @@ export function planificar(filas: Parameters<typeof agruparNotas>[0], snap: Snap
   const origenes = new Map<string, Snapshot['origenes']>();
   for (const o of snap.origenes) origenes.set(o.clave, [...(origenes.get(o.clave) ?? []), o]);
   const usadas = new Map<string, number>(); // código → folio que ya lo reservó
-  const tarjetas = new Map<string, { ciclo: number; ocupadas: Set<number> }>();
-  const tarjetaDe = (clienteId: string) => {
-    let t = tarjetas.get(clienteId);
-    if (!t) {
-      const suyas = snap.tarjetas.filter((x) => x.clienteId === clienteId);
-      // Misma regla que siguientePosicion: la tarjeta actual es la vuelta más alta con algún pedido vigente.
-      const ciclo = suyas.reduce((m, x) => Math.max(m, x.ciclo), 1);
-      t = { ciclo, ocupadas: new Set(suyas.filter((x) => x.ciclo === ciclo).map((x) => x.posicion)) };
-      tarjetas.set(clienteId, t);
-    }
-    return t;
+  /** Tarjeta de cada cliente según la BD (la vuelta más alta con algún pedido vigente y sus lugares). */
+  const tarjetaDeBd = (clienteId: string) => {
+    const suyas = snap.tarjetas.filter((x) => x.clienteId === clienteId);
+    const ciclo = suyas.reduce((m, x) => Math.max(m, x.ciclo), 1);
+    return { ciclo, ocupadas: new Set(suyas.filter((x) => x.ciclo === ciclo).map((x) => x.posicion)) };
   };
+  interface Candidata {
+    n: ReturnType<typeof agruparNotas>['notas'][number];
+    clave: string;
+    hash: string;
+    cliente: Snapshot['clientes'][number];
+    vendedor: Snapshot['vendedores'][number];
+    items: { p: PiezaSnapshot; fila: number }[];
+    fecha: string;
+    lugar: number;
+  }
+  const candidatas: Candidata[] = [];
   const notas: NotaPlan[] = [];
 
   for (const n of agrupadas) {
@@ -100,6 +104,9 @@ export function planificar(filas: Parameters<typeof agruparNotas>[0], snap: Snap
       errores.push(...problemas);
       continue;
     }
+
+    if (n.filas.length > MAX_PIEZAS_PEDIDO)
+      err('demasiadas_piezas', `Máximo ${MAX_PIEZAS_PEDIDO} piezas por pedido.`);
 
     // Estatus: solo «Por cobrar» por ahora.
     if (!esEstatusSoportado(n.estatus))
@@ -149,7 +156,8 @@ export function planificar(filas: Parameters<typeof agruparNotas>[0], snap: Snap
         continue;
       }
       usadas.set(codigo, n.folio);
-      if (p.estado !== 'disponible') {
+      // Igual que exigirDisponibles: las piezas de un exhibidor también se apartan en una nota KZR.
+      if (p.estado !== 'disponible' && p.estado !== 'en_exhibidor') {
         err('pieza_no_disponible', `La pieza ${codigo} no está disponible (estado: ${p.estado}).`, [f.fila]);
         continue;
       }
@@ -171,66 +179,90 @@ export function planificar(filas: Parameters<typeof agruparNotas>[0], snap: Snap
         });
     }
 
-    // Lugar de la tarjeta en la vuelta actual del cliente (y lo ya reservado por otras notas del Excel).
-    let ciclo = 0;
-    let posicion = 0;
-    if (cliente && tarjeta.ok) {
-      const t = tarjetaDe(cliente.id);
-      if (t.ocupadas.has(tarjeta.lugar))
-        err(
-          'lugar_ocupado',
-          `El lugar ${tarjeta.lugar} de la tarjeta (vuelta ${t.ciclo}) del cliente ${corto(cliente.id)} ya está ocupado.`,
-        );
-      else {
-        ciclo = t.ciclo;
-        posicion = tarjeta.lugar;
-        t.ocupadas.add(tarjeta.lugar);
-      }
-    }
-
-    // Totales con el mismo cálculo del dominio que usa crearPedido.
-    const pctBps = posicion ? descuentoLealtad({ cuentaTarjeta: true, posicion }).pctBps : 0;
-    const t = calcularTotales(
-      items.map((i) => i.p.precioCentavos),
-      pctBps,
-      0,
-    );
-    if (!problemas.length && t.total === 0)
-      err(
-        'total_cero',
-        'El total de la nota es 0: crearPedido la liquidaría al crearla, no se soporta aquí.',
-      );
-
-    if (problemas.length) {
+    if (problemas.length || !cliente || !vendedor || !tarjeta.ok) {
       errores.push(...problemas);
       continue;
     }
-    const itemsPlan: ItemPlan[] = items.map((i, k) => ({
-      piezaId: i.p.id,
-      codigo: i.p.codigo,
-      precioCentavos: i.p.precioCentavos,
-      precioFinalCentavos: t.preciosFinales[k]!,
-    }));
-    notas.push({
-      estado: 'nueva',
-      folio: n.folio,
+    candidatas.push({
+      n,
       clave,
-      hashFuente: hash,
-      filas: nums,
-      fecha: (tarjeta as { fecha: string }).fecha,
-      clienteId: cliente!.id,
-      vendedorId: vendedor!.id,
-      clienteEtiqueta: `${corto(cliente!.id)} (${iniciales(cliente!.nombre)})`,
-      vendedorEtiqueta: `${corto(vendedor!.id)} (${iniciales(vendedor!.nombre)})`,
-      ciclo,
-      posicion,
-      pctBps,
-      items: itemsPlan,
-      subtotal: t.subtotal,
-      descuentoLealtad: t.descuentoLealtad,
-      total: t.total,
+      hash,
+      cliente,
+      vendedor,
+      items,
+      fecha: tarjeta.fecha,
+      lugar: tarjeta.lugar,
     });
   }
+
+  // Tarjeta de lealtad (reunión 2026-10-23, punto 3: al llegar al 10 se reinicia). Las notas de cada cliente se
+  // procesan por fecha y folio sobre los lugares que ya tiene en la BD. Si el lugar pedido está libre en la
+  // vuelta actual se usa; si la vuelta ya llegó al lugar 10 (o está llena), se abre la siguiente; si el lugar
+  // está ocupado en una vuelta que no ha llegado al 10, es un error.
+  const tamano = REGLAS_LEALTAD.tamanoCiclo;
+  const porCliente = new Map<string, Candidata[]>();
+  for (const c of candidatas) porCliente.set(c.cliente.id, [...(porCliente.get(c.cliente.id) ?? []), c]);
+  for (const [clienteId, lista] of porCliente) {
+    lista.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.n.folio - b.n.folio);
+    const t = tarjetaDeBd(clienteId);
+    for (const c of lista) {
+      const nums = c.n.filas.map((f) => f.fila);
+      if (t.ocupadas.size >= tamano || t.ocupadas.has(tamano)) {
+        t.ciclo++;
+        t.ocupadas = new Set();
+      } else if (t.ocupadas.has(c.lugar)) {
+        errores.push({
+          codigo: 'lugar_ocupado',
+          folio: c.n.folio,
+          filas: nums,
+          mensaje: `El lugar ${c.lugar} de la tarjeta (vuelta ${t.ciclo}) del cliente ${corto(clienteId)} ya está ocupado.`,
+        });
+        continue;
+      }
+      t.ocupadas.add(c.lugar);
+      // Totales con el mismo cálculo del dominio que usa crearPedido.
+      const pctBps = descuentoLealtad({ cuentaTarjeta: true, posicion: c.lugar }).pctBps;
+      const tot = calcularTotales(
+        c.items.map((i) => i.p.precioCentavos),
+        pctBps,
+        0,
+      );
+      if (tot.total === 0) {
+        errores.push({
+          codigo: 'total_cero',
+          folio: c.n.folio,
+          filas: nums,
+          mensaje: 'El total de la nota es 0: crearPedido la liquidaría al crearla, no se soporta aquí.',
+        });
+        continue;
+      }
+      notas.push({
+        estado: 'nueva',
+        folio: c.n.folio,
+        clave: c.clave,
+        hashFuente: c.hash,
+        filas: nums,
+        fecha: c.fecha,
+        clienteId,
+        vendedorId: c.vendedor.id,
+        clienteEtiqueta: `${corto(clienteId)} (${iniciales(c.cliente.nombre)})`,
+        vendedorEtiqueta: `${corto(c.vendedor.id)} (${iniciales(c.vendedor.nombre)})`,
+        ciclo: t.ciclo,
+        posicion: c.lugar,
+        pctBps,
+        items: c.items.map((i, k) => ({
+          piezaId: i.p.id,
+          codigo: i.p.codigo,
+          precioCentavos: i.p.precioCentavos,
+          precioFinalCentavos: tot.preciosFinales[k]!,
+        })),
+        subtotal: tot.subtotal,
+        descuentoLealtad: tot.descuentoLealtad,
+        total: tot.total,
+      });
+    }
+  }
+  notas.sort((a, b) => a.folio - b.folio);
 
   const folios = notas.map((n) => n.folio);
   const siguienteFolio = Math.max(snap.maxFolio, snap.folioSecuencia, 0, ...folios) + 1;

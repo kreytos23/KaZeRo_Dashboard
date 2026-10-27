@@ -60,3 +60,23 @@ export function listarRamas(): string[] {
   const lista = JSON.parse(neon(['branches', 'list', '--output', 'json'])) as unknown;
   return Array.isArray(lista) ? lista.map((r: { name?: unknown }) => String(r.name)) : [];
 }
+
+export interface RamaNeon {
+  id: string;
+  name: string;
+  parentId: string | null;
+  /** ISO 8601, tal como lo entrega Neon. */
+  createdAt: string | null;
+}
+
+/** Ramas del proyecto con su padre y fecha de creación (sin credenciales). */
+export function listarRamasDetalle(): RamaNeon[] {
+  const lista = JSON.parse(neon(['branches', 'list', '--output', 'json'])) as unknown;
+  if (!Array.isArray(lista)) return [];
+  return lista.map((r: Record<string, unknown>) => ({
+    id: String(r.id),
+    name: String(r.name),
+    parentId: typeof r.parent_id === 'string' ? r.parent_id : null,
+    createdAt: typeof r.created_at === 'string' ? r.created_at : null,
+  }));
+}

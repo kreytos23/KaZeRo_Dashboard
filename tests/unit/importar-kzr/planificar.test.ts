@@ -198,3 +198,59 @@ describe('planificar: idempotencia y avisos', () => {
     expect(p.avisos.map((a) => a.codigo)).toEqual(['descripcion_distinta']);
   });
 });
+
+describe('planificar: vueltas de la tarjeta (reunión 2026-10-23, punto 3)', () => {
+  const piezasMuchas = (n: number) => Array.from({ length: n }, (_, i) => pz(`T${i + 1}`));
+  const nota = (folio: number, lugar: number, dia: number, id: string) =>
+    f(folio, {
+      nota: `KZR-${folio}`,
+      id,
+      tarjeta: `${lugar} ${String(dia).padStart(2, '0')}/09/2026`,
+    });
+  const lugares = (p: ReturnType<typeof planificar>) =>
+    p.notas.map((n) => (n as NotaNueva).ciclo + ':' + (n as NotaNueva).posicion);
+
+  it('tarjeta llena en la BD → la nota abre la vuelta siguiente (en el lugar del Excel)', () => {
+    const llena = Array.from({ length: 10 }, (_, i) => ({ clienteId: C1, ciclo: 1, posicion: i + 1 }));
+    const p = planificar([f(2)], snap({ tarjetas: llena }), HOY);
+    expect(p.errores).toEqual([]);
+    expect(lugares(p)).toEqual(['2:1']);
+  });
+  it('notas del Excel 9, 10, 1, 2 (por fecha) cruzan a una vuelta nueva', () => {
+    const filas = [nota(1, 9, 1, 'T1'), nota(2, 10, 2, 'T2'), nota(3, 1, 3, 'T3'), nota(4, 2, 4, 'T4')];
+    const p = planificar(filas, snap({ piezas: piezasMuchas(4) }), HOY);
+    expect(p.errores).toEqual([]);
+    expect(lugares(p)).toEqual(['1:9', '1:10', '2:1', '2:2']);
+  });
+  it('se ordena por fecha y luego folio, no por el orden del Excel', () => {
+    const filas = [nota(4, 2, 4, 'T4'), nota(3, 1, 3, 'T3'), nota(2, 10, 2, 'T2'), nota(1, 9, 1, 'T1')];
+    const p = planificar(filas, snap({ piezas: piezasMuchas(4) }), HOY);
+    expect(lugares(p)).toEqual(['1:9', '1:10', '2:1', '2:2']);
+  });
+  it('lugar repetido en una vuelta que no ha llegado al 10 → lugar_ocupado', () => {
+    const p = planificar([nota(1, 3, 1, 'T1'), nota(2, 3, 2, 'T2')], snap({ piezas: piezasMuchas(2) }), HOY);
+    expect(p.errores.map((e) => e.codigo)).toEqual(['lugar_ocupado']);
+    expect(p.errores[0]!.folio).toBe(2);
+  });
+});
+
+describe('planificar: tope de piezas y piezas en exhibidor', () => {
+  it('más de MAX_PIEZAS_PEDIDO piezas en una nota → error con el mensaje de la app', () => {
+    const codigos = Array.from({ length: 101 }, (_, i) => `T${i + 1}`);
+    const p = planificar(
+      codigos.map((id, i) => f(i + 2, { id })),
+      snap({ piezas: codigos.map((c) => pz(c)) }),
+      HOY,
+    );
+    expect(p.errores.map((e) => e.codigo)).toEqual(['demasiadas_piezas']);
+    expect(p.errores[0]!.mensaje).toBe('Máximo 100 piezas por pedido.');
+  });
+  it('una pieza en_exhibidor se acepta como en crearPedido; apartada o vendida no', () => {
+    expect(
+      errores([f(2)], snap({ piezas: [pz('ZZ01', { estado: 'en_exhibidor', exhibidorId: 'ex-1' })] })),
+    ).toEqual([]);
+    expect(errores([f(2)], snap({ piezas: [pz('ZZ01', { estado: 'vendida' })] }))).toEqual([
+      'pieza_no_disponible',
+    ]);
+  });
+});

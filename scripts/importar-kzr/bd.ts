@@ -20,7 +20,11 @@ import { normalizarCodigo } from '../../src/domain/codigos';
 import { centavosANumeric, numericACentavos } from '../../src/domain/dinero';
 import { pctBpsANumeric } from '../../src/domain/pedidos';
 import { fijarContextoAuditoria } from '../../src/server/auditoria/servicio';
-import { apartarPiezas, bloquearPiezasPorCodigo, type PiezaBloqueada } from '../../src/server/pedidos/comun';
+import {
+  apartarPiezas,
+  bloquearPiezasParaApartar,
+  type PiezaBloqueada,
+} from '../../src/server/pedidos/comun';
 import { asegurarAdminMigracion } from '../migrar-excel/aplicar';
 import { parsearNota } from './parsear';
 import { claveNota, planificar } from './planificar';
@@ -120,7 +124,9 @@ export async function cargarSnapshot(tx: Ejecutor, filas: readonly FilaExcel[]):
       .from(pedido)
       .where(sql`${pedido.cuentaTarjeta} AND ${pedido.estado} <> 'cancelado'`),
     tx.execute(sql`SELECT coalesce(max(folio), 0)::int AS m FROM pedido`),
-    tx.execute(sql`SELECT CASE WHEN is_called THEN last_value ELSE 0 END::int AS v FROM pedido_folio_seq`),
+    tx.execute(
+      sql`SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END::int AS v FROM pedido_folio_seq`,
+    ),
   ]);
   return {
     clientes,
@@ -157,7 +163,7 @@ async function fijarSecuenciaFolio(tx: Ejecutor): Promise<number> {
     WITH m AS (
       SELECT GREATEST(
         (SELECT coalesce(max(folio), 0) FROM pedido),
-        (SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM pedido_folio_seq)
+        (SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END FROM pedido_folio_seq)
       )::int AS v)
     SELECT CASE WHEN v >= 1 THEN setval(pg_get_serial_sequence('pedido', 'folio'), v, true) ELSE 0 END AS s, v
     FROM m`);
@@ -268,10 +274,16 @@ async function verificar(
   return dif;
 }
 
-/** Orden de bloqueo D-10: clientes (no key update, por id) → tabla pedido (nadie más crea folios) → piezas por id. */
-async function bloquear(tx: Ejecutor, plan: PlanKzr): Promise<void> {
+/**
+ * Orden de bloqueo (el mismo que crearPedido, D-10): clientes por id (NO KEY UPDATE: serializa los lugares de la
+ * tarjeta) → exhibidores de las piezas → piezas por id (FOR UPDATE), con el helper de la app. NO se bloquea la
+ * tabla `pedido`: un LOCK TABLE podría interbloquear con crearPedido (que bloquea piezas antes de insertar) y
+ * frenaría toda escritura de pedidos. Un folio que choque con uno creado a la vez en el panel lo detecta el
+ * índice único `pedido_folio_uq`: la transacción entera falla y se deshace (se reporta como folio_existente).
+ */
+async function bloquear(tx: Ejecutor, plan: PlanKzr) {
   const nuevas = plan.notas.filter((n): n is NotaNueva => n.estado === 'nueva');
-  const clientes = [...new Set(nuevas.map((n) => n.clienteId))];
+  const clientes = [...new Set(nuevas.map((n) => n.clienteId))].sort();
   if (clientes.length)
     await tx
       .select({ id: cliente.id })
@@ -279,7 +291,15 @@ async function bloquear(tx: Ejecutor, plan: PlanKzr): Promise<void> {
       .where(inArray(cliente.id, clientes))
       .orderBy(asc(cliente.id))
       .for('no key update');
-  await tx.execute(sql`LOCK TABLE pedido IN SHARE ROW EXCLUSIVE MODE`);
+  const codigos = nuevas.flatMap((n) => n.items.map((i) => i.codigo));
+  const { piezas } = await bloquearPiezasParaApartar(tx, codigos);
+  return { clientes: new Set(clientes), piezas: new Map(piezas.map((p) => [p.id, p])) };
+}
+
+/** Violación del índice único del folio (23505): otra transacción creó ese folio entre la lectura y la escritura. */
+function esChoqueDeFolio(e: unknown): boolean {
+  const c = (e as { cause?: { code?: unknown; constraint?: unknown } } | null)?.cause;
+  return c?.code === '23505' && c.constraint === 'pedido_folio_uq';
 }
 
 export async function aplicarKzr(
@@ -287,6 +307,7 @@ export async function aplicarKzr(
   filas: readonly FilaExcel[],
   o: { modo: 'ensayo' | 'aplicar'; hoy: string; hashEsperado?: string },
 ): Promise<ResultadoKzr> {
+  let ultimoPlan: PlanKzr | undefined;
   try {
     return await conDbUrl(url, (db) =>
       db.transaction(async (tx) => {
@@ -297,18 +318,23 @@ export async function aplicarKzr(
         // 1) Primera pasada solo para saber qué bloquear; 2) bloqueos; 3) el plan definitivo, ya bajo los bloqueos.
         const previo = planificar(filas, await cargarSnapshot(tx, filas), o.hoy);
         if (previo.errores.length) throw new ErrorPlanConErrores(previo);
-        await bloquear(tx, previo);
-        const nuevasPrevias = previo.notas.filter((n): n is NotaNueva => n.estado === 'nueva');
-        const codigos = nuevasPrevias.flatMap((n) => n.items.map((i) => i.codigo));
-        const bloqueadas = await bloquearPiezasPorCodigo(tx, codigos);
+        const bloqueados = await bloquear(tx, previo);
         const snap = await cargarSnapshot(tx, filas);
         const plan = planificar(filas, snap, o.hoy);
+        ultimoPlan = plan;
         if (plan.errores.length) throw new ErrorPlanConErrores(plan);
+        // Todo lo que el plan definitivo toca debe estar entre lo bloqueado; si no, la BD cambió: ROLLBACK.
+        const tocaFueraDeLoBloqueado = plan.notas.some(
+          (n) =>
+            n.estado === 'nueva' &&
+            (!bloqueados.clientes.has(n.clienteId) || n.items.some((i) => !bloqueados.piezas.has(i.piezaId))),
+        );
+        if (tocaFueraDeLoBloqueado) throw new ErrorPlanCambio(o.hashEsperado ?? previo.hash, plan.hash);
         if (o.hashEsperado !== undefined && o.hashEsperado !== plan.hash)
           throw new ErrorPlanCambio(o.hashEsperado, plan.hash);
 
         const nuevas = plan.notas.filter((n): n is NotaNueva => n.estado === 'nueva');
-        const porId = new Map(bloqueadas.piezas.map((p) => [p.id, p]));
+        const porId = bloqueados.piezas;
         const pedidosAntes = await contarPedidos(tx);
         const pedidoIds = new Map<number, string>();
         const ins = { pedidos: 0, items: 0, piezasApartadas: 0, movimientos: 0, origen: 0 };
@@ -369,6 +395,18 @@ export async function aplicarKzr(
     );
   } catch (e) {
     if (e instanceof RollbackIntencional) return e.resultado;
+    if (esChoqueDeFolio(e) && ultimoPlan)
+      throw new ErrorPlanConErrores({
+        ...ultimoPlan,
+        errores: [
+          {
+            codigo: 'folio_existente',
+            folio: null,
+            filas: [],
+            mensaje: 'Otro proceso creó uno de los folios mientras se importaba. ROLLBACK: no quedó nada.',
+          },
+        ],
+      });
     throw e;
   }
 }

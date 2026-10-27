@@ -36,6 +36,7 @@ export type CodigoProblema =
   | 'pieza_repetida'
   | 'lugar_ocupado'
   | 'total_cero'
+  | 'demasiadas_piezas'
   | 'folio_existente'
   | 'origen_cambiado'
   | 'descripcion_distinta';

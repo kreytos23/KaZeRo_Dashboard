@@ -2,12 +2,26 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   ejecutar,
   parsearArgumentos,
+  validarRespaldo,
   type Dependencias,
   type EnsayoGuardado,
 } from '../../../scripts/importar-kzr/cli';
 import { ErrorPlanCambio, type ResultadoKzr } from '../../../scripts/importar-kzr/bd';
+import type { RamaNeon } from '../../../scripts/lib/neon';
 import type { PlanKzr } from '../../../scripts/importar-kzr/tipos';
 
+const AHORA = new Date('2026-10-26T12:00:00Z');
+const rama = (name: string, id: string, parentId: string | null, createdAt: string | null): RamaNeon => ({
+  id,
+  name,
+  parentId,
+  createdAt,
+});
+const RAMAS = [
+  rama('production', 'br-prod', null, '2026-01-01T00:00:00Z'),
+  rama('development', 'br-dev', 'br-prod', '2026-01-02T00:00:00Z'),
+  rama('respaldo-1', 'br-r1', 'br-prod', '2026-10-26T08:00:00Z'),
+];
 const plan = (errores: PlanKzr['errores'] = []): PlanKzr => ({
   notas: [],
   errores,
@@ -37,7 +51,9 @@ function deps(extra: Partial<Dependencias> & { produccion?: boolean; ensayo?: En
     }),
     simular: vi.fn(async () => plan()),
     aplicar: vi.fn(async () => resultado()),
-    ramas: () => ['production', 'respaldo-1'],
+    ramas: () => RAMAS,
+    hostProduccionNeon: () => 'h',
+    ahora: () => AHORA,
     leerEnsayo: async () => extra.ensayo ?? null,
     guardarEnsayo: async (_r, x) => void guardados.push(x),
     exigirIgnorado: () => undefined,
@@ -101,7 +117,12 @@ describe('ejecutar', () => {
     const hash = 'h'.repeat(64);
     const ensayo = { hashPlan: hash, fecha: '' };
     const base = ['aplicar', 'a.xlsx', `--plan=${hash}`];
-    for (const extra of [[], ['--confirmo-produccion'], ['--confirmo-produccion', '--respaldo=nada']]) {
+    for (const extra of [
+      [],
+      ['--confirmo-produccion'],
+      ['--confirmo-produccion', '--respaldo=nada'],
+      ['--confirmo-produccion', '--respaldo=development'],
+    ]) {
       const { d } = deps({ produccion: true, ensayo });
       expect(await ejecutar([...base, ...extra], d)).toBe(4);
       expect(d.aplicar).not.toHaveBeenCalled();
@@ -117,5 +138,30 @@ describe('ejecutar', () => {
       }),
     });
     expect(await ejecutar(['ensayo', 'a.xlsx', '--plan=a'], d)).toBe(3);
+  });
+});
+
+describe('validarRespaldo', () => {
+  const c = {
+    ahora: AHORA,
+    hostDestino: 'ep-x-pooler.region.neon.tech',
+    hostProduccionNeon: 'ep-x.region.neon.tech',
+  };
+  it('acepta un respaldo reciente, hijo de production y del mismo proyecto', () => {
+    expect(() => validarRespaldo(RAMAS, 'respaldo-1', c)).not.toThrow();
+  });
+  it('rechaza: otro proyecto, no existe, padre distinto de production, muy viejo o sin fecha', () => {
+    expect(() =>
+      validarRespaldo(RAMAS, 'respaldo-1', { ...c, hostProduccionNeon: 'otro.neon.tech' }),
+    ).toThrow(/proyecto/);
+    expect(() => validarRespaldo(RAMAS, 'nada', c)).toThrow(/no existe/);
+    const deDev = [...RAMAS, rama('r-dev', 'br-2', 'br-dev', '2026-10-26T08:00:00Z')];
+    expect(() => validarRespaldo(deDev, 'r-dev', c)).toThrow(/production/);
+    const viejo = [...RAMAS, rama('r-viejo', 'br-3', 'br-prod', '2026-10-24T08:00:00Z')];
+    expect(() => validarRespaldo(viejo, 'r-viejo', c)).toThrow(/24 h/);
+    const sinFecha = [...RAMAS, rama('r-sf', 'br-4', 'br-prod', null)];
+    expect(() => validarRespaldo(sinFecha, 'r-sf', c)).toThrow(/24 h/);
+    const raiz = [...RAMAS, rama('r-raiz', 'br-5', null, '2026-10-26T08:00:00Z')];
+    expect(() => validarRespaldo(raiz, 'r-raiz', c)).toThrow(/production/);
   });
 });
