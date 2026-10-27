@@ -7,7 +7,7 @@ import { comisionCentavos } from '@/domain/comisiones';
 import { numericACentavos } from '@/domain/dinero';
 import { crearCliente } from '@/server/clientes/servicio';
 import { anularPagoComision, cerrarMesComisiones, registrarPagoComision } from '@/server/comisiones/servicio';
-import { pendientesDeVendedora, reporteComisiones } from '@/server/comisiones/lecturas';
+import { comisionesPendientes, pendientesDeVendedora, reporteComisiones } from '@/server/comisiones/lecturas';
 import { registrarPagoDePedido } from '@/server/pagos/servicio';
 import { devolverPiezaDefectuosa } from '@/server/pedidos/devolucion';
 import { crearPedido } from '@/server/pedidos/servicio';
@@ -349,8 +349,18 @@ describe('comisiones', () => {
       { mes: '2026-11-01', nombre: 'Noviembre 2026', montoCentavos: 18000 },
     ]);
     expect(await app((db) => pendientesDeVendedora(db, rosaId))).toEqual([]);
+    expect(await app((db) => comisionesPendientes(db))).toEqual([
+      {
+        mes: '2026-11-01',
+        nombre: 'Noviembre 2026',
+        vendedorId: perlaId,
+        vendedorNombre: expect.any(String),
+        montoCentavos: 18000,
+      },
+    ]);
     await pagar(c.corteId, perlaId);
     expect(await app((db) => pendientesDeVendedora(db, perlaId))).toEqual([]);
+    expect(await app((db) => comisionesPendientes(db))).toEqual([]);
   });
 
   it('un mes que no es el abierto ni está cerrado → no_encontrado', async () => {

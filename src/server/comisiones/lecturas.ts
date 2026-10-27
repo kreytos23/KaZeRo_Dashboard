@@ -274,23 +274,45 @@ export async function reporteComisiones(
   };
 }
 
-/** Cortes cerrados donde la vendedora tiene comisión > 0 y ningún pago vigente. */
+/** Cortes cerrados donde cada vendedora (o la indicada) tiene comisión > 0 y ningún pago vigente. */
+export async function comisionesPendientes(
+  db: Ejecutor,
+  vendedorId?: string,
+): Promise<
+  { mes: string; nombre: string; vendedorId: string; vendedorNombre: string; montoCentavos: number }[]
+> {
+  const r = await db.execute<{
+    mes: string;
+    vendedor_id: string;
+    vendedor_nombre: string;
+    monto: string;
+  }>(sql`
+    SELECT c.mes::text AS mes, l.vendedor_id, v.nombre AS vendedor_nombre, sum(l.monto)::text AS monto
+      FROM corte_comision c
+      JOIN comision_linea l ON l.corte_id = c.id
+      JOIN vendedor v ON v.id = l.vendedor_id
+     WHERE (${vendedorId ?? null}::uuid IS NULL OR l.vendedor_id = ${vendedorId ?? null}::uuid)
+       AND NOT EXISTS (SELECT 1 FROM pago_comision p
+                        WHERE p.corte_id = c.id AND p.vendedor_id = l.vendedor_id AND p.anulado_at IS NULL)
+     GROUP BY c.mes, l.vendedor_id, v.nombre
+    HAVING sum(l.monto) > 0
+     ORDER BY c.mes, v.nombre`);
+  return r.rows.map((x) => ({
+    mes: x.mes,
+    nombre: nombreMes(x.mes),
+    vendedorId: x.vendedor_id,
+    vendedorNombre: x.vendedor_nombre,
+    montoCentavos: numericACentavos(x.monto),
+  }));
+}
+
 export async function pendientesDeVendedora(
   db: Ejecutor,
   vendedorId: string,
 ): Promise<{ mes: string; nombre: string; montoCentavos: number }[]> {
-  const r = await db.execute<{ mes: string; monto: string }>(sql`
-    SELECT c.mes::text AS mes, sum(l.monto)::text AS monto
-      FROM corte_comision c
-      JOIN comision_linea l ON l.corte_id = c.id AND l.vendedor_id = ${vendedorId}
-     WHERE NOT EXISTS (SELECT 1 FROM pago_comision p
-                        WHERE p.corte_id = c.id AND p.vendedor_id = ${vendedorId} AND p.anulado_at IS NULL)
-     GROUP BY c.mes
-    HAVING sum(l.monto) > 0
-     ORDER BY c.mes`);
-  return r.rows.map((x) => ({
-    mes: x.mes,
-    nombre: nombreMes(x.mes),
-    montoCentavos: numericACentavos(x.monto),
+  return (await comisionesPendientes(db, vendedorId)).map(({ mes, nombre, montoCentavos }) => ({
+    mes,
+    nombre,
+    montoCentavos,
   }));
 }
