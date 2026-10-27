@@ -10,7 +10,6 @@ import { conIdempotencia } from '@/server/idempotencia';
 import { validarFecha } from '@/server/pedidos/servicio';
 import { calcularMesAbierto, consultaElegibles, mensajeNoTerminado } from './lecturas';
 
-
 /** Mes del corte y nombre de la vendedora en una sola lectura (`nombre` nulo si la vendedora no existe). */
 async function corteYVendedora(db: Ejecutor, corteId: string, vendedorId: string) {
   const [r] = await db
@@ -93,8 +92,7 @@ export async function registrarPagoComision(
   },
 ): Promise<{ pagoId: string; montoCentavos: number }> {
   const metodo = metodoPagoComision.enumValues.find((m) => m === d.metodo);
-  if (!metodo)
-    throw new ErrorNegocio('metodo_invalido', 'Elige un método de pago válido.', 'metodo');
+  if (!metodo) throw new ErrorNegocio('metodo_invalido', 'Elige un método de pago válido.', 'metodo');
   const nota = d.nota?.trim() || null;
   if (nota && nota.length > 200)
     throw new ErrorNegocio('nota_invalida', 'La nota admite hasta 200 caracteres.', 'nota');

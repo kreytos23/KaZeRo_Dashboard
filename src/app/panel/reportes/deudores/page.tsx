@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
 import { centavosANumeric, formatoMXN } from '@/domain/dinero';
 import { fechaCorta } from '@/domain/fechas';
@@ -7,6 +6,7 @@ import { formatoFolio } from '@/domain/pedidos';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { Saldo } from '@/features/ui/Saldo';
+import { uuidOpcional } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { reporteDeudores } from '@/server/reportes/deudores';
 import { listarVendedores } from '@/server/vendedores/servicio';
@@ -22,8 +22,8 @@ export default async function Deudores({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   await requerirSesion();
-  const v = z.uuid().safeParse((await searchParams).vendedor);
-  const vendedorId = v.success ? v.data : '';
+  const { vendedor } = await searchParams;
+  const vendedorId = uuidOpcional(typeof vendedor === 'string' ? vendedor : null) ?? '';
   const [r, vendedores] = await conDbLectura((db) =>
     Promise.all([reporteDeudores(db, { vendedorId: vendedorId || undefined }), listarVendedores(db)]),
   );

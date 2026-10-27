@@ -1,4 +1,4 @@
-import { Selector } from '@/features/ui/Campo';
+import { SelectorVendedora } from '../SelectorVendedora';
 
 /** Formulario GET: funciona sin JavaScript (el select nativo y el botón envían `?vendedor=`). */
 export function FiltroVendedora({
@@ -10,15 +10,7 @@ export function FiltroVendedora({
 }) {
   return (
     <form role="search" method="get" className="flex flex-wrap items-end gap-2">
-      <Selector
-        etiqueta="Vendedora"
-        name="vendedor"
-        defaultValue={actual}
-        opciones={[
-          { valor: '', texto: 'Todas' },
-          ...vendedores.map((v) => ({ valor: v.id, texto: v.nombre })),
-        ]}
-      />
+      <SelectorVendedora vendedores={vendedores} actual={actual} />
       <button type="submit" className="boton-secundario">
         Filtrar
       </button>

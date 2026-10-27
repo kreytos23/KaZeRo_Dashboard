@@ -1,8 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
-import { nombreMes } from '@/domain/comisiones';
+import { mesDeUrl, nombreMes } from '@/domain/comisiones';
 import { formatoMXN, porcentajeLegible } from '@/domain/dinero';
 import { fechaCorta, hoyMX } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
@@ -10,16 +9,17 @@ import { Selector } from '@/features/ui/Campo';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPago } from '@/features/ui/estado-visual';
+import { uuidOpcional } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { mesesComisiones, reporteComisiones } from '@/server/comisiones/lecturas';
 import { ErrorNegocio } from '@/server/errores';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { ETIQUETA_METODO } from '../../pedidos/etiquetas';
+import { SelectorVendedora } from '../SelectorVendedora';
 import { FormCerrarMes, FormRegistrarPagoComision, PagoRegistrado } from './FormsComisiones';
 
 export const metadata = { title: 'Comisiones' };
 
-const MES_URL = /^\d{4}-(0[1-9]|1[0-2])$/;
 const AVISOS = new Map([
   ['cerrado', 'Mes cerrado: los pedidos y montos quedaron congelados.'],
   ['pagado', 'Pago registrado.'],
@@ -34,16 +34,18 @@ export default async function Comisiones({
 }) {
   await requerirSesion();
   const sp = await searchParams;
-  const v = z.uuid().safeParse(sp.vendedor);
-  const vendedorId = v.success ? v.data : '';
+  const vendedorId = uuidOpcional(typeof sp.vendedor === 'string' ? sp.vendedor : null) ?? '';
   const hoy = hoyMX();
-  const [meses, vendedores] = await conDbLectura((db) =>
-    Promise.all([mesesComisiones(db, hoy), listarVendedores(db)]),
-  );
-  const pedido = typeof sp.mes === 'string' && MES_URL.test(sp.mes) ? sp.mes : null;
-  const mes = pedido ? `${pedido}-01` : meses.abierto;
   // El reporte completo (no filtrado): el cierre y su confirmación siempre hablan de todo el mes.
-  const r = await conDbLectura((db) => reporteComisiones(db, mes, { hoy })).catch((e: unknown) => {
+  const { meses, vendedores, mes, r } = await conDbLectura(async (db) => {
+    const meses = await mesesComisiones(db, hoy);
+    const mes = mesDeUrl(typeof sp.mes === 'string' ? sp.mes : null) ?? meses.abierto;
+    const [vendedores, r] = await Promise.all([
+      listarVendedores(db),
+      reporteComisiones(db, mes, { hoy, abierto: meses.abierto }),
+    ]);
+    return { meses, vendedores, mes, r };
+  }).catch((e: unknown) => {
     if (e instanceof ErrorNegocio && e.codigo === 'no_encontrado') notFound();
     throw e;
   });
@@ -69,15 +71,7 @@ export default async function Comisiones({
       )}
       <form role="search" method="get" className="flex flex-wrap items-end gap-2">
         <Selector etiqueta="Mes" name="mes" defaultValue={mes.slice(0, 7)} opciones={opcionesMes} />
-        <Selector
-          etiqueta="Vendedora"
-          name="vendedor"
-          defaultValue={vendedorId}
-          opciones={[
-            { valor: '', texto: 'Todas' },
-            ...vendedores.map((x) => ({ valor: x.id, texto: x.nombre })),
-          ]}
-        />
+        <SelectorVendedora vendedores={vendedores} actual={vendedorId} />
         <button type="submit" className="boton-secundario">
           Ver
         </button>
@@ -93,11 +87,9 @@ export default async function Comisiones({
             {r.cerrado && r.cerradoAt ? ` · cerrado el ${fechaMX(r.cerradoAt)}` : ' · en curso'}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <a href={`${pdf}${conFiltro}`} download className="boton-secundario">
-            Descargar PDF
-          </a>
-        </div>
+        <a href={`${pdf}${conFiltro}`} download className="boton-secundario">
+          Descargar PDF
+        </a>
       </div>
 
       {!r.cerrado && (
