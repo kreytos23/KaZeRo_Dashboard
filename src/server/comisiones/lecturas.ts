@@ -174,7 +174,9 @@ export async function reporteComisiones(
   o: { vendedorId?: string; hoy?: string; abierto?: string } = {},
 ): Promise<ReporteComisiones> {
   const hoy = o.hoy ?? hoyMX();
-  const [corte] = await db.select().from(corteComision).where(eq(corteComision.mes, mes));
+  // El mes abierto no puede tener corte: se evita la consulta.
+  const [corte] =
+    o.abierto === mes ? [] : await db.select().from(corteComision).where(eq(corteComision.mes, mes));
   let detalle: PedidoComisionable[];
   const pagos = new Map<string, PagoComisionVista>();
   if (corte) {
@@ -303,16 +305,5 @@ export async function comisionesPendientes(
     vendedorId: x.vendedor_id,
     vendedorNombre: x.vendedor_nombre,
     montoCentavos: numericACentavos(x.monto),
-  }));
-}
-
-export async function pendientesDeVendedora(
-  db: Ejecutor,
-  vendedorId: string,
-): Promise<{ mes: string; nombre: string; montoCentavos: number }[]> {
-  return (await comisionesPendientes(db, vendedorId)).map(({ mes, nombre, montoCentavos }) => ({
-    mes,
-    nombre,
-    montoCentavos,
   }));
 }

@@ -7,7 +7,7 @@ import { comisionCentavos } from '@/domain/comisiones';
 import { numericACentavos } from '@/domain/dinero';
 import { crearCliente } from '@/server/clientes/servicio';
 import { anularPagoComision, cerrarMesComisiones, registrarPagoComision } from '@/server/comisiones/servicio';
-import { comisionesPendientes, pendientesDeVendedora, reporteComisiones } from '@/server/comisiones/lecturas';
+import { comisionesPendientes, reporteComisiones } from '@/server/comisiones/lecturas';
 import { registrarPagoDePedido } from '@/server/pagos/servicio';
 import { devolverPiezaDefectuosa } from '@/server/pedidos/devolucion';
 import { crearPedido } from '@/server/pedidos/servicio';
@@ -276,7 +276,7 @@ describe('comisiones', () => {
     let v = perla(await reporte('2026-11-01', '2026-12-01'));
     expect(v.estadoPago).toBe('pagado');
     expect(v.pago).toMatchObject({ id: p1.pagoId, metodo: 'efectivo', montoCentavos: 18000, nota: null });
-    expect(await app((db) => pendientesDeVendedora(db, perlaId))).toEqual([]);
+    expect(await app((db) => comisionesPendientes(db, perlaId))).toEqual([]);
     await expect(anular(p1.pagoId, '   ')).rejects.toMatchObject({
       codigo: 'motivo_invalido',
       campo: 'motivo',
@@ -342,13 +342,19 @@ describe('comisiones', () => {
     expect(perla(r).pedidosDetalle).toMatchObject([{ pedidoId: p.id, baseCentavos: 0, montoCentavos: 0 }]);
   });
 
-  it('pendientesDeVendedora lista el mes cerrado mientras no se pague y lo quita al pagar', async () => {
+  it('comisionesPendientes por vendedora lista el mes cerrado mientras no se pague y lo quita al pagar', async () => {
     await liquidado(100000, '2026-11-05');
     const c = await cerrar('2026-11-01', '2026-12-01');
-    expect(await app((db) => pendientesDeVendedora(db, perlaId))).toEqual([
-      { mes: '2026-11-01', nombre: 'Noviembre 2026', montoCentavos: 18000 },
+    expect(await app((db) => comisionesPendientes(db, perlaId))).toEqual([
+      {
+        mes: '2026-11-01',
+        nombre: 'Noviembre 2026',
+        vendedorId: perlaId,
+        vendedorNombre: expect.any(String),
+        montoCentavos: 18000,
+      },
     ]);
-    expect(await app((db) => pendientesDeVendedora(db, rosaId))).toEqual([]);
+    expect(await app((db) => comisionesPendientes(db, rosaId))).toEqual([]);
     expect(await app((db) => comisionesPendientes(db))).toEqual([
       {
         mes: '2026-11-01',
@@ -359,7 +365,7 @@ describe('comisiones', () => {
       },
     ]);
     await pagar(c.corteId, perlaId);
-    expect(await app((db) => pendientesDeVendedora(db, perlaId))).toEqual([]);
+    expect(await app((db) => comisionesPendientes(db, perlaId))).toEqual([]);
     expect(await app((db) => comisionesPendientes(db))).toEqual([]);
   });
 
