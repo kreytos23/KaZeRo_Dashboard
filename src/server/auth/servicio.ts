@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, inArray, isNull, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull, lt, sql, type SQL } from 'drizzle-orm';
 import type { Db, Ejecutor } from '@/db/pool';
 import { accesoLog, admin, codigoRecuperacion, sesion } from '@/db/schema';
 import { descifrar } from './cifrado';
@@ -54,59 +54,57 @@ export function registrarAcceso(db: Ejecutor, email: string, evento: Evento, red
     .values({ email, evento, ip: red.ip, userAgent: red.userAgent, createdAt: ahora });
 }
 
-/** Minutos de bloqueo restantes (0 = libre). Cuenta fallos desde el último login_ok dentro de la ventana. */
-async function minutosBloqueo(db: Ejecutor, email: string, ahora: Date): Promise<number> {
+const LIMITE_CORREO = { max: POLITICA.maxFallos, ventanaMin: POLITICA.ventanaMin, cortaEnLoginOk: true };
+const LIMITE_IP = { max: MAX_FALLOS_IP, ventanaMin: VENTANA_IP_MIN, cortaEnLoginOk: false };
+
+/**
+ * Minutos de bloqueo restantes (0 = libre) para las filas que cumplan `donde` (un correo o una IP): cuenta
+ * password_fallido/totp_fallido dentro de la ventana. Por correo, además, el último login_ok corta el conteo.
+ */
+async function minutosBloqueo(
+  db: Ejecutor,
+  ahora: Date,
+  donde: SQL,
+  l: { max: number; ventanaMin: number; cortaEnLoginOk: boolean },
+): Promise<number> {
+  const eventos: Evento[] = l.cortaEnLoginOk
+    ? ['login_ok', 'password_fallido', 'totp_fallido']
+    : ['password_fallido', 'totp_fallido'];
   const filas = await db
     .select({ evento: accesoLog.evento, createdAt: accesoLog.createdAt })
     .from(accesoLog)
     .where(
       and(
-        eq(accesoLog.email, email),
-        gt(accesoLog.createdAt, masMinutos(ahora, -POLITICA.ventanaMin)),
-        inArray(accesoLog.evento, ['login_ok', 'password_fallido', 'totp_fallido']),
+        donde,
+        gt(accesoLog.createdAt, masMinutos(ahora, -l.ventanaMin)),
+        inArray(accesoLog.evento, eventos),
       ),
     )
     // Desempate determinista: en el mismo instante, los fallos van antes que el login_ok (false < true),
     // así un login_ok simultáneo no corta el conteo según el orden físico de las filas.
     .orderBy(desc(accesoLog.createdAt), sql`(${accesoLog.evento} = 'login_ok')`)
-    .limit(POLITICA.maxFallos + 1);
+    .limit(l.max + 1);
   const fallos: Date[] = [];
   for (const f of filas) {
     if (f.evento === 'login_ok') break;
     fallos.push(f.createdAt);
   }
-  if (fallos.length < POLITICA.maxFallos) return 0;
-  const libreEn = masMinutos(fallos[POLITICA.maxFallos - 1]!, POLITICA.ventanaMin).getTime();
+  if (fallos.length < l.max) return 0;
+  // Con ≥ max fallos, el bloqueo termina cuando el max-ésimo más reciente sale de la ventana.
+  const libreEn = masMinutos(fallos[l.max - 1]!, l.ventanaMin).getTime();
   return Math.max(1, Math.ceil((libreEn - ahora.getTime()) / MIN));
 }
 
-/**
- * Minutos de bloqueo por IP (0 = libre): cuenta password_fallido/totp_fallido de esa IP en la ventana.
- * IP nula → 0: no se puede limitar (el intento se registra igual).
- */
-export async function minutosBloqueoIp(db: Ejecutor, ip: string | null, ahora: Date): Promise<number> {
-  if (!ip) return 0;
-  const filas = await db
-    .select({ createdAt: accesoLog.createdAt })
-    .from(accesoLog)
-    .where(
-      and(
-        eq(accesoLog.ip, ip),
-        gt(accesoLog.createdAt, masMinutos(ahora, -VENTANA_IP_MIN)),
-        inArray(accesoLog.evento, ['password_fallido', 'totp_fallido']),
-      ),
-    )
-    .orderBy(desc(accesoLog.createdAt))
-    .limit(MAX_FALLOS_IP);
-  if (filas.length < MAX_FALLOS_IP) return 0;
-  // Con ≥ MAX fallos, el bloqueo termina cuando el MAX-ésimo más reciente sale de la ventana.
-  const libreEn = masMinutos(filas[MAX_FALLOS_IP - 1]!.createdAt, VENTANA_IP_MIN).getTime();
-  return Math.max(1, Math.ceil((libreEn - ahora.getTime()) / MIN));
-}
+const minutosBloqueoCorreo = (db: Ejecutor, email: string, ahora: Date) =>
+  minutosBloqueo(db, ahora, eq(accesoLog.email, email), LIMITE_CORREO);
+
+/** IP nula → 0: no se puede limitar (el intento se registra igual). */
+const minutosBloqueoIp = (db: Ejecutor, ip: string | null, ahora: Date) =>
+  ip ? minutosBloqueo(db, ahora, eq(accesoLog.ip, ip), LIMITE_IP) : Promise.resolve(0);
 
 /** Bloqueo combinado: el mayor entre el de correo y el de IP, para que el mensaje sea idéntico. */
 async function bloqueoTotal(tx: Ejecutor, email: string, ip: string | null, ahora: Date) {
-  return Math.max(await minutosBloqueo(tx, email, ahora), await minutosBloqueoIp(tx, ip, ahora));
+  return Math.max(await minutosBloqueoCorreo(tx, email, ahora), await minutosBloqueoIp(tx, ip, ahora));
 }
 
 type ResultadoLogin =
@@ -295,7 +293,7 @@ export async function reautenticarAdmin(
   if (!fila) return { ok: false, motivo: 'credenciales' };
   const email = fila.email.toLowerCase();
   await bloquearCorreo(tx, email);
-  const bloqueo = await minutosBloqueo(tx, email, ahora);
+  const bloqueo = await minutosBloqueoCorreo(tx, email, ahora);
   if (bloqueo > 0) {
     await registrarAcceso(tx, email, 'bloqueado', red, ahora);
     return { ok: false, motivo: 'bloqueado', minutosRestantes: bloqueo };
