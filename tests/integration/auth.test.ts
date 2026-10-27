@@ -315,11 +315,13 @@ describe('límite de intentos por IP', () => {
       ),
     );
     expect(r).toMatchObject({ ok: false, motivo: 'bloqueado' });
-    // El código no se quemó: desde otra IP el mismo código sigue valiendo.
+    // El bloqueo revoca ese pre-token pero no quema el paso TOTP: un login nuevo desde otra IP acepta el mismo código.
+    const pre2 = await entrar(IP_B);
+    if (!pre2.ok) throw new Error('login falló');
     const otra = await app((db) =>
       verificarSegundoFactor(
         db,
-        { preToken: pre.preToken, codigo: generarCodigoTotp(secreto, t), ip: IP_B, userAgent: 'v' },
+        { preToken: pre2.preToken, codigo: generarCodigoTotp(secreto, t), ip: IP_B, userAgent: 'v' },
         llaveTotp(),
         t,
       ),
