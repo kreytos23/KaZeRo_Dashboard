@@ -118,7 +118,7 @@ export interface Dependencias {
 }
 
 /** El reporte lleva datos personales: solo se escribe donde git lo ignora. */
-function exigirIgnoradoGit(ruta: string) {
+export function exigirIgnoradoGit(ruta: string) {
   try {
     execFileSync('git', ['check-ignore', '-q', '--no-index', ruta], { stdio: 'ignore' });
   } catch {

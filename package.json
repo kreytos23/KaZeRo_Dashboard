@@ -24,7 +24,8 @@
     "admin:crear": "tsx scripts/crear-admin.ts",
     "bd:configurar": "tsx scripts/configurar-bd.ts",
     "smoke": "tsx scripts/smoke.ts",
-    "excel:migrar": "tsx scripts/migrar-excel.ts"
+    "excel:migrar": "tsx scripts/migrar-excel.ts",
+    "excel:kzr": "tsx scripts/importar-kzr.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.2.0",
