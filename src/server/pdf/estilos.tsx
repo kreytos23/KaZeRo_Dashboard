@@ -8,7 +8,6 @@ export const estilos = StyleSheet.create({
   pagina: { padding: 36, paddingBottom: 54, fontFamily: 'Helvetica', fontSize: 10, color: '#222' },
   marca: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 },
   logo: { height: 34 },
-  marcaNombre: { fontFamily: 'Helvetica-Bold', fontSize: 16 },
   lema: { fontSize: 10, color: COLOR_SUAVE },
   titulo: { fontFamily: 'Helvetica-Bold', fontSize: 16, marginTop: 4 },
   meta: { fontSize: 10, color: COLOR_SUAVE, marginTop: 2 },
@@ -71,7 +70,6 @@ export function Encabezado({ logo, titulo, meta }: { logo: Buffer; titulo: strin
         {/* eslint-disable-next-line jsx-a11y/alt-text */}
         <Image src={logo} style={estilos.logo} />
         <View>
-          <Text style={estilos.marcaNombre}>KaZeRo</Text>
           <Text style={estilos.lema}>{LEMA}</Text>
         </View>
       </View>

@@ -1,6 +1,7 @@
 import { Document, Page, Text, View } from '@react-pdf/renderer';
 import { formatoMXN, porcentajeLegible } from '@/domain/dinero';
 import { hoyMX } from '@/domain/fechas';
+import { formatoFolio } from '@/domain/pedidos';
 import type { ReporteComisiones, VendedoraComision } from '@/server/comisiones/lecturas';
 import { fechaCorta } from './DeudoresPdf';
 import { Encabezado, Fila, Pie, estilos } from './estilos';
@@ -20,7 +21,7 @@ const estadoPago = (v: VendedoraComision) =>
 
 const A_RESUMEN = [34, 8, 12, 23, 23];
 const L_RESUMEN: ('l' | 'r')[] = ['l', 'r', 'r', 'r', 'r'];
-const A_DETALLE = [10, 34, 20, 18, 18];
+const A_DETALLE = [12, 32, 20, 18, 18];
 const L_DETALLE: ('l' | 'r')[] = ['l', 'l', 'l', 'r', 'r'];
 
 export function ComisionesPdf({ r, logo }: { r: ReporteComisiones; logo: Buffer }) {
@@ -74,7 +75,7 @@ export function ComisionesPdf({ r, logo }: { r: ReporteComisiones; logo: Buffer 
                     anchos={A_DETALLE}
                     alinear={L_DETALLE}
                     celdas={[
-                      String(p.folio),
+                      formatoFolio(p.folio),
                       p.clienteNombre,
                       fechaCorta(p.fechaLiquidacion),
                       formatoMXN(p.baseCentavos),
