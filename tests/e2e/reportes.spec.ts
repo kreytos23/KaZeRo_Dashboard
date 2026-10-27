@@ -6,6 +6,7 @@ import {
   abrirAccion,
   elegirOpcion,
   irA,
+  mesAbiertoComisiones,
   RUTA_ESTADO,
   sembrarCliente,
   sembrarPedidoConAbonos,
@@ -85,12 +86,13 @@ test.describe('reportes', () => {
   }, info) => {
     const m = marca(info.project.name);
     const sufijo = `${m}${info.retry ? ` r${info.retry}` : ''}`;
-    // Un mes cerrado no se reabre y la BD sobrevive al reintento: el intento 0 cierra hace 2 meses y el
-    // reintento (CI permite uno) el mes siguiente, que ya es el abierto. El pedido liquidado hace 2 meses
-    // entra en el cierre que toque, así que cada intento ejecuta el flujo completo.
-    expect(info.retry, 'solo hay dos meses terminados que cerrar en orden').toBeLessThanOrEqual(1);
+    // Un mes cerrado no se reabre y la BD sobrevive al reintento: se cierra el mes que la BD tenga abierto
+    // (hace 2 meses en el primer intento, el siguiente si el anterior llegó a cerrar). El pedido liquidado
+    // hace 2 meses entra en el cierre que toque, así que cada intento ejecuta el flujo completo.
     const { dia } = mesPasado(2);
-    const { mes, nombre } = mesPasado(2 - info.retry);
+    const abierto = await mesAbiertoComisiones();
+    const mes = abierto.slice(0, 7);
+    const nombre = nombreMes(abierto);
     mesCerrado = mes;
     const clienta = await sembrarCliente(`Clienta Com ${sufijo}`);
     // Liquidado el día 10 de hace 2 meses: $149 al 10 % = $14.90.

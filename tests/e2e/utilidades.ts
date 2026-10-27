@@ -159,6 +159,12 @@ async function servicios() {
 }
 const dueno = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(process.env.DATABASE_URL_OWNER!, fn);
 
+/** Mes de comisiones abierto ahora (`AAAA-MM-01`), preguntado a la BD: no depende de cuántos intentos van. */
+export async function mesAbiertoComisiones(): Promise<string> {
+  const { mesesComisiones } = await import('../../src/server/comisiones/lecturas');
+  return dueno(async (db) => (await mesesComisiones(db)).abierto);
+}
+
 export async function sembrarVendedor(nombre: string): Promise<string> {
   const s = await servicios();
   return dueno((db) => s.vendedores.crearVendedor(db, { nombre, tipo: 'casa', comisionPct: '0.00' }));
