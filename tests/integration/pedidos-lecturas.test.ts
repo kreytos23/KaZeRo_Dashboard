@@ -6,6 +6,7 @@ import { crearExhibidor, enviarPiezas, obtenerExhibidor } from '@/server/exhibid
 import { registrarPagoDePedido } from '@/server/pagos/servicio';
 import {
   apartadasDeExhibidor,
+  contarPedidos,
   listarPedidos,
   obtenerPedidoPorFolio,
   previsualizarPedido,
@@ -123,6 +124,23 @@ describe('lecturas de pedidos', () => {
     expect((await app((db) => obtenerPedidoPorFolio(db, b.folio)))!.pagos).toHaveLength(1);
     expect(await app((db) => obtenerPedidoPorFolio(db, 99999))).toBeNull();
     expect((await app((db) => listarPedidos(db, { conSaldo: true }))).map((x) => x.folio)).toEqual([a.folio]);
+    // El conteo comparte el WHERE del listado y no depende de limite/offset.
+    for (const fl of [
+      { conSaldo: true },
+      { estado: 'liquidado' as const },
+      { q: 'tanya' },
+      { q: 'nadie' },
+      {},
+    ]) {
+      expect(await app((db) => contarPedidos(db, fl))).toBe(
+        (await app((db) => listarPedidos(db, fl))).length,
+      );
+    }
+    expect(await app((db) => contarPedidos(db, { conSaldo: true }))).toBe(1);
+    expect(await app((db) => contarPedidos(db, { limite: 1, offset: 1 }))).toBe(2);
+    expect((await app((db) => listarPedidos(db, { limite: 1, offset: 1 }))).map((x) => x.folio)).toEqual([
+      a.folio,
+    ]);
     expect((await app((db) => listarPedidos(db, { estado: 'liquidado' }))).map((x) => x.folio)).toEqual([
       b.folio,
     ]);

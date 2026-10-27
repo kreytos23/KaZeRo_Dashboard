@@ -13,6 +13,7 @@ import {
   altaPieza,
   cambiarEstado,
   deshacerUltimoCambio,
+  contarPiezas,
   listarPiezas,
   obtenerPiezaPorCodigo,
 } from '@/server/piezas/servicio';
@@ -330,6 +331,22 @@ describe('ubicación visible', () => {
     expect((await app((db) => listarPiezas(db, { ubicacion: 'kazero' }))).map((p) => p.codigo)).toEqual([
       'CUC3',
     ]);
+    // El conteo usa los mismos filtros que el listado y no depende de limite/offset.
+    for (const fl of [
+      { ubicacion: 'vendedora' as const, vendedorId: ids.nelly },
+      { ubicacion: 'vendedora' as const },
+      { ubicacion: 'kazero' as const },
+      { q: 'cuc' },
+      {},
+    ]) {
+      expect(await app((db) => contarPiezas(db, fl))).toBe((await app((db) => listarPiezas(db, fl))).length);
+    }
+    expect(await app((db) => contarPiezas(db, { ubicacion: 'vendedora' }))).toBe(2);
+    expect(await app((db) => contarPiezas(db, {}))).toBe(3);
+    expect((await app((db) => listarPiezas(db, { limite: 1, offset: 2 }))).map((p) => p.codigo)).toEqual([
+      'CUC3',
+    ]);
+    expect(await app((db) => contarPiezas(db, { limite: 1, offset: 2 }))).toBe(3);
     expect((await app((db) => obtenerPiezaPorCodigo(db, 'CUC1')))!.ubicacionEtiqueta).toBe('Con Nelly');
   });
 

@@ -1,15 +1,17 @@
 import Link from 'next/link';
 import { conDbLectura } from '@/db/client';
 import { formatoMXN, numericACentavos } from '@/domain/dinero';
+import { acotarPagina } from '@/domain/paginacion';
 import { FotoPieza } from '@/features/imagenes/FotoPieza';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { CampoConLista } from '@/features/ui/CampoConLista';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
+import { Paginacion } from '@/features/ui/Paginacion';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPieza, vistaUbicacion } from '@/features/ui/estado-visual';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarCatalogo } from '@/server/catalogos/servicio';
-import { listarPiezas } from '@/server/piezas/servicio';
+import { contarPiezas, listarPiezas } from '@/server/piezas/servicio';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { ETIQUETA_ESTADO, ETIQUETA_UBICACION_FILTRO } from './etiquetas';
 import { POR_PAGINA, idDeCatalogo, leerFiltros } from './filtros';
@@ -24,13 +26,13 @@ export default async function PaginaInventario({
   await requerirSesion();
   const f = leerFiltros(await searchParams);
   // Los filtros de catálogo llegan por nombre: se resuelven a id con las listas (que el formulario también usa).
-  const [catalogos, piezas, vendedoras] = await conDbLectura(async (db) => {
+  const [catalogos, piezas, vendedoras, total, pagina] = await conDbLectura(async (db) => {
     const cat = await Promise.all([
       listarCatalogo(db, 'categoria'),
       listarCatalogo(db, 'material'),
       listarCatalogo(db, 'proveedor'),
     ]);
-    const pz = await listarPiezas(db, {
+    const filtros = {
       q: f.q,
       estado: f.estado,
       ubicacion: f.ubicacion,
@@ -38,27 +40,22 @@ export default async function PaginaInventario({
       categoriaId: idDeCatalogo(cat[0], f.categoria),
       materialId: idDeCatalogo(cat[1], f.material),
       proveedorId: idDeCatalogo(cat[2], f.proveedor),
-      limite: POR_PAGINA,
-      offset: (f.pagina - 1) * POR_PAGINA,
-    });
-    const vs = await listarVendedores(db);
-    return [cat, pz, vs.filter((v) => v.tipo !== 'casa')] as const;
+    };
+    const pedir = (pag: number) =>
+      listarPiezas(db, { ...filtros, limite: POR_PAGINA, offset: (pag - 1) * POR_PAGINA });
+    // Total y página en paralelo (mismo WHERE); si la página pedida se pasa de la última, se vuelve a pedir.
+    const [n, primera, vs] = await Promise.all([
+      contarPiezas(db, filtros),
+      pedir(f.pagina),
+      listarVendedores(db),
+    ]);
+    const pag = acotarPagina(f.pagina, n, POR_PAGINA);
+    const pz = pag === f.pagina ? primera : await pedir(pag);
+    return [cat, pz, vs.filter((v) => v.tipo !== 'casa'), n, pag] as const;
   });
   const [categorias, materiales, proveedores] = catalogos;
-  const conPagina = (p: number) => {
-    const qs = new URLSearchParams();
-    if (f.q) qs.set('q', f.q);
-    if (f.estado) qs.set('estado', f.estado);
-    if (f.ubicacion) qs.set('ubicacion', f.ubicacion);
-    if (f.vendedor) qs.set('vendedor', f.vendedor);
-    if (f.categoria) qs.set('categoria', f.categoria);
-    if (f.material) qs.set('material', f.material);
-    if (f.proveedor) qs.set('proveedor', f.proveedor);
-    qs.set('pagina', String(p));
-    return `?${qs}`;
-  };
   const filtrado = Boolean(
-    f.q || f.estado || f.categoria || f.material || f.proveedor || f.ubicacion || f.vendedor || f.pagina > 1,
+    f.q || f.estado || f.categoria || f.material || f.proveedor || f.ubicacion || f.vendedor || pagina > 1,
   );
   return (
     <section className="flex flex-col gap-6">
@@ -232,18 +229,20 @@ export default async function PaginaInventario({
           </div>
         </>
       )}
-      <nav aria-label="Páginas" className="flex gap-2">
-        {f.pagina > 1 && (
-          <Link href={conPagina(f.pagina - 1)} className="flex min-h-11 items-center px-3 enlace">
-            Anterior
-          </Link>
-        )}
-        {piezas.length === POR_PAGINA && (
-          <Link href={conPagina(f.pagina + 1)} className="flex min-h-11 items-center px-3 enlace">
-            Siguiente
-          </Link>
-        )}
-      </nav>
+      <Paginacion
+        pagina={pagina}
+        total={total}
+        porPagina={POR_PAGINA}
+        parametros={{
+          q: f.q,
+          estado: f.estado,
+          ubicacion: f.ubicacion,
+          vendedor: f.vendedor,
+          categoria: f.categoria,
+          material: f.material,
+          proveedor: f.proveedor,
+        }}
+      />
     </section>
   );
 }
