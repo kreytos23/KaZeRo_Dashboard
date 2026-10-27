@@ -45,6 +45,8 @@ export interface VendedoraComision extends ResumenVendedora {
 export interface ReporteComisiones {
   mes: string;
   nombre: string;
+  /** Id del corte (solo mes cerrado): lo necesita el formulario de pago. */
+  corteId: string | null;
   cerrado: boolean;
   cerradoAt: string | null;
   cerrable: boolean;
@@ -263,6 +265,7 @@ export async function reporteComisiones(
   return {
     mes,
     nombre: nombreMes(mes),
+    corteId: corte?.id ?? null,
     cerrado: !!corte,
     cerradoAt: corte ? corte.cerradoAt.toISOString() : null,
     cerrable,

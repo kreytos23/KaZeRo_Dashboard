@@ -59,3 +59,14 @@ export function vistaSaldo(estado: EstadoPedido, saldoCentavos: number): VistaSa
   const debe = estado === 'abierto' && saldoCentavos > 0;
   return { destacado: debe, rotulo: debe ? 'Por cobrar' : 'Sin saldo' };
 }
+
+export type EstadoPagoComision = 'pendiente' | 'pagado' | 'sin_comision' | 'estimado';
+
+const PAGO: Record<EstadoPagoComision, VistaEstado> = {
+  pendiente: { texto: 'Pago pendiente', tono: 'aviso', icono: 'abierto' },
+  pagado: { texto: 'Pagado', tono: 'exito', icono: 'check' },
+  sin_comision: { texto: 'Sin comisión', tono: 'neutro', icono: 'cuadro' },
+  estimado: { texto: 'Estimado', tono: 'secundario', icono: 'rombo' },
+};
+
+export const vistaEstadoPago = (estado: EstadoPagoComision): VistaEstado => PAGO[estado];

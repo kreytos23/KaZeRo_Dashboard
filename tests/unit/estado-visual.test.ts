@@ -3,6 +3,7 @@ import { ETIQUETA_ESTADO } from '@/app/panel/inventario/etiquetas';
 import { ETIQUETA_ESTADO_PEDIDO } from '@/app/panel/pedidos/etiquetas';
 import {
   vistaEstadoExhibidor,
+  vistaEstadoPago,
   vistaEstadoPedido,
   vistaEstadoPieza,
   vistaSaldo,
@@ -60,5 +61,18 @@ describe('vistaSaldo', () => {
     expect(vistaSaldo('abierto', 0).destacado).toBe(false);
     expect(vistaSaldo('liquidado', 0).destacado).toBe(false);
     expect(vistaSaldo('cancelado', 5000).destacado).toBe(false);
+  });
+});
+
+describe('vistaEstadoPago', () => {
+  it('pendiente (aviso), pagado (éxito), sin comisión (neutro) y estimado (informativo)', () => {
+    const e = ['pendiente', 'pagado', 'sin_comision', 'estimado'] as const;
+    const v = e.map(vistaEstadoPago);
+    expect(v.map((x) => x.tono)).toEqual(['aviso', 'exito', 'neutro', 'secundario']);
+    expect(v.map((x) => x.texto)).toEqual(['Pago pendiente', 'Pagado', 'Sin comisión', 'Estimado']);
+  });
+  it('cada estado con tono propio lleva un icono distinto', () => {
+    const iconos = (['pendiente', 'pagado', 'estimado'] as const).map((e) => vistaEstadoPago(e).icono);
+    expect(new Set(iconos).size).toBe(3);
   });
 });

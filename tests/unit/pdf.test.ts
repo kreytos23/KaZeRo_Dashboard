@@ -83,6 +83,7 @@ describe('PDF', () => {
   it('comisiones: bytes de un PDF (mes cerrado y pagado)', async () => {
     const r: ReporteComisiones = {
       mes: '2026-11-01',
+      corteId: 'corte-1',
       nombre: 'Noviembre 2026',
       cerrado: true,
       cerradoAt: '2026-12-02T10:00:00.000Z',
