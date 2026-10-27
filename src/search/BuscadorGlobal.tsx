@@ -144,7 +144,7 @@ export function BuscadorGlobal() {
         role="listbox"
         aria-label="Resultados"
         hidden={!visible}
-        className="lista-combo absolute inset-x-4 z-10 mt-1 overflow-hidden md:inset-x-auto md:w-full rounded-lg border border-borde bg-superficie shadow"
+        className="lista-combo absolute inset-x-4 mt-1 overflow-hidden md:inset-x-auto md:w-full rounded-lg border border-borde bg-superficie shadow"
       >
         {visible &&
           resultados.map((r, i) => (
