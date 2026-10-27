@@ -100,7 +100,7 @@ export function FormRegistrarPago(p: Props) {
   // La llave del Fragment cambia con la versión y con lo pagado: refresca valores y regenera la llave de idempotencia.
   const marca = `${p.version}-${p.saldo}`;
   return (
-    <section aria-labelledby="registrar-pago" className="flex flex-col gap-2">
+    <section aria-labelledby={p.abierto ? 'registrar-pago' : undefined} className="flex flex-col gap-2">
       {p.abierto && (
         <h2 id="registrar-pago" className="text-lg font-semibold">
           Registrar pago

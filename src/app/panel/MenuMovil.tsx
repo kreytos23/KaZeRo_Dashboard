@@ -104,7 +104,7 @@ export function MenuMovil({ children }: { children: React.ReactNode }) {
       <div
         ref={panel}
         id={idPanel}
-        className={`${abierto ? 'flex' : 'hidden'} absolute inset-x-0 top-full z-30 max-h-[calc(100dvh-4rem)] flex-col gap-2 overflow-y-auto border-b border-borde bg-white px-4 py-3 shadow-lg`}
+        className={`${abierto ? 'flex' : 'hidden'} absolute inset-x-0 top-full z-30 max-h-[calc(100dvh-4rem)] flex-col gap-2 overflow-y-auto border-b border-borde bg-superficie px-4 py-3 shadow-lg`}
       >
         <NavPanel vertical alElegir={() => setAbiertoEn(null)} />
         <div className="flex flex-col gap-1 border-t border-borde pt-2">{children}</div>

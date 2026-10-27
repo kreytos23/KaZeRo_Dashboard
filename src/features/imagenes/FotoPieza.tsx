@@ -19,8 +19,8 @@ export function FotoPieza({
 }) {
   const caja =
     variante === 'grande'
-      ? 'aspect-square w-full max-w-sm rounded-lg border border-borde bg-white object-contain'
-      : 'size-12 rounded border border-borde bg-white object-cover';
+      ? 'aspect-square w-full max-w-sm rounded-lg border border-borde bg-superficie object-contain'
+      : 'size-12 rounded border border-borde bg-superficie object-cover';
   if (!clave)
     return variante === 'grande' ? (
       <div className={`${caja} flex items-center justify-center text-meta text-tinta-suave`}>Sin foto</div>

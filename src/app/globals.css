@@ -30,6 +30,7 @@
   --color-tinta-suave: #6a5850; /* 6.3:1 sobre crema; 5.6:1 sobre rubor suave */
   --color-borde: #efdcd5; /* decorativo: separadores de tablas y tarjetas */
   --color-borde-campo: #998075; /* contorno de campos: ≥3:1 contra blanco y crema */
+  --color-superficie: #fff; /* fondo de campos, tarjetas y paneles */
 
   /* Estados: verde azulado y carmesí, distintos entre sí y del terracota de los botones. */
   --color-exito: #22663f;
@@ -266,7 +267,7 @@
   min-height: --spacing(11);
   border: 1px solid var(--color-borde-campo);
   border-radius: var(--radius-lg);
-  background-color: #fff;
+  background-color: var(--color-superficie);
   padding-inline: --spacing(3);
   font-variant-numeric: tabular-nums;
   color: var(--color-tinta);
@@ -297,7 +298,7 @@
 @utility tarjeta {
   border: 1px solid var(--color-borde);
   border-radius: var(--radius-xl);
-  background-color: #fff;
+  background-color: var(--color-superficie);
   box-shadow: 0 1px 2px rgb(165 78 41 / 0.06);
 }
 
@@ -305,9 +306,21 @@
 @utility fondo-acuarela {
   background-color: var(--color-crema);
   background-image:
-    radial-gradient(40rem 28rem at 0% 0%, rgb(242 207 200 / 0.55), transparent 70%),
-    radial-gradient(36rem 26rem at 100% 100%, rgb(195 217 180 / 0.45), transparent 70%),
-    radial-gradient(24rem 18rem at 100% 0%, rgb(235 179 105 / 0.18), transparent 70%);
+    radial-gradient(
+      40rem 28rem at 0% 0%,
+      color-mix(in srgb, var(--color-marca-rubor) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      36rem 26rem at 100% 100%,
+      color-mix(in srgb, var(--color-marca-menta) 45%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      24rem 18rem at 100% 0%,
+      color-mix(in srgb, var(--color-marca-durazno) 18%, transparent),
+      transparent 70%
+    );
 }
 
 /*
@@ -377,7 +390,7 @@
   min-height: --spacing(11);
   border: 1px solid var(--color-secundario);
   border-radius: var(--radius-lg);
-  background-color: #fff;
+  background-color: var(--color-superficie);
   padding-inline: --spacing(4);
   font-weight: 500;
   color: var(--color-secundario);
@@ -474,7 +487,7 @@
   width: 100%;
   border: 1px solid var(--color-borde-campo);
   border-radius: var(--radius-lg);
-  background-color: #fff;
+  background-color: var(--color-superficie);
   padding-inline: --spacing(3);
   color: var(--color-tinta);
   transition: var(--transicion-control);
@@ -566,7 +579,7 @@
     margin: 0;
     border: 1.5px solid var(--color-borde-campo);
     border-radius: 0.4rem;
-    background-color: #fff;
+    background-color: var(--color-superficie);
     transition:
       background-color var(--check-box) var(--ease-smooth-out),
       border-color var(--check-box) var(--ease-smooth-out),
@@ -623,7 +636,7 @@
     overflow: auto;
     border: 1px solid var(--color-borde);
     border-radius: var(--radius-xl);
-    background-color: #fff;
+    background-color: var(--color-superficie);
     padding: --spacing(1);
     box-shadow:
       0 8px 24px rgb(43 33 28 / 0.12),

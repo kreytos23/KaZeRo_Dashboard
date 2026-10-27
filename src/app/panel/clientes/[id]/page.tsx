@@ -107,9 +107,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
             <h2 id="saldo-favor" className="text-lg font-semibold">
               Saldo a favor
             </h2>
-            <p className="tarjeta p-4 text-3xl font-semibold tabular-nums">
-              Saldo a favor: {mxn(resumen.saldoFavor)}
-            </p>
+            <p className="tarjeta p-4 text-3xl font-semibold tabular-nums">{mxn(resumen.saldoFavor)}</p>
             <FormsSaldoFavor
               clienteId={c.id}
               saldo={resumen.saldoFavor}

@@ -15,7 +15,7 @@ export function MarcoAcceso({ children }: { children: React.ReactNode }) {
           loading="eager"
           className="h-auto w-32 sm:w-40"
         />
-        <div className="flex w-full flex-col gap-6 rounded-2xl border border-borde bg-white/90 p-6 shadow-[0_12px_40px_-16px_rgb(165_78_41/0.25)] sm:p-8">
+        <div className="flex w-full flex-col gap-6 rounded-2xl border border-borde bg-superficie/90 p-6 shadow-[0_12px_40px_-16px_rgb(165_78_41/0.25)] sm:p-8">
           {children}
         </div>
       </div>

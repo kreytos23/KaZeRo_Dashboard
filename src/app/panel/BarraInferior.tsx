@@ -28,7 +28,7 @@ export function BarraInferior() {
   return (
     <nav
       aria-label="Accesos rápidos"
-      className="fixed inset-x-0 bottom-0 z-20 border-t border-borde bg-white md:hidden"
+      className="fixed inset-x-0 bottom-0 z-20 border-t border-borde bg-superficie md:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
       <ul className="mx-auto flex max-w-md items-end justify-around px-2 pt-1 pb-1">

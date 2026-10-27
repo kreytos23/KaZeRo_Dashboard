@@ -31,7 +31,7 @@ export function TarjetaLealtad({ tarjeta }: { tarjeta: Tarjeta }) {
                 : k.estado === 'libre'
                   ? 'border-dashed border-borde-campo bg-crema'
                   : 'border-borde'
-            } ${k.estado === 'ocupada' ? 'bg-white' : ''}`}
+            } ${k.estado === 'ocupada' ? 'bg-superficie' : ''}`}
           >
             {k.conSaldo && (
               <span

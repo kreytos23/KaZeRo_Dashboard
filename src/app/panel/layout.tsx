@@ -37,7 +37,7 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
       >
         Saltar al contenido
       </a>
-      <header className="relative border-b border-borde bg-white">
+      <header className="relative border-b border-borde bg-superficie">
         {/* Filete con el degradado del monograma: el toque de marca sin cargar imágenes. */}
         <div
           aria-hidden="true"

@@ -76,7 +76,7 @@ export function BuscarPieza({ onElegir }: { onElegir: (codigo: string) => void }
         role="listbox"
         aria-label="Piezas encontradas"
         hidden={!visible}
-        className="lista-combo absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-borde bg-white shadow"
+        className="lista-combo absolute inset-x-0 top-full z-30 mt-1 overflow-hidden rounded-lg border border-borde bg-superficie shadow"
       >
         {visible &&
           resultados.map((r, i) => (

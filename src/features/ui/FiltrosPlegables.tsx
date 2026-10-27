@@ -47,7 +47,7 @@ export function FiltrosPlegables({
         onClick={(e) => {
           if (e.target === panel.current) panel.current.close();
         }}
-        className="fixed inset-x-0 top-auto bottom-0 m-0 max-h-[85dvh] w-full max-w-none overflow-y-auto rounded-t-2xl bg-white p-4 text-tinta backdrop:bg-tinta/35 md:hidden"
+        className="fixed inset-x-0 top-auto bottom-0 m-0 max-h-[85dvh] w-full max-w-none overflow-y-auto rounded-t-2xl bg-superficie p-4 text-tinta backdrop:bg-tinta/35 md:hidden"
       >
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 id="titulo-filtros" className="text-lg font-semibold">
