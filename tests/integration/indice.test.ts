@@ -37,15 +37,15 @@ describe('índice de búsqueda', () => {
         precioCentavos: 100,
       }),
     );
-    const cid = await app((db) => crearCliente(db, { nombre: 'Danya', referencia: '5to norte' }));
+    const cid = await app((db) => crearCliente(db, { nombre: 'Clienta', referencia: '5to norte' }));
     const vid = await app((db) =>
-      crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
+      crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' }),
     );
     expect(await app((db) => construirIndice(db))).toEqual({
       v: 4,
       piezas: [[pid.id, 'IX01', 'Anillo luna', 'disponible', null, null]],
-      clientes: [[cid, 'Danya', '5to norte']],
-      vendedores: [[vid, 'Nelly']],
+      clientes: [[cid, 'Clienta', '5to norte']],
+      vendedores: [[vid, 'Perla']],
       pedidos: [],
     });
   });
@@ -162,7 +162,7 @@ describe('GET /api/busqueda/indice', () => {
 
   it('sesión completa → 200, JSON y private, no-store', async () => {
     cookieActual = await sesionCon('completa');
-    await app((db) => crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }));
+    await app((db) => crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' }));
     const { GET } = await import('@/app/api/busqueda/indice/route');
     const res = await GET();
     expect(res.status).toBe(200);

@@ -41,6 +41,11 @@ export function uuidOpcionalDe(fd: FormData, campo: string): string | null {
   return texto(fd, campo) === '' ? null : uuidDe(fd, campo);
 }
 
+/** Uuid de un parámetro de URL: ausente o inválido → null (sin filtro). */
+export function uuidOpcional(valor: string | null | undefined): string | null {
+  return valor && UUID.test(valor) ? valor : null;
+}
+
 /** `version` del bloqueo optimista: entero positivo. */
 export function versionDe(fd: FormData): number {
   const v = texto(fd, 'version');

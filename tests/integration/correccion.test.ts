@@ -41,10 +41,10 @@ async function nueva(codigo = 'CO01') {
 }
 async function exhibidorCon(...codigos: string[]) {
   const vendedorId = await app((db) =>
-    crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
+    crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' }),
   );
   const exhibidorId = await app((db) =>
-    crearExhibidor(db, { vendedorId, nombre: 'Exh Nelly', fechaEnvio: '2026-10-11' }),
+    crearExhibidor(db, { vendedorId, nombre: 'Exh Perla', fechaEnvio: '2026-10-11' }),
   );
   await app((db) => enviarPiezas(db, { exhibidorId, codigos }));
   return exhibidorId;
@@ -230,7 +230,7 @@ describe('corrección concurrente con exhibidores (orden exhibidor → pieza)', 
     expect(cierre).toMatchObject({ status: 'fulfilled' });
     expect(correccion).toMatchObject({
       status: 'fulfilled',
-      value: { aEstado: 'disponible', exhibidorNombre: 'Exh Nelly', exhibidorCerrado: true },
+      value: { aEstado: 'disponible', exhibidorNombre: 'Exh Perla', exhibidorCerrado: true },
     });
     expect(await ficha('CO01')).toMatchObject({ estado: 'disponible', exhibidorId: null });
   });

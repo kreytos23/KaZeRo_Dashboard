@@ -1,5 +1,6 @@
 import type { EstadoPieza } from '@/server/piezas/servicio';
 import type { EstadoPedido } from '@/server/pedidos/comun';
+import type { EstadoPagoComision } from '@/domain/comisiones';
 import type { Ubicacion } from '@/domain/ubicacion';
 
 /** Tono semántico: el color nunca va solo, siempre con un icono de forma distinta y el texto. */
@@ -59,3 +60,12 @@ export function vistaSaldo(estado: EstadoPedido, saldoCentavos: number): VistaSa
   const debe = estado === 'abierto' && saldoCentavos > 0;
   return { destacado: debe, rotulo: debe ? 'Por cobrar' : 'Sin saldo' };
 }
+
+const PAGO: Record<EstadoPagoComision, VistaEstado> = {
+  pendiente: { texto: 'Pago pendiente', tono: 'aviso', icono: 'abierto' },
+  pagado: { texto: 'Pagado', tono: 'exito', icono: 'check' },
+  sin_comision: { texto: 'Sin comisión', tono: 'neutro', icono: 'cuadro' },
+  estimado: { texto: 'Estimado', tono: 'secundario', icono: 'rombo' },
+};
+
+export const vistaEstadoPago = (estado: EstadoPagoComision): VistaEstado => PAGO[estado];

@@ -132,7 +132,7 @@ describe('bitácora por trigger (R-08)', () => {
     const [v] = await app((db) =>
       db
         .insert(vendedor)
-        .values({ nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' })
+        .values({ nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' })
         .returning({ id: vendedor.id }),
     );
     const e = await capturar(() =>
@@ -141,10 +141,10 @@ describe('bitácora por trigger (R-08)', () => {
     expect(traducirErrorPg(e)?.codigo).toBe('auditoria_motivo_dinero');
     await editar(
       { adminId },
-      sql`UPDATE vendedor SET nombre = 'Nelly R', activo = false WHERE id = ${v!.id}`,
+      sql`UPDATE vendedor SET nombre = 'Perla R', activo = false WHERE id = ${v!.id}`,
     );
     expect((await bitacora(v!.id)).map((f) => [f.campo, f.antes, f.despues, f.motivo])).toEqual([
-      ['nombre', 'Nelly', 'Nelly R', null],
+      ['nombre', 'Perla', 'Perla R', null],
       ['activo', 'true', 'false', null],
     ]);
   });

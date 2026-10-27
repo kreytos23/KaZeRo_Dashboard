@@ -127,6 +127,20 @@
       "when": 1792740946789,
       "tag": "0017_ajustes_reunion_reglas",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793090077290,
+      "tag": "0018_clammy_maverick",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793090090024,
+      "tag": "0019_comisiones_reglas",
+      "breakpoints": true
     }
   ]
 }

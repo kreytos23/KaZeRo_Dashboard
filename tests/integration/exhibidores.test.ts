@@ -18,7 +18,7 @@ const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn)
 
 async function preparar() {
   const vendedorId = await app((db) =>
-    crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
+    crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' }),
   );
   for (const codigo of ['EX01', 'EX02', 'EX03']) {
     await app((db) =>
@@ -32,7 +32,7 @@ async function preparar() {
     );
   }
   const exhibidorId = await app((db) =>
-    crearExhibidor(db, { vendedorId, nombre: 'Exhibidor Nelly - 16sep', fechaEnvio: '2026-09-16' }),
+    crearExhibidor(db, { vendedorId, nombre: 'Exhibidor Perla - 16sep', fechaEnvio: '2026-09-16' }),
   );
   return { vendedorId, exhibidorId };
 }
@@ -48,12 +48,12 @@ describe('exhibidores', () => {
       enviadas: 2,
     });
     const p = (await app((db) => obtenerPiezaPorCodigo(db, 'EX01')))!;
-    expect(p).toMatchObject({ estado: 'en_exhibidor', exhibidorNombre: 'Exhibidor Nelly - 16sep' });
+    expect(p).toMatchObject({ estado: 'en_exhibidor', exhibidorNombre: 'Exhibidor Perla - 16sep' });
     expect((await app((db) => historial(db, p.id)))[0]).toMatchObject({
       tipo: 'envio_exhibidor',
       deEstado: 'disponible',
       aEstado: 'en_exhibidor',
-      exhibidorNombre: 'Exhibidor Nelly - 16sep',
+      exhibidorNombre: 'Exhibidor Perla - 16sep',
     });
     const e = (await app((db) => obtenerExhibidor(db, exhibidorId)))!;
     expect(e.piezasActuales).toBe(2);
@@ -136,7 +136,7 @@ describe('exhibidores', () => {
       tipo: 'regreso',
       deEstado: 'en_exhibidor',
       aEstado: 'disponible',
-      exhibidorNombre: 'Exhibidor Nelly - 16sep',
+      exhibidorNombre: 'Exhibidor Perla - 16sep',
     });
   });
 

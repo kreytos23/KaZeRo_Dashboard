@@ -124,9 +124,9 @@ describe('ubicación en el inventario (Plan 3.1)', () => {
     expect(f.ubicacion).toBe('vendedora');
   });
   it('los movimientos de custodia nombran a la vendedora y la devolución a su pedido', () => {
-    const m = { vendedorNombre: 'Nelly', pedidoFolio: 5 };
-    expect(textoMovimiento({ ...m, tipo: 'entrega_vendedora' })).toBe('Entregada a Nelly');
-    expect(textoMovimiento({ ...m, tipo: 'regreso_vendedora' })).toBe('Regresó a Kazero de Nelly');
+    const m = { vendedorNombre: 'Perla', pedidoFolio: 5 };
+    expect(textoMovimiento({ ...m, tipo: 'entrega_vendedora' })).toBe('Entregada a Perla');
+    expect(textoMovimiento({ ...m, tipo: 'regreso_vendedora' })).toBe('Regresó a Kazero de Perla');
     expect(textoMovimiento({ ...m, tipo: 'devolucion' })).toBe('Devuelta por defecto (KZR-5)');
     expect(textoMovimiento({ ...m, tipo: 'alta' })).toBe('Alta');
     expect(textoMovimiento({ vendedorNombre: null, pedidoFolio: null, tipo: 'entrega_vendedora' })).toBe(

@@ -339,14 +339,14 @@ describe('importar notas KZR', () => {
     ]);
   });
 
-  it('vendedora por prefijo: «Nelly» liga a «Nelly Zavala»; «Nel» no', async () => {
-    const nelly = await app((db) =>
-      crearVendedor(db, { nombre: 'Nelly Zavala', tipo: 'revendedora', comisionPct: '10.00' }),
+  it('vendedora por prefijo: «Perla» liga a «Perla Ejemplo»; «Per» no', async () => {
+    const perla = await app((db) =>
+      crearVendedor(db, { nombre: 'Perla Ejemplo', tipo: 'revendedora', comisionPct: '10.00' }),
     );
-    expect(await erroresDe([fila(2, { vendedor: 'Nel - Ana' })])).toEqual(['vendedor_no_encontrado']);
-    await aplicar([fila(2, { vendedor: 'Nelly - Ana' })]);
+    expect(await erroresDe([fila(2, { vendedor: 'Per - Ana' })])).toEqual(['vendedor_no_encontrado']);
+    await aplicar([fila(2, { vendedor: 'Perla - Ana' })]);
     const r = (await owner((db) => db.execute(sql`SELECT vendedor_id FROM pedido`))).rows;
-    expect(r).toEqual([{ vendedor_id: nelly }]);
+    expect(r).toEqual([{ vendedor_id: perla }]);
   });
 
   it('crea el cliente que falta (una vez por nombre), con origen_excel y tarjeta desde su primera nota', async () => {

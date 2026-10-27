@@ -82,21 +82,21 @@ describe('textos de la corrección', () => {
       describirDestino({ aEstado: 'disponible', exhibidorId: null, exhibidorCerrado: false }, null),
     ).toBe('La pieza volverá a Disponible.');
     expect(
-      describirDestino({ aEstado: 'en_exhibidor', exhibidorId: EX, exhibidorCerrado: false }, 'Exh Nelly'),
-    ).toBe('La pieza volverá al exhibidor Exh Nelly.');
+      describirDestino({ aEstado: 'en_exhibidor', exhibidorId: EX, exhibidorCerrado: false }, 'Exh Perla'),
+    ).toBe('La pieza volverá al exhibidor Exh Perla.');
     expect(
-      describirDestino({ aEstado: 'disponible', exhibidorId: null, exhibidorCerrado: true }, 'Exh Nelly'),
-    ).toBe('La pieza volverá a Disponible: el exhibidor Exh Nelly ya está cerrado.');
+      describirDestino({ aEstado: 'disponible', exhibidorId: null, exhibidorCerrado: true }, 'Exh Perla'),
+    ).toBe('La pieza volverá a Disponible: el exhibidor Exh Perla ya está cerrado.');
   });
   it('confirma lo que pasó', () => {
     expect(mensajeCorreccion({ aEstado: 'disponible', exhibidorNombre: null, exhibidorCerrado: false })).toBe(
       'Cambio deshecho: la pieza volvió a Disponible.',
     );
     expect(
-      mensajeCorreccion({ aEstado: 'en_exhibidor', exhibidorNombre: 'Exh Nelly', exhibidorCerrado: false }),
-    ).toBe('Cambio deshecho: la pieza volvió al exhibidor Exh Nelly.');
+      mensajeCorreccion({ aEstado: 'en_exhibidor', exhibidorNombre: 'Exh Perla', exhibidorCerrado: false }),
+    ).toBe('Cambio deshecho: la pieza volvió al exhibidor Exh Perla.');
     expect(
-      mensajeCorreccion({ aEstado: 'disponible', exhibidorNombre: 'Exh Nelly', exhibidorCerrado: true }),
-    ).toBe('Cambio deshecho. El exhibidor Exh Nelly está cerrado: la pieza quedó disponible.');
+      mensajeCorreccion({ aEstado: 'disponible', exhibidorNombre: 'Exh Perla', exhibidorCerrado: true }),
+    ).toBe('Cambio deshecho. El exhibidor Exh Perla está cerrado: la pieza quedó disponible.');
   });
 });

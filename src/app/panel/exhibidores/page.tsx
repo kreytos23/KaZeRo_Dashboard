@@ -55,7 +55,7 @@ export default async function PaginaExhibidores({
             name="nombre"
             required
             maxLength={120}
-            placeholder="Exhibidor Nelly - 16sep"
+            placeholder="Exhibidor Perla - 16sep"
           />
           <Campo etiqueta="Fecha de envío" name="fechaEnvio" type="date" defaultValue={hoyMX()} required />
         </FormAccion>

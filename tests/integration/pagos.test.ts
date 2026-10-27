@@ -61,9 +61,9 @@ beforeEach(async () => {
   adminId = await reiniciarConAdmin();
   ctx = {
     vendedorId: await app((db) =>
-      crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
+      crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' }),
     ),
-    clienteId: await app((db) => crearCliente(db, { nombre: 'Danya' })),
+    clienteId: await app((db) => crearCliente(db, { nombre: 'Clienta' })),
   };
 });
 
@@ -120,7 +120,7 @@ describe('registrarPagoDePedido', () => {
       fecha: '2026-10-01',
       metodo: 'transferencia',
       pagadorTipo: 'cliente',
-      pagadorNombre: 'Danya',
+      pagadorNombre: 'Clienta',
     });
   });
 
@@ -135,7 +135,7 @@ describe('registrarPagoDePedido', () => {
       }),
     );
     const exhibidorId = await app((db) =>
-      crearExhibidor(db, { vendedorId: ctx.vendedorId, nombre: 'Nelly 1', fechaEnvio: '2026-10-01' }),
+      crearExhibidor(db, { vendedorId: ctx.vendedorId, nombre: 'Perla 1', fechaEnvio: '2026-10-01' }),
     );
     await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['PG02'] }));
     const p = await app((db) =>

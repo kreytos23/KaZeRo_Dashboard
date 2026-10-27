@@ -161,7 +161,7 @@ describe('crearPedido', () => {
   });
 
   it('R-05 concurrencia entre clientes distintos (sin el bloqueo del cliente): decide el bloqueo de la pieza', async () => {
-    const otro = await app((db) => crearCliente(db, { nombre: 'Nelly Pérez' }));
+    const otro = await app((db) => crearCliente(db, { nombre: 'Perla Pérez' }));
     const [a, b] = await piezas(`C0X`, 2);
     const r = await Promise.allSettled([
       crear({ codigos: [a!, b!] }),
@@ -362,7 +362,7 @@ describe('crearPedido', () => {
   it('una pieza en exhibidor queda apartada conservando su exhibidor', async () => {
     const [a] = await piezas('PM', 1);
     const exhibidorId = await app((db) =>
-      crearExhibidor(db, { vendedorId: ctx.vendedorId, nombre: 'Nelly', fechaEnvio: '2026-10-01' }),
+      crearExhibidor(db, { vendedorId: ctx.vendedorId, nombre: 'Perla', fechaEnvio: '2026-10-01' }),
     );
     await app((db) => enviarPiezas(db, { exhibidorId, codigos: [a!] }));
     await crear({ codigos: [a!] });

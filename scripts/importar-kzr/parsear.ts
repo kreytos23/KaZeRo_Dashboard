@@ -1,6 +1,6 @@
 /**
  * Parseo y validación puros de las filas del Excel de notas KZR (sin BD): folio de la nota, tarjeta de
- * lealtad «N dd/mm/aaaa», vendedora «Nelly - Ana», estatus, agrupación por nota y consistencia entre filas.
+ * lealtad «N dd/mm/aaaa», vendedora «Perla - Ana», estatus, agrupación por nota y consistencia entre filas.
  */
 import { createHash } from 'node:crypto';
 import { normalizarCodigo } from '../../src/domain/codigos';
@@ -44,7 +44,7 @@ export function parsearTarjeta(
   return { ok: true, lugar, fecha };
 }
 
-/** «Nelly - Ana» → vendedora «Nelly» (lo de después es la compradora y se ignora). Sin « - », todo el texto. */
+/** «Perla - Ana» → vendedora «Perla» (lo de después es la compradora y se ignora). Sin « - », todo el texto. */
 export function partirVendedor(t: string): { vendedora: string; comprador: string | null } {
   const m = /^(.*?)\s+-\s+(.*)$/.exec(t.trim());
   if (!m) return { vendedora: t.trim(), comprador: null };

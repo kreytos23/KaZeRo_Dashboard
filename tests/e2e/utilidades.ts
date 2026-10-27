@@ -159,6 +159,12 @@ async function servicios() {
 }
 const dueno = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(process.env.DATABASE_URL_OWNER!, fn);
 
+/** Mes de comisiones abierto ahora (`AAAA-MM-01`), preguntado a la BD: no depende de cuántos intentos van. */
+export async function mesAbiertoComisiones(): Promise<string> {
+  const { mesesComisiones } = await import('../../src/server/comisiones/lecturas');
+  return dueno(async (db) => (await mesesComisiones(db)).abierto);
+}
+
 export async function sembrarVendedor(nombre: string): Promise<string> {
   const s = await servicios();
   return dueno((db) => s.vendedores.crearVendedor(db, { nombre, tipo: 'casa', comisionPct: '0.00' }));
@@ -194,7 +200,7 @@ export async function sembrarPiezas(
     );
 }
 
-async function pedidoDe(clienteId: string, vendedorId: string, codigos: string[]) {
+async function pedidoDe(clienteId: string, vendedorId: string, codigos: string[], fecha?: string) {
   const s = await servicios();
   const { adminId } = datosAdmin();
   return dueno((db) =>
@@ -203,6 +209,7 @@ async function pedidoDe(clienteId: string, vendedorId: string, codigos: string[]
       adminId,
       clienteId,
       vendedorId,
+      fecha,
       codigos,
       cuentaTarjeta: true,
       descuentoManualCentavos: 0,
@@ -254,4 +261,34 @@ export async function sembrarPedidoConExhibidor(
   const clienteId = await sembrarCliente(`Cliente ${codigo}`);
   const { folio } = await pedidoDe(clienteId, vendedorId, [codigo]);
   return { exhibidorId, codigo, folio, clienteId };
+}
+
+/**
+ * Pedido de una pieza de $149 con fecha propia y abonos fechados (transferencia de la clienta). Con los abonos
+ * que sumen $149 el pedido queda liquidado en la fecha del último; con menos, abierto con saldo.
+ */
+export async function sembrarPedidoConAbonos(
+  clienteId: string,
+  vendedorId: string,
+  codigo: string,
+  fecha: string,
+  abonos: { fecha: string; centavos: number }[],
+): Promise<{ id: string; folio: number }> {
+  await sembrarPiezas([codigo], 14900);
+  const { id, folio } = await pedidoDe(clienteId, vendedorId, [codigo], fecha);
+  const s = await servicios();
+  const { adminId } = datosAdmin();
+  for (const a of abonos)
+    await dueno((db) =>
+      s.pagos.registrarPagoDePedido(db, {
+        key: randomUUID(),
+        adminId,
+        pedidoId: id,
+        fecha: a.fecha,
+        montoCentavos: a.centavos,
+        metodo: 'transferencia',
+        pagador: 'cliente',
+      }),
+    );
+  return { id, folio };
 }

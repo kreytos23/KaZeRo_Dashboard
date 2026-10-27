@@ -21,14 +21,14 @@ beforeEach(async () => {
 });
 
 describe('vendedor (R-08, R-09)', () => {
-  async function nelly() {
+  async function perla() {
     const id = await app((db) =>
-      crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18' }),
+      crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18' }),
     );
     return (await app((db) => obtenerVendedor(db, id)))!;
   }
   it('cambiar la comisión exige motivo y queda en el historial', async () => {
-    const v = await nelly();
+    const v = await perla();
     await expect(
       app((db) => actualizarVendedor(db, { ...v, adminId, comisionPct: '20' })),
     ).rejects.toMatchObject({
@@ -47,18 +47,18 @@ describe('vendedor (R-08, R-09)', () => {
     });
   });
   it('"18" y "18.00" son la misma comisión: no-op sin motivo', async () => {
-    const v = await nelly();
+    const v = await perla();
     expect(await app((db) => actualizarVendedor(db, { ...v, adminId, comisionPct: '18' }))).toEqual({
       cambios: 0,
     });
     expect((await app((db) => obtenerVendedor(db, v.id)))!.version).toBe(v.version);
   });
   it('nombre y activo no exigen motivo', async () => {
-    const v = await nelly();
-    await app((db) => actualizarVendedor(db, { ...v, adminId, nombre: 'Nelly R', activo: false }));
+    const v = await perla();
+    await app((db) => actualizarVendedor(db, { ...v, adminId, nombre: 'Perla R', activo: false }));
     const [e] = await app((db) => historialDeCambios(db, 'vendedor', v.id));
     expect(e!.campos.map((c) => [c.campo, c.antes, c.despues])).toEqual([
-      ['nombre', 'Nelly', 'Nelly R'],
+      ['nombre', 'Perla', 'Perla R'],
       ['activo', 'true', 'false'],
     ]);
   });
@@ -67,9 +67,9 @@ describe('vendedor (R-08, R-09)', () => {
 describe('cliente (R-08)', () => {
   it('registra el vendedor habitual por nombre y el teléfono', async () => {
     const vid = await app((db) =>
-      crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18' }),
+      crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18' }),
     );
-    const id = await app((db) => crearCliente(db, { nombre: 'Danya', referencia: '5to norte' }));
+    const id = await app((db) => crearCliente(db, { nombre: 'Clienta', referencia: '5to norte' }));
     const c = (await app((db) => obtenerCliente(db, id)))!;
     expect(
       await app((db) =>
@@ -81,12 +81,12 @@ describe('cliente (R-08)', () => {
       motivo: null,
       campos: [
         { campo: 'telefono', antes: null, despues: '5551234567' },
-        { campo: 'vendedor_habitual', antes: null, despues: 'Nelly' },
+        { campo: 'vendedor_habitual', antes: null, despues: 'Perla' },
       ],
     });
   });
   it('guardar sin cambios no escribe ni sube la versión', async () => {
-    const id = await app((db) => crearCliente(db, { nombre: 'Danya' }));
+    const id = await app((db) => crearCliente(db, { nombre: 'Clienta' }));
     const c = (await app((db) => obtenerCliente(db, id)))!;
     expect(await app((db) => actualizarCliente(db, { ...c, adminId, notas: '  ' }))).toEqual({ cambios: 0 });
     expect((await app((db) => obtenerCliente(db, id)))!.version).toBe(c.version);
@@ -96,10 +96,10 @@ describe('cliente (R-08)', () => {
 describe('exhibidor (D5)', () => {
   async function abierto() {
     const vendedorId = await app((db) =>
-      crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18' }),
+      crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18' }),
     );
     const id = await app((db) =>
-      crearExhibidor(db, { vendedorId, nombre: 'Exh Nelly', fechaEnvio: '2026-09-16' }),
+      crearExhibidor(db, { vendedorId, nombre: 'Exh Perla', fechaEnvio: '2026-09-16' }),
     );
     return (await app((db) => obtenerExhibidor(db, id)))!;
   }
@@ -110,13 +110,13 @@ describe('exhibidor (D5)', () => {
         exhibidorId: e.id,
         version: e.version,
         adminId,
-        nombre: 'Exh Nelly 16sep',
+        nombre: 'Exh Perla 16sep',
         fechaEnvio: '2026-09-17',
       }),
     );
     const [h] = await app((db) => historialDeCambios(db, 'exhibidor', e.id));
     expect(h!.campos).toEqual([
-      { campo: 'nombre', antes: 'Exh Nelly', despues: 'Exh Nelly 16sep' },
+      { campo: 'nombre', antes: 'Exh Perla', despues: 'Exh Perla 16sep' },
       { campo: 'fecha_envio', antes: '2026-09-16', despues: '2026-09-17' },
     ]);
   });
@@ -219,13 +219,13 @@ describe('catálogos (D6)', () => {
 describe('historialPorEntidad', () => {
   it('el límite cuenta entradas: la más antigua dentro del límite no queda cortada', async () => {
     const id = await app((db) =>
-      crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18' }),
+      crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18' }),
     );
     let v = (await app((db) => obtenerVendedor(db, id)))!;
     // Dos ediciones de 2 campos cada una: 4 filas de campo, 2 entradas.
-    await app((db) => actualizarVendedor(db, { ...v, adminId, nombre: 'Nelly A', activo: false }));
+    await app((db) => actualizarVendedor(db, { ...v, adminId, nombre: 'Perla A', activo: false }));
     v = (await app((db) => obtenerVendedor(db, id)))!;
-    await app((db) => actualizarVendedor(db, { ...v, adminId, nombre: 'Nelly B', activo: true }));
+    await app((db) => actualizarVendedor(db, { ...v, adminId, nombre: 'Perla B', activo: true }));
     // Con limite = 3 filas se cortaría la entrada antigua; con 2 entradas deben venir completas.
     const h = (await app((db) => historialPorEntidad(db, ['vendedor'], 2))).get(id)!;
     expect(h.map((e) => e.campos.length)).toEqual([2, 2]);

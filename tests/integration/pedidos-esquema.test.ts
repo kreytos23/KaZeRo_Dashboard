@@ -250,7 +250,7 @@ describe('reglas de pedidos en la BD', () => {
     );
     expect(traducirErrorPg(e)?.codigo).toBe('auditoria_motivo_dinero');
     const [v2] = await app((db) =>
-      db.insert(vendedor).values({ nombre: 'Nelly', tipo: 'revendedora' }).returning({ id: vendedor.id }),
+      db.insert(vendedor).values({ nombre: 'Perla', tipo: 'revendedora' }).returning({ id: vendedor.id }),
     );
     await conAuditoria((tx) =>
       tx
@@ -263,7 +263,7 @@ describe('reglas de pedidos en la BD', () => {
         sql`SELECT campo, antes, despues FROM v_auditoria WHERE entidad = 'pedido' AND entidad_id = ${b.pedidoId}`,
       ),
     );
-    expect(r.rows).toEqual([{ campo: 'vendedor', antes: 'Kazero', despues: 'Nelly' }]);
+    expect(r.rows).toEqual([{ campo: 'vendedor', antes: 'Kazero', despues: 'Perla' }]);
   });
 
   it('updated_at de pedido y de sus líneas lo mantiene un trigger', async () => {

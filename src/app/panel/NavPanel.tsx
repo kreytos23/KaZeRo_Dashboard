@@ -9,6 +9,7 @@ const NAVEGACION = [
   ['/panel/exhibidores', 'Exhibidores'],
   ['/panel/clientes', 'Clientes'],
   ['/panel/vendedores', 'Vendedores'],
+  ['/panel/reportes', 'Reportes'],
   ['/panel/catalogos', 'Catálogos'],
   ['/panel/administradores', 'Administradores'],
 ] as const;

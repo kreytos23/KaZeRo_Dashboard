@@ -7,6 +7,11 @@ export function parsearFechaISO(t: string): string | null {
   return f.getUTCFullYear() === a && f.getUTCMonth() === me - 1 && f.getUTCDate() === d ? m[0] : null;
 }
 
+/** '2026-10-12' → '12/10/2026' (fecha de negocio, sin zona horaria). */
+export function fechaCorta(iso: string): string {
+  return iso.split('-').reverse().join('/');
+}
+
 const DIA_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' });
 
 /** Fecha de negocio de hoy (YYYY-MM-DD) en la zona horaria del negocio. */

@@ -18,7 +18,7 @@ async function capturar(fn: () => Promise<unknown>) {
   }
 }
 
-async function vendedorBase(nombre = 'Danya') {
+async function vendedorBase(nombre = 'Vendedora Prueba') {
   const [v] = await app((db) =>
     db.insert(vendedor).values({ nombre, tipo: 'casa' }).returning({ id: vendedor.id }),
   );

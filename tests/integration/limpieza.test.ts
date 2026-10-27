@@ -2,7 +2,8 @@ import { sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { limpiarDatosPrueba, TABLAS_NEGOCIO } from '../../scripts/lib/limpieza';
 import { conDbUrl } from '@/db/pool';
-import { reiniciarConAdmin, urlOwner } from './utilidades';
+import { rotarAccesoLog } from '@/server/auth/rotacion';
+import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
 const owner = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlOwner(), fn);
 
@@ -112,5 +113,20 @@ describe('limpiarDatosPrueba', () => {
     );
     const tablas = (r.rows as { t: string }[]).map((x) => x.t);
     expect(tablas.filter((t) => ![...TABLAS_NEGOCIO, ...conservar].includes(t))).toEqual([]);
+  });
+});
+
+describe('rotarAccesoLog', () => {
+  it('borra lo de más de 180 días, conserva lo de 179 y devuelve el conteo', async () => {
+    await reiniciarConAdmin();
+    await owner((db) =>
+      db.execute(sql`INSERT INTO acceso_log (email, evento, created_at) VALUES
+        ('a@x.test', 'login_ok', now() - interval '181 days'),
+        ('b@x.test', 'login_ok', now() - interval '179 days')`),
+    );
+    const n = await conDbUrl(urlApp(), (db) => rotarAccesoLog(db));
+    expect(n).toBe(1);
+    const r = await owner((db) => db.execute(sql`SELECT email FROM acceso_log`));
+    expect((r.rows as { email: string }[]).map((x) => x.email)).toEqual(['b@x.test']);
   });
 });

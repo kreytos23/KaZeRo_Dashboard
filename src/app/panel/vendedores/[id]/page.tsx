@@ -14,9 +14,11 @@ import { FormAccion } from '@/features/ui/FormAccion';
 import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
+import { ErrorNegocio } from '@/server/errores';
 import { listarExhibidores } from '@/server/exhibidores/servicio';
 import { piezasDeVendedora } from '@/server/piezas/custodia';
 import { saldoFavorDeVendedor } from '@/server/pedidos/lecturas';
+import { resumenDeVendedora } from '@/server/vendedores/resumen';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
 import { accionEditarVendedor } from '../acciones';
 import { TIPOS } from '../tipos';
@@ -29,15 +31,19 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [v, exhibidores, cambios, saldoFavor, enPoder] = await conDbLectura((db) =>
+  const [v, exhibidores, cambios, saldoFavor, enPoder, resumen] = await conDbLectura((db) =>
     Promise.all([
       obtenerVendedor(db, id.data),
       listarExhibidores(db, { vendedorId: id.data }),
       historialDeCambios(db, 'vendedor', id.data),
       saldoFavorDeVendedor(db, id.data),
       piezasDeVendedora(db, id.data),
+      resumenDeVendedora(db, id.data),
     ]),
-  );
+  ).catch((e: unknown) => {
+    if (e instanceof ErrorNegocio && e.codigo === 'no_encontrado') notFound();
+    throw e;
+  });
   if (!v) notFound();
   return (
     <section className="flex flex-col gap-6">
@@ -113,6 +119,41 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
           </section>
         </div>
         <div className="ficha-col">
+          <section aria-labelledby="cobranza" className="order-2 flex flex-col gap-2">
+            <h2 id="cobranza" className="text-lg font-semibold">
+              Cobranza y comisiones
+            </h2>
+            <div className="tarjeta flex flex-col gap-1 p-4 text-dato">
+              <Link
+                href={`/panel/reportes/deudores?vendedor=${v.id}`}
+                className="enlace inline-flex min-h-11 items-center"
+              >
+                Por cobrar: {formatoMXN(resumen.porCobrarCentavos)} en {resumen.pedidosConSaldo}{' '}
+                {resumen.pedidosConSaldo === 1 ? 'pedido' : 'pedidos'}
+              </Link>
+              <Link
+                href={`/panel/reportes/comisiones?mes=${resumen.comisionEnCurso.mes.slice(0, 7)}&vendedor=${v.id}`}
+                className="enlace inline-flex min-h-11 items-center"
+              >
+                Comisión estimada de {resumen.comisionEnCurso.nombre}:{' '}
+                {formatoMXN(resumen.comisionEnCurso.montoCentavos)}
+              </Link>
+              {resumen.pendientes.length > 0 && (
+                <div className="flex flex-col">
+                  <p className="font-medium">Pagos de comisión pendientes</p>
+                  {resumen.pendientes.map((p) => (
+                    <Link
+                      key={p.mes}
+                      href={`/panel/reportes/comisiones?mes=${p.mes.slice(0, 7)}&vendedor=${v.id}`}
+                      className="enlace inline-flex min-h-11 items-center"
+                    >
+                      {p.nombre}: {formatoMXN(p.montoCentavos)}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
           <div className="order-3 flex max-w-2xl flex-col gap-3">
             <FormAccion accion={accionEditarVendedor} textoBoton="Guardar cambios">
               {/* key por versión en los campos (no en el formulario): refresca los defaultValue sin perder el estado de la acción. */}
