@@ -1,12 +1,13 @@
 'use client';
 
-import { useRef, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 
 /**
  * Filtros de un listado. Desde `md` el formulario va en línea con «Limpiar filtros»; en celular se pliegan en una
  * fila con «Filtros (n)», las etiquetas activas (cada una quita su filtro) y un panel inferior (`<dialog>` nativo:
- * foco atrapado y Esc de serie). `children` se renderiza en ambos formularios GET; los controles derivan su `id`
- * de `useId`, así que no se repiten.
+ * foco atrapado y Esc de serie). `children` se renderiza en ambos formularios GET (el del panel solo mientras
+ * está abierto, así nunca hay dos copias de los campos a la vez en celular); los controles derivan su `id` de
+ * `useId`, así que no se repiten.
  */
 export function FiltrosPlegables({
   activos,
@@ -18,6 +19,8 @@ export function FiltrosPlegables({
   children: ReactNode;
 }) {
   const panel = useRef<HTMLDialogElement>(null);
+  const [abierto, setAbierto] = useState(false);
+  const hay = activos.length > 0;
   const limpiar = (
     <a href={hrefLimpiar} className="enlace inline-flex min-h-11 items-center text-meta">
       Limpiar filtros
@@ -28,10 +31,17 @@ export function FiltrosPlegables({
       <form role="search" className="hidden flex-wrap items-end gap-2 md:flex">
         {children}
         <button className="boton-secundario">Filtrar</button>
-        {activos.length > 0 && limpiar}
+        {hay && limpiar}
       </form>
       <div className="flex flex-wrap items-center gap-2 md:hidden">
-        <button type="button" className="boton-secundario" onClick={() => panel.current?.showModal()}>
+        <button
+          type="button"
+          className="boton-secundario"
+          onClick={() => {
+            setAbierto(true);
+            panel.current?.showModal();
+          }}
+        >
           Filtros ({activos.length})
         </button>
         {activos.map((a) => (
@@ -43,6 +53,7 @@ export function FiltrosPlegables({
       </div>
       <dialog
         ref={panel}
+        onClose={() => setAbierto(false)}
         aria-labelledby="titulo-filtros"
         onClick={(e) => {
           if (e.target === panel.current) panel.current.close();
@@ -62,13 +73,15 @@ export function FiltrosPlegables({
             <span aria-hidden="true">✕</span>
           </button>
         </div>
-        <form role="search" className="flex flex-col gap-3">
-          {children}
-          <div className="flex flex-wrap items-center gap-2">
-            <button className="boton-primario">Ver resultados</button>
-            {activos.length > 0 && limpiar}
-          </div>
-        </form>
+        {abierto && (
+          <form role="search" className="flex flex-col gap-3">
+            {children}
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="boton-primario">Ver resultados</button>
+              {hay && limpiar}
+            </div>
+          </form>
+        )}
       </dialog>
     </>
   );
