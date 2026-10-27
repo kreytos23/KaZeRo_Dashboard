@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { BuscadorGlobal } from '@/search/BuscadorGlobal';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { accionCerrarSesion, accionCerrarTodas } from './acciones';
+import { BarraInferior } from './BarraInferior';
 import { MenuMovil } from './MenuMovil';
 import { NavPanel } from './NavPanel';
 
@@ -74,10 +75,11 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
       <main
         id="contenido"
         tabIndex={-1}
-        className="mx-auto w-full max-w-[90rem] px-4 py-6 outline-none sm:py-8"
+        className="mx-auto w-full max-w-[90rem] px-4 py-6 outline-none sm:py-8 max-md:pb-24"
       >
         {children}
       </main>
+      <BarraInferior />
     </div>
   );
 }
