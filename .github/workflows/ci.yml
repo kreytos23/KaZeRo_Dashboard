@@ -62,6 +62,12 @@ jobs:
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
           # Una rama Neon temporal por worker (se borran todas al terminar); baja sola si el plan no alcanza.
           KAZERO_TEST_WORKERS: '3'
+      # Si la corrida se cancela, el proceso muere antes de borrar sus ramas de Neon: se borran aquí.
+      - if: cancelled()
+        run: pnpm exec tsx scripts/limpiar-ramas-ci.ts integracion
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
 
   build:
     needs: [calidad, unit]
@@ -117,6 +123,12 @@ jobs:
         with: { name: next-build }
       - run: tar -xf next-build.tar && rm next-build.tar
       - run: pnpm test:e2e
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+      # Si la corrida se cancela, el proceso muere antes de borrar sus ramas de Neon: se borran aquí.
+      - if: cancelled()
+        run: pnpm exec tsx scripts/limpiar-ramas-ci.ts e2e
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
