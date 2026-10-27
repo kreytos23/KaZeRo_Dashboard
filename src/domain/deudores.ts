@@ -25,7 +25,8 @@ export interface GrupoDeudores {
   saldoCentavos: number;
 }
 
-const dia = (iso: string) => Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
+const dia = (iso: string) =>
+  Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
 
 export function agruparDeudores(
   pedidos: PedidoDeudor[],
@@ -37,8 +38,12 @@ export function agruparDeudores(
   for (const p of pedidos) {
     if (p.saldoCentavos <= 0) continue;
     const dias = Math.round((dia(hoy) - dia(p.fecha)) / 86_400_000);
-    const g = porVendedora.get(p.vendedorId) ??
-      { vendedorId: p.vendedorId, vendedorNombre: p.vendedorNombre, pedidos: [], saldoCentavos: 0 };
+    const g = porVendedora.get(p.vendedorId) ?? {
+      vendedorId: p.vendedorId,
+      vendedorNombre: p.vendedorNombre,
+      pedidos: [],
+      saldoCentavos: 0,
+    };
     g.pedidos.push({ ...p, dias, atrasado: dias > DIAS_ATRASO });
     g.saldoCentavos += p.saldoCentavos;
     porVendedora.set(p.vendedorId, g);

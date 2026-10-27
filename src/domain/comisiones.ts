@@ -3,8 +3,18 @@
 export type Mes = string; // 'AAAA-MM-01'
 
 const MESES = [
-  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
+  'Enero',
+  'Febrero',
+  'Marzo',
+  'Abril',
+  'Mayo',
+  'Junio',
+  'Julio',
+  'Agosto',
+  'Septiembre',
+  'Octubre',
+  'Noviembre',
+  'Diciembre',
 ];
 
 export function mesDe(fechaISO: string): Mes {
@@ -28,7 +38,11 @@ export function mesCerrable(mes: Mes, hoy: string): boolean {
 }
 
 /** D-2: tras un cierre, lo atrasado entra en el mes siguiente (C-4); sin cierres, el más antiguo con liquidaciones. */
-export function mesAbierto(o: { ultimoCerrado: Mes | null; liquidacionMasAntigua: string | null; hoy: string }): Mes {
+export function mesAbierto(o: {
+  ultimoCerrado: Mes | null;
+  liquidacionMasAntigua: string | null;
+  hoy: string;
+}): Mes {
   if (o.ultimoCerrado) return mesSiguiente(o.ultimoCerrado);
   return mesDe(o.liquidacionMasAntigua ?? o.hoy);
 }
@@ -36,7 +50,8 @@ export function mesAbierto(o: { ultimoCerrado: Mes | null; liquidacionMasAntigua
 /** D-6: base × % redondeado half-up, sin flotantes. */
 export function comisionCentavos(baseCentavos: number, pctNumeric: string): number {
   const m = /^(\d{1,3})(?:\.(\d{1,2}))?$/.exec(pctNumeric.trim());
-  if (!m || !Number.isSafeInteger(baseCentavos) || baseCentavos < 0) throw new Error('comision: dato inválido');
+  if (!m || !Number.isSafeInteger(baseCentavos) || baseCentavos < 0)
+    throw new Error('comision: dato inválido');
   const pctCent = BigInt(m[1]!) * 100n + BigInt((m[2] ?? '').padEnd(2, '0'));
   if (pctCent > 10000n) throw new Error('comision: % fuera de rango');
   const num = BigInt(baseCentavos) * pctCent;
@@ -64,8 +79,14 @@ export interface ResumenVendedora {
 export function resumenPorVendedora(lineas: LineaComision[]): ResumenVendedora[] {
   const porVendedora = new Map<string, ResumenVendedora & { ids: Set<string> }>();
   for (const l of lineas) {
-    const r = porVendedora.get(l.vendedorId) ??
-      { vendedorId: l.vendedorId, vendedorNombre: l.vendedorNombre, pedidos: 0, baseCentavos: 0, comisionCentavos: 0, ids: new Set<string>() };
+    const r = porVendedora.get(l.vendedorId) ?? {
+      vendedorId: l.vendedorId,
+      vendedorNombre: l.vendedorNombre,
+      pedidos: 0,
+      baseCentavos: 0,
+      comisionCentavos: 0,
+      ids: new Set<string>(),
+    };
     r.ids.add(l.pedidoId);
     r.baseCentavos += l.baseCentavos;
     r.comisionCentavos += l.montoCentavos;

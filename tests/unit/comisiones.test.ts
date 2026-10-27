@@ -37,13 +37,19 @@ describe('meses', () => {
 
 describe('mesAbierto', () => {
   it('sin cierres ni liquidaciones es el mes de hoy', () => {
-    expect(mesAbierto({ ultimoCerrado: null, liquidacionMasAntigua: null, hoy: '2026-11-15' })).toBe('2026-11-01');
+    expect(mesAbierto({ ultimoCerrado: null, liquidacionMasAntigua: null, hoy: '2026-11-15' })).toBe(
+      '2026-11-01',
+    );
   });
   it('tras un cierre es el siguiente, aunque haya pagos atrasados', () => {
-    expect(mesAbierto({ ultimoCerrado: '2026-10-01', liquidacionMasAntigua: '2026-09-10', hoy: '2026-11-15' })).toBe('2026-11-01');
+    expect(
+      mesAbierto({ ultimoCerrado: '2026-10-01', liquidacionMasAntigua: '2026-09-10', hoy: '2026-11-15' }),
+    ).toBe('2026-11-01');
   });
   it('sin cierres, el mes de la liquidación más antigua', () => {
-    expect(mesAbierto({ ultimoCerrado: null, liquidacionMasAntigua: '2026-08-20', hoy: '2026-11-15' })).toBe('2026-08-01');
+    expect(mesAbierto({ ultimoCerrado: null, liquidacionMasAntigua: '2026-08-20', hoy: '2026-11-15' })).toBe(
+      '2026-08-01',
+    );
   });
 });
 
@@ -64,8 +70,13 @@ describe('comisionCentavos', () => {
 });
 
 describe('resumenPorVendedora', () => {
-  const l = (vendedorId: string, vendedorNombre: string, pedidoId: string, montoCentavos: number, baseCentavos: number): LineaComision =>
-    ({ vendedorId, vendedorNombre, pedidoId, folio: 1, montoCentavos, baseCentavos });
+  const l = (
+    vendedorId: string,
+    vendedorNombre: string,
+    pedidoId: string,
+    montoCentavos: number,
+    baseCentavos: number,
+  ): LineaComision => ({ vendedorId, vendedorNombre, pedidoId, folio: 1, montoCentavos, baseCentavos });
   it('suma las líneas por vendedora, cuenta pedidos y ordena por nombre', () => {
     const r = resumenPorVendedora([
       l('v2', 'Zoila', 'p1', 15, 100),

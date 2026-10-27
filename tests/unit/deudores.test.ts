@@ -2,8 +2,17 @@ import { describe, expect, it } from 'vitest';
 import { agruparDeudores, type PedidoDeudor } from '@/domain/deudores';
 
 const p = (o: Partial<PedidoDeudor>): PedidoDeudor => ({
-  pedidoId: 'p', folio: 1, vendedorId: 'v1', vendedorNombre: 'Ana', clienteNombre: 'Cli', telefono: null,
-  fecha: '2026-11-01', totalCentavos: 1000, pagadoCentavos: 0, saldoCentavos: 1000, ...o,
+  pedidoId: 'p',
+  folio: 1,
+  vendedorId: 'v1',
+  vendedorNombre: 'Ana',
+  clienteNombre: 'Cli',
+  telefono: null,
+  fecha: '2026-11-01',
+  totalCentavos: 1000,
+  pagadoCentavos: 0,
+  saldoCentavos: 1000,
+  ...o,
 });
 
 describe('agruparDeudores', () => {
