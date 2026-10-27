@@ -46,6 +46,8 @@ export async function crearBases(urlAdmin: string, nombres: string[]) {
   await ejecutar(urlAdmin, [
     `DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kazero_owner') THEN CREATE ROLE kazero_owner; END IF; END $$`,
     `ALTER ROLE kazero_owner WITH LOGIN CREATEROLE PASSWORD '${pwOwner}'`,
+    // Como neondb_owner (neon_superuser): ver la actividad de otros roles en pg_stat_activity.
+    `GRANT pg_read_all_stats TO kazero_owner`,
     ...nombres.map((n) => `CREATE DATABASE "${n}" OWNER kazero_owner`),
   ]);
   const owners = nombres.map((n) => conCredenciales(urlAdmin, 'kazero_owner', pwOwner, n));
