@@ -27,6 +27,13 @@ export function finDeMes(mes: Mes): string {
   return new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
 }
 
+const MES_URL = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+/** Mes de la URL ('AAAA-MM') → 'AAAA-MM-01'; null si falta o no es un mes válido. */
+export function mesDeUrl(valor: string | null | undefined): Mes | null {
+  return valor && MES_URL.test(valor) ? `${valor}-01` : null;
+}
+
 export function mesSiguiente(mes: Mes): Mes {
   const a = Number(mes.slice(0, 4));
   const m = Number(mes.slice(5, 7));
@@ -79,7 +86,7 @@ export interface ResumenVendedora {
 
 /** Suma los montos ya calculados por línea; nunca recalcula sobre el total. */
 export function resumenPorVendedora(lineas: LineaComision[]): ResumenVendedora[] {
-  const porVendedora = new Map<string, ResumenVendedora & { ids: Set<string> }>();
+  const porVendedora = new Map<string, ResumenVendedora>();
   for (const l of lineas) {
     const r = porVendedora.get(l.vendedorId) ?? {
       vendedorId: l.vendedorId,
@@ -87,16 +94,13 @@ export function resumenPorVendedora(lineas: LineaComision[]): ResumenVendedora[]
       pedidos: 0,
       baseCentavos: 0,
       comisionCentavos: 0,
-      ids: new Set<string>(),
     };
-    r.ids.add(l.pedidoId);
+    r.pedidos += 1; // un pedido por línea: comision_linea_pedido_uq impide repetirlo
     r.baseCentavos += l.baseCentavos;
     r.comisionCentavos += l.montoCentavos;
     porVendedora.set(l.vendedorId, r);
   }
-  return [...porVendedora.values()]
-    .map(({ ids, ...r }) => ({ ...r, pedidos: ids.size }))
-    .sort((a, b) => a.vendedorNombre.localeCompare(b.vendedorNombre, 'es'));
+  return [...porVendedora.values()].sort((a, b) => a.vendedorNombre.localeCompare(b.vendedorNombre, 'es'));
 }
 
 export function nombreMes(mes: Mes): string {

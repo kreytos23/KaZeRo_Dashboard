@@ -18,7 +18,7 @@ export async function resumenDeVendedora(
   const abierto = await calcularMesAbierto(db, hoy);
   const [deudas, curso, pendientes] = await Promise.all([
     reporteDeudores(db, { vendedorId, hoy }),
-    reporteComisiones(db, abierto, { vendedorId, hoy }),
+    reporteComisiones(db, abierto, { vendedorId, hoy, abierto }),
     pendientesDeVendedora(db, vendedorId),
   ]);
   return {

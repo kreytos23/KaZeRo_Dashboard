@@ -75,7 +75,7 @@ interface Elegible {
 export async function consultaElegibles(
   tx: Ejecutor,
   finMes: string,
-  o: { bloquear: boolean },
+  o: { bloquear: boolean; vendedorId?: string },
 ): Promise<Elegible[]> {
   const r = await tx.execute<{
     id: string;
@@ -88,13 +88,15 @@ export async function consultaElegibles(
     fl: string;
   }>(sql`
     SELECT p.id, p.folio, p.vendedor_id, v.nombre AS vendedor_nombre, v.comision_pct, c.nombre AS cliente_nombre,
-           p.total, kz_fecha_liquidacion(p.id)::text AS fl
+           p.total, liq.f::text AS fl
       FROM pedido p
       JOIN vendedor v ON v.id = p.vendedor_id
       JOIN cliente c ON c.id = p.cliente_id
+      CROSS JOIN LATERAL (SELECT kz_fecha_liquidacion(p.id) AS f) liq
      WHERE p.estado = 'liquidado'
        AND NOT EXISTS (SELECT 1 FROM comision_linea l WHERE l.pedido_id = p.id)
-       AND kz_fecha_liquidacion(p.id) <= ${finMes}::date
+       AND liq.f <= ${finMes}::date
+       ${o.vendedorId ? sql`AND p.vendedor_id = ${o.vendedorId}` : sql``}
      ORDER BY p.id
      ${o.bloquear ? sql`FOR UPDATE OF p` : sql``}`);
   return r.rows.map((f) => ({
@@ -144,22 +146,15 @@ function armar(
   pagos: Map<string, PagoComisionVista>,
   cerrado: boolean,
 ): VendedoraComision[] {
-  const resumen = resumenPorVendedora(
-    detalle.map((d) => ({
-      vendedorId: d.vendedorId,
-      vendedorNombre: d.vendedorNombre,
-      pedidoId: d.pedidoId,
-      folio: d.folio,
-      montoCentavos: d.montoCentavos,
-      baseCentavos: d.baseCentavos,
-    })),
-  );
-  return resumen.map((r) => {
+  const porVendedora = new Map<string, PedidoComisionable[]>();
+  for (const d of detalle) porVendedora.set(d.vendedorId, [...(porVendedora.get(d.vendedorId) ?? []), d]);
+  return resumenPorVendedora(detalle).map((r) => {
     const pago = pagos.get(r.vendedorId) ?? null;
+    const pedidosDetalle = porVendedora.get(r.vendedorId)!;
     return {
       ...r,
-      pct: detalle.find((d) => d.vendedorId === r.vendedorId)!.pct,
-      pedidosDetalle: detalle.filter((d) => d.vendedorId === r.vendedorId),
+      pct: pedidosDetalle[0]!.pct,
+      pedidosDetalle,
       pago,
       estadoPago: !cerrado
         ? 'estimado'
@@ -176,7 +171,7 @@ function armar(
 export async function reporteComisiones(
   db: Ejecutor,
   mes: string,
-  o: { vendedorId?: string; hoy?: string } = {},
+  o: { vendedorId?: string; hoy?: string; abierto?: string } = {},
 ): Promise<ReporteComisiones> {
   const hoy = o.hoy ?? hoyMX();
   const [corte] = await db.select().from(corteComision).where(eq(corteComision.mes, mes));
@@ -199,7 +194,12 @@ export async function reporteComisiones(
       .innerJoin(pedido, eq(pedido.id, comisionLinea.pedidoId))
       .innerJoin(cliente, eq(cliente.id, pedido.clienteId))
       .innerJoin(vendedor, eq(vendedor.id, comisionLinea.vendedorId))
-      .where(eq(comisionLinea.corteId, corte.id))
+      .where(
+        and(
+          eq(comisionLinea.corteId, corte.id),
+          o.vendedorId ? eq(comisionLinea.vendedorId, o.vendedorId) : undefined,
+        ),
+      )
       .orderBy(asc(pedido.folio));
     detalle = lineas.map((l) => ({
       pedidoId: l.pedidoId,
@@ -225,9 +225,9 @@ export async function reporteComisiones(
         montoCentavos: numericACentavos(p.monto),
       });
   } else {
-    if (mes !== (await calcularMesAbierto(db, hoy)))
+    if (mes !== (o.abierto ?? (await calcularMesAbierto(db, hoy))))
       throw new ErrorNegocio('no_encontrado', 'Ese mes no tiene cierre.');
-    const filas = await consultaElegibles(db, finDeMes(mes), { bloquear: false });
+    const filas = await consultaElegibles(db, finDeMes(mes), { bloquear: false, vendedorId: o.vendedorId });
     detalle = filas.map((f) => ({
       pedidoId: f.pedidoId,
       folio: f.folio,
@@ -240,7 +240,6 @@ export async function reporteComisiones(
       montoCentavos: comisionCentavos(numericACentavos(f.total), f.comisionPct),
     }));
   }
-  if (o.vendedorId) detalle = detalle.filter((d) => d.vendedorId === o.vendedorId);
   const vendedoras = armar(detalle, pagos, !!corte);
   if (o.vendedorId && !vendedoras.length) {
     const [v] = await db
