@@ -117,7 +117,7 @@ async function insertarPorLotes<T extends PgTable>(
 }
 
 /** Admin dedicado: contraseña aleatoria descartada en el acto y TOTP inservible → nunca puede iniciar sesión. */
-async function asegurarAdminMigracion(tx: Ejecutor): Promise<string> {
+export async function asegurarAdminMigracion(tx: Ejecutor): Promise<string> {
   const hash = await hashPassword(randomBytes(32).toString('base64url'));
   await tx.execute(
     sql`INSERT INTO admin (email, password_hash, totp_secret_cifrado)
