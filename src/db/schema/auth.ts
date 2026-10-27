@@ -92,6 +92,8 @@ export const accesoLog = pgTable(
   (t) => [
     index('acceso_log_email_fecha_idx').on(t.email, t.createdAt),
     index('acceso_log_fecha_idx').on(t.createdAt),
+    // Plan 5a (D-7): límite de intentos de login por IP.
+    index('acceso_log_ip_idx').on(t.ip, t.createdAt),
   ],
 );
 

@@ -8,6 +8,9 @@ import { GuardaBdError } from './guarda-bd';
  * codigo_recuperacion: las cuentas siguen entrando. El orden respeta las FK (TRUNCATE en una sola sentencia).
  */
 export const TABLAS_NEGOCIO = [
+  'pago_comision',
+  'comision_linea',
+  'corte_comision',
   'origen_excel',
   'auditoria_campo',
   'auditoria',

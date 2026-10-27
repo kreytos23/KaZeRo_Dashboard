@@ -5,7 +5,7 @@ export const urlApp = () => process.env.DATABASE_URL!;
 export const urlOwner = () => process.env.DATABASE_URL_OWNER!;
 export const llaveTotp = () => process.env.KAZERO_TOTP_KEY!;
 
-const TRUNCATE_TODO = `TRUNCATE origen_excel, auditoria_campo, auditoria, saldo_favor_mov, aplicacion_pago, pago, devolucion, pedido_item, pedido, movimiento_pieza, pieza, exhibidor, cliente, vendedor, categoria, material, proveedor,
+const TRUNCATE_TODO = `TRUNCATE pago_comision, comision_linea, corte_comision, origen_excel, auditoria_campo, auditoria, saldo_favor_mov, aplicacion_pago, pago, devolucion, pedido_item, pedido, movimiento_pieza, pieza, exhibidor, cliente, vendedor, categoria, material, proveedor,
       codigo_recuperacion, sesion, acceso_log, idempotencia, admin RESTART IDENTITY CASCADE`;
 
 /** Limpia inventario, personas y auth. Solo el dueño puede TRUNCATE. */

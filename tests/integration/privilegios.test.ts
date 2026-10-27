@@ -63,7 +63,8 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
         db.execute<{ p: string }>(sql`
           SELECT table_name || '.' || column_name AS p FROM information_schema.column_privileges
           WHERE grantee = 'kazero_app' AND table_schema = 'public' AND privilege_type = 'UPDATE'
-            AND table_name IN ('auditoria', 'auditoria_campo', 'movimiento_pieza', 'pieza', 'pedido', 'pedido_item', 'aplicacion_pago')`),
+            AND table_name IN ('auditoria', 'auditoria_campo', 'movimiento_pieza', 'pieza', 'pedido', 'pedido_item', 'aplicacion_pago',
+              'corte_comision', 'comision_linea', 'pago_comision')`),
       ]),
     );
     const orden = (f: { rows: { p: string }[] }) => f.rows.map((x) => x.p).sort();
@@ -132,6 +133,8 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
         ...pedidoCols.map((c) => `pedido.${c}`),
         ...['vigente', 'quitado_at', 'updated_at'].map((c) => `pedido_item.${c}`),
         'aplicacion_pago.anulada_at',
+        // Plan 5a: un pago de comisión solo se anula; cortes y líneas no se actualizan.
+        ...['anulado_at', 'anulacion_motivo', 'anulado_por'].map((c) => `pago_comision.${c}`),
       ].sort(),
     );
   });
@@ -145,7 +148,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
     const t = (tabla: string, ...privs: string[]) => privs.map((p) => `${tabla}:${p}`);
     // La lista se escribe a mano a propósito: si alguien agrega un grant, esta prueba obliga a decidirlo aquí.
     const esperado = [
-      ...t('acceso_log', 'DELETE', 'INSERT', 'SELECT'),
+      ...t('acceso_log', 'INSERT', 'SELECT'), // Plan 5a (D-8): la rotación la hace kz_rotar_acceso_log
       ...t('admin', 'SELECT'),
       ...t('aplicacion_pago', 'INSERT', 'SELECT'),
       ...t('auditoria', 'SELECT'), // Plan 2.1: la escribe solo kz_auditar (SECURITY DEFINER)
@@ -153,6 +156,8 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       ...t('categoria', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('cliente', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('codigo_recuperacion', 'INSERT', 'SELECT'),
+      ...t('comision_linea', 'INSERT', 'SELECT'), // Plan 5a: cortes, líneas y pagos no se borran
+      ...t('corte_comision', 'INSERT', 'SELECT'),
       ...t('devolucion', 'INSERT', 'SELECT'), // Plan 3.1: no se edita ni se borra
       ...t('exhibidor', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('idempotencia', 'DELETE', 'INSERT', 'SELECT', 'UPDATE'),
@@ -160,6 +165,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       ...t('movimiento_pieza', 'INSERT', 'SELECT'),
       ...t('origen_excel', 'SELECT'), // Plan 7a: solo la escribe el script de migración (dueño)
       ...t('pago', 'INSERT', 'SELECT'),
+      ...t('pago_comision', 'INSERT', 'SELECT'), // UPDATE solo de las columnas de anulación
       ...t('pedido', 'INSERT', 'SELECT'),
       ...t('pedido_item', 'INSERT', 'SELECT'),
       ...t('pieza', 'INSERT', 'SELECT'), // UPDATE por columna desde el Plan 2.1 (lo vigila su prueba)
