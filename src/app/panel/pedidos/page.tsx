@@ -4,8 +4,10 @@ import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { acotarPagina } from '@/domain/paginacion';
 import { formatoFolio } from '@/domain/pedidos';
 import { Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
+import { FiltrosPlegables } from '@/features/ui/FiltrosPlegables';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { Paginacion } from '@/features/ui/Paginacion';
+import { urlSinFiltro, urlSinFiltros } from '@/features/ui/filtros-url';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPedido } from '@/features/ui/estado-visual';
 import { Saldo } from '@/features/ui/Saldo';
@@ -17,6 +19,9 @@ import { ETIQUETA_ESTADO_PEDIDO, fechaCorta } from './etiquetas';
 import { POR_PAGINA, leerFiltrosPedidos } from './filtros';
 
 export const metadata = { title: 'Pedidos' };
+
+const RUTA = '/panel/pedidos';
+const CLAVES_FILTRO = ['q', 'estado', 'vendedor', 'cliente', 'desde', 'hasta', 'saldo'] as const;
 
 const mxn = (n: string) => formatoMXN(numericACentavos(n));
 
@@ -58,6 +63,29 @@ export default async function PaginaPedidos({
       .concat(clientes)
       .map((c) => ({ valor: c.id, texto: c.nombre })),
   ];
+  const etiquetas: [string, string | undefined][] = [
+    ['q', f.q ? `“${f.q}”` : undefined],
+    ['estado', f.estado && ETIQUETA_ESTADO_PEDIDO[f.estado]],
+    [
+      'vendedor',
+      f.vendedor ? (vendedores.find((v) => v.id === f.vendedor)?.nombre ?? 'Vendedor') : undefined,
+    ],
+    [
+      'cliente',
+      f.cliente ? (opcionesCliente.find((c) => c.valor === f.cliente)?.texto ?? 'Cliente') : undefined,
+    ],
+    ['desde', f.desde && `Desde ${fechaCorta(f.desde)}`],
+    ['hasta', f.hasta && `Hasta ${fechaCorta(f.hasta)}`],
+    ['saldo', f.conSaldo ? 'Con saldo pendiente' : undefined],
+  ];
+  const sp = new URLSearchParams(
+    Object.entries({ ...f, saldo: f.conSaldo ? '1' : undefined }).flatMap(([k, v]) =>
+      v && k !== 'pagina' && k !== 'conSaldo' ? [[k, String(v)]] : [],
+    ),
+  );
+  const activos = etiquetas.flatMap(([clave, etiqueta]) =>
+    etiqueta ? [{ clave, etiqueta, href: urlSinFiltro(RUTA, sp, clave) }] : [],
+  );
   const filtrado = Boolean(
     f.q || f.estado || f.vendedor || f.cliente || f.desde || f.hasta || f.conSaldo || pagina > 1,
   );
@@ -70,7 +98,7 @@ export default async function PaginaPedidos({
           Nuevo pedido
         </Link>
       </div>
-      <form role="search" className="flex flex-wrap items-end gap-2">
+      <FiltrosPlegables activos={activos} hrefLimpiar={urlSinFiltros(RUTA, sp, CLAVES_FILTRO)}>
         <Campo etiqueta="Folio o cliente" name="q" type="search" defaultValue={f.q} maxLength={120} />
         <Selector
           etiqueta="Estado"
@@ -101,8 +129,7 @@ export default async function PaginaPedidos({
         <CampoCasilla name="saldo" value="1" defaultChecked={f.conSaldo}>
           Con saldo pendiente
         </CampoCasilla>
-        <button className="boton-secundario">Filtrar</button>
-      </form>
+      </FiltrosPlegables>
 
       <p role="status" className={rangoInvertido ? 'aviso-atencion' : undefined}>
         {rangoInvertido ? 'La fecha «Desde» es posterior a «Hasta»: no habrá resultados.' : ''}

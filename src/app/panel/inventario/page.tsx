@@ -5,8 +5,10 @@ import { acotarPagina } from '@/domain/paginacion';
 import { FotoPieza } from '@/features/imagenes/FotoPieza';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { CampoConLista } from '@/features/ui/CampoConLista';
+import { FiltrosPlegables } from '@/features/ui/FiltrosPlegables';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { Paginacion } from '@/features/ui/Paginacion';
+import { urlSinFiltro, urlSinFiltros } from '@/features/ui/filtros-url';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPieza, vistaUbicacion } from '@/features/ui/estado-visual';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -17,6 +19,9 @@ import { ETIQUETA_ESTADO, ETIQUETA_UBICACION_FILTRO } from './etiquetas';
 import { POR_PAGINA, idDeCatalogo, leerFiltros } from './filtros';
 
 export const metadata = { title: 'Inventario' };
+
+const RUTA = '/panel/inventario';
+const CLAVES_FILTRO = ['q', 'estado', 'ubicacion', 'vendedor', 'categoria', 'material', 'proveedor'] as const;
 
 export default async function PaginaInventario({
   searchParams,
@@ -54,6 +59,27 @@ export default async function PaginaInventario({
     return [cat, pz, vs.filter((v) => v.tipo !== 'casa'), n, pag] as const;
   });
   const [categorias, materiales, proveedores] = catalogos;
+  // Con vendedora elegida la ubicación va implícita: su etiqueta sería redundante.
+  const etiquetas: [string, string | undefined][] = [
+    ['q', f.q ? `“${f.q}”` : undefined],
+    ['estado', f.estado && ETIQUETA_ESTADO[f.estado]],
+    ['ubicacion', f.vendedor ? undefined : f.ubicacion && ETIQUETA_UBICACION_FILTRO[f.ubicacion]],
+    [
+      'vendedor',
+      f.vendedor ? (vendedoras.find((v) => v.id === f.vendedor)?.nombre ?? 'Vendedora') : undefined,
+    ],
+    ['categoria', f.categoria],
+    ['material', f.material],
+    ['proveedor', f.proveedor],
+  ];
+  const sp = new URLSearchParams(
+    Object.entries(f).flatMap(([k, v]) =>
+      v && k !== 'pagina' && !(k === 'ubicacion' && f.vendedor) ? [[k, String(v)]] : [],
+    ),
+  );
+  const activos = etiquetas.flatMap(([clave, etiqueta]) =>
+    etiqueta ? [{ clave, etiqueta, href: urlSinFiltro(RUTA, sp, clave) }] : [],
+  );
   const filtrado = Boolean(
     f.q || f.estado || f.categoria || f.material || f.proveedor || f.ubicacion || f.vendedor || pagina > 1,
   );
@@ -70,7 +96,7 @@ export default async function PaginaInventario({
           </Link>
         </div>
       </div>
-      <form role="search" className="flex flex-wrap items-end gap-2">
+      <FiltrosPlegables activos={activos} hrefLimpiar={urlSinFiltros(RUTA, sp, CLAVES_FILTRO)}>
         <Campo etiqueta="Código o descripción" name="q" type="search" defaultValue={f.q} maxLength={120} />
         <Selector
           etiqueta="Estado"
@@ -123,8 +149,7 @@ export default async function PaginaInventario({
           maxLength={80}
           textoNuevo="Filtrar por"
         />
-        <button className="boton-secundario">Filtrar</button>
-      </form>
+      </FiltrosPlegables>
       {piezas.length === 0 ? (
         filtrado ? (
           <EstadoVacio

@@ -420,7 +420,18 @@
   }
 }
 
-/* Tarjeta de lista cuyo enlace cubre toda la tarjeta: realce al pasar y presión al tocar. */
+/* Filtro activo en la fila de celular: toca para quitarlo. */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: --spacing(1);
+  min-height: --spacing(11);
+  border-radius: 9999px;
+  background-color: var(--color-secundario-suave);
+  padding-inline: --spacing(3);
+  color: var(--color-secundario-fuerte);
+}
+
 @utility fila-enlace {
   transition: background-color var(--duration-quick) var(--ease-smooth-out);
   @media (hover: hover) {
@@ -434,6 +445,7 @@
   }
 }
 
+/* Tarjeta de lista cuyo enlace cubre toda la tarjeta: realce al pasar y presión al tocar. */
 @utility tarjeta-enlace {
   transition: var(--transicion-control);
   @media (hover: hover) {
