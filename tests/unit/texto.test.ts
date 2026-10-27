@@ -5,7 +5,7 @@ describe('normalizar', () => {
   it.each([
     ['  Rocío   Santibañez ', 'rocio santibanez'],
     ['ORO LAMINADO', 'oro laminado'],
-    ['Danya\t5to  norte', 'danya 5to norte'],
+    ['Clienta\t5to  norte', 'clienta 5to norte'],
     ['', ''],
     ['\tabc\n', 'abc'],
     ['straße Ø Łódź', 'strasse o lodz'],

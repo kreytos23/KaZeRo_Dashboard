@@ -8,12 +8,12 @@ describe('etiquetaUbicacion', () => {
     expect(etiquetaUbicacion({ ...base, ubicacion: 'kazero', estado: 'disponible' })).toBe('Kazero'));
   it('en un exhibidor', () =>
     expect(
-      etiquetaUbicacion({ ...base, ubicacion: 'exhibidor', exhibidorNombre: 'Nelly 1', estado: 'exhibida' }),
-    ).toBe('Exhibidor Nelly 1'));
+      etiquetaUbicacion({ ...base, ubicacion: 'exhibidor', exhibidorNombre: 'Perla 1', estado: 'exhibida' }),
+    ).toBe('Exhibidor Perla 1'));
   it('con una vendedora', () =>
     expect(
-      etiquetaUbicacion({ ...base, ubicacion: 'vendedora', vendedorNombre: 'Nelly', estado: 'disponible' }),
-    ).toBe('Con Nelly'));
+      etiquetaUbicacion({ ...base, ubicacion: 'vendedora', vendedorNombre: 'Perla', estado: 'disponible' }),
+    ).toBe('Con Perla'));
   it('vendida', () =>
     expect(etiquetaUbicacion({ ...base, ubicacion: 'fuera', estado: 'vendida' })).toBe('Vendida'));
   it('regalo', () =>

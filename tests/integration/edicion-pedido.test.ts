@@ -343,11 +343,11 @@ describe('editarPedido: casos de revisión', () => {
   it('los errores de piezas al agregar caen en el campo `agregar` del formulario de edición', async () => {
     const p = await crear([await alta('EC01')]);
     await crear([await alta('EC02')]);
-    const nelly = await app((db) =>
-      crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
+    const perla = await app((db) =>
+      crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' }),
     );
     await alta('EC03');
-    await app((db) => entregarAVendedora(db, { adminId, vendedorId: nelly, codigos: ['EC03'] }));
+    await app((db) => entregarAVendedora(db, { adminId, vendedorId: perla, codigos: ['EC03'] }));
     await expect(editar(p.id, { agregar: ['EC02'], motivo: 'x' })).rejects.toMatchObject({
       codigo: 'piezas_no_disponibles',
       campo: 'agregar',

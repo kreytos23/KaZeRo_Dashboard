@@ -33,16 +33,16 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   const codigo = `${prefijo}01`;
 
   await irA(page, '/panel/vendedores');
-  await page.getByLabel('Nombre').fill(`Nelly ${m}`);
+  await page.getByLabel('Nombre').fill(`Perla ${m}`);
   await elegirOpcion(page, 'Tipo', 'Revendedora');
   await page.getByLabel('Comisión (%)').fill('18');
   await page.getByRole('button', { name: 'Agregar vendedor' }).click();
   await expect(estadoCon(page, 'Vendedor agregado.')).toBeVisible();
-  await expect(page.getByRole('link', { name: `Nelly ${m}` })).toBeVisible();
+  await expect(page.getByRole('link', { name: `Perla ${m}` })).toBeVisible();
 
   // Ficha del vendedor: tras guardar debe verse la confirmación (regresión de la key/remount).
-  await page.getByRole('link', { name: `Nelly ${m}` }).click();
-  await expect(page.getByRole('heading', { name: `Nelly ${m}` })).toBeVisible();
+  await page.getByRole('link', { name: `Perla ${m}` }).click();
+  await expect(page.getByRole('heading', { name: `Perla ${m}` })).toBeVisible();
   await page.getByLabel('Comisión (%)').fill('20');
   // R-09: cambiar dinero exige motivo; el campo lo anuncia en su etiqueta.
   await expect(page.getByLabel('Motivo del cambio (obligatorio)')).toBeVisible();
@@ -74,7 +74,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await expect(page).toHaveURL(new RegExp(`/panel/inventario/${codigo}$`));
 
   await irA(page, '/panel/exhibidores');
-  await elegirOpcion(page, 'Vendedor', `Nelly ${m}`, true);
+  await elegirOpcion(page, 'Vendedor', `Perla ${m}`, true);
   await page.getByLabel('Nombre del exhibidor').fill(`Exhibidor ${m}`);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
   await expect(estadoCon(page, 'Exhibidor creado.')).toBeVisible();

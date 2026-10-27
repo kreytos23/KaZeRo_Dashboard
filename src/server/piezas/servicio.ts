@@ -54,7 +54,7 @@ export type PiezaFila = {
   exhibidorId: string | null;
   imagenClave: string | null;
   ubicacion: Ubicacion;
-  /** «Kazero», «Exhibidor X», «Con Nelly»… (reunión 2026-10-23, punto 5). */
+  /** «Kazero», «Exhibidor X», «Con Perla»… (reunión 2026-10-23, punto 5). */
   ubicacionEtiqueta: string;
   vendedorCustodiaId: string | null;
   vendedorCustodiaNombre: string | null;

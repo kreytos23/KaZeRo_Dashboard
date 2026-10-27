@@ -60,7 +60,7 @@ async function pedidoDePrueba() {
   const adminId = await adminDePrueba();
   const clienteId = await app((db) => crearCliente(db, { nombre: 'Clienta Sintética' }));
   const vendedorId = await app((db) =>
-    crearVendedor(db, { nombre: 'Nelly Zavala', tipo: 'revendedora', comisionPct: '18.00' }),
+    crearVendedor(db, { nombre: 'Perla Ejemplo', tipo: 'revendedora', comisionPct: '18.00' }),
   );
   await app((db) =>
     crearPedido(db, {
@@ -106,7 +106,7 @@ describe('PDF de deudores', () => {
     const { GET } = await import('@/app/panel/reportes/deudores/pdf/route');
     const f = await GET(new Request(`http://localhost/panel/reportes/deudores/pdf?vendedor=${vid}`));
     expect(f.headers.get('content-disposition')).toBe(
-      `attachment; filename="deudores-${hoyMX()}-nelly-zavala.pdf"`,
+      `attachment; filename="deudores-${hoyMX()}-perla-ejemplo.pdf"`,
     );
     const x = await GET(new Request('http://localhost/panel/reportes/deudores/pdf?vendedor=nada'));
     expect(x.headers.get('content-disposition')).toBe(`attachment; filename="deudores-${hoyMX()}.pdf"`);

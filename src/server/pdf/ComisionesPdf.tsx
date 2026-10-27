@@ -31,9 +31,7 @@ export function ComisionesPdf({ r, logo }: { r: ReporteComisiones; logo: Buffer 
           titulo={`Comisiones — ${r.nombre}`}
           meta={[
             `Generado el ${fechaCorta(hoyMX())}`,
-            r.cerrado
-              ? textoCierre(r.cerradoAt)
-              : 'Estimado, sin cerrar',
+            r.cerrado ? textoCierre(r.cerradoAt) : 'Estimado, sin cerrar',
           ]}
         />
         {r.vendedoras.length === 0 && <Text style={estilos.vacio}>No hay comisiones en este mes.</Text>}

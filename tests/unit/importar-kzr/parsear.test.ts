@@ -59,14 +59,14 @@ describe('parsearTarjeta', () => {
 
 describe('partirVendedor', () => {
   it('lo de antes de « - » es la vendedora; lo de después, la compradora (se ignora)', () => {
-    expect(partirVendedor('Nelly - Ana')).toEqual({ vendedora: 'Nelly', comprador: 'Ana' });
-    expect(partirVendedor('  Nelly   -   Ana María ')).toEqual({
-      vendedora: 'Nelly',
+    expect(partirVendedor('Perla - Ana')).toEqual({ vendedora: 'Perla', comprador: 'Ana' });
+    expect(partirVendedor('  Perla   -   Ana María ')).toEqual({
+      vendedora: 'Perla',
       comprador: 'Ana María',
     });
   });
   it('sin « - » se usa todo el texto; un guion pegado no separa', () => {
-    expect(partirVendedor('Nelly')).toEqual({ vendedora: 'Nelly', comprador: null });
+    expect(partirVendedor('Perla')).toEqual({ vendedora: 'Perla', comprador: null });
     expect(partirVendedor('Ana-María')).toEqual({ vendedora: 'Ana-María', comprador: null });
   });
 });

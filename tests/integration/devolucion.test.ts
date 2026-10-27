@@ -88,9 +88,9 @@ beforeEach(async () => {
   adminId = await reiniciarConAdmin();
   ctx = {
     vendedorId: await app((db) =>
-      crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
+      crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' }),
     ),
-    clienteId: await app((db) => crearCliente(db, { nombre: 'Danya' })),
+    clienteId: await app((db) => crearCliente(db, { nombre: 'Clienta' })),
   };
 });
 

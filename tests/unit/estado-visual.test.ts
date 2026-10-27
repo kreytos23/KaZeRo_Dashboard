@@ -38,8 +38,8 @@ describe('vistaEstadoPieza', () => {
 
 describe('vistaUbicacion y exhibidor', () => {
   it('la ubicación conserva el texto armado y es neutra', () => {
-    expect(vistaUbicacion('vendedora', 'Con Nelly')).toEqual({
-      texto: 'Con Nelly',
+    expect(vistaUbicacion('vendedora', 'Con Perla')).toEqual({
+      texto: 'Con Perla',
       tono: 'neutro',
       icono: 'pin',
     });

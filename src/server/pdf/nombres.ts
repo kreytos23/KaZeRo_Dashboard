@@ -13,10 +13,10 @@ function nombre(base: string, vendedora?: string | null) {
   return `${base}${s ? `-${s}` : ''}.pdf`;
 }
 
-/** 'deudores-2026-11-12.pdf' | 'deudores-2026-11-12-nelly-zavala.pdf' */
+/** 'deudores-2026-11-12.pdf' | 'deudores-2026-11-12-perla-ejemplo.pdf' */
 export const nombreArchivoDeudores = (fecha: string, vendedora?: string | null) =>
   nombre(`deudores-${fecha}`, vendedora);
 
-/** 'comisiones-2026-11.pdf' | 'comisiones-2026-11-nelly-zavala.pdf' */
+/** 'comisiones-2026-11.pdf' | 'comisiones-2026-11-perla-ejemplo.pdf' */
 export const nombreArchivoComisiones = (mes: string, vendedora?: string | null) =>
   nombre(`comisiones-${mes}`, vendedora);

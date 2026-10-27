@@ -259,22 +259,22 @@ describe('planificar: vendedora por prefijo', () => {
   const conVend = (nombres: [string, boolean][]) =>
     snap({ vendedores: nombres.map(([nombre, activo], i) => ({ id: `v${i}`, nombre, activo })) });
   it('sin coincidencia exacta, acepta una vendedora activa única que empieza con el texto + palabra completa', () => {
-    const p = planificar([f(2, { vendedor: 'Nelly - Clienta' })], conVend([['Nelly Zavala', true]]), HOY);
+    const p = planificar([f(2, { vendedor: 'Perla - Clienta' })], conVend([['Perla Ejemplo', true]]), HOY);
     expect(p.errores).toEqual([]);
     expect((p.notas[0] as NotaNueva).vendedorId).toBe('v0');
     expect(p.avisos).toEqual([
       expect.objectContaining({
         codigo: 'vendedor_por_prefijo',
-        mensaje: expect.stringContaining('Nelly Zavala'),
+        mensaje: expect.stringContaining('Perla Ejemplo'),
       }),
     ]);
   });
   it('la coincidencia exacta tiene prioridad sobre el prefijo', () => {
     const p = planificar(
-      [f(2, { vendedor: 'Nelly' })],
+      [f(2, { vendedor: 'Perla' })],
       conVend([
-        ['Nelly Zavala', true],
-        ['Nelly', true],
+        ['Perla Ejemplo', true],
+        ['Perla', true],
       ]),
       HOY,
     );
@@ -284,25 +284,25 @@ describe('planificar: vendedora por prefijo', () => {
   it('ambigua si hay más de una; no encontrada si es parte de una palabra o la vendedora está inactiva', () => {
     expect(
       errores(
-        [f(2, { vendedor: 'Nelly' })],
+        [f(2, { vendedor: 'Perla' })],
         conVend([
-          ['Nelly Zavala', true],
-          ['Nelly Ruiz', true],
+          ['Perla Ejemplo', true],
+          ['Perla Ruiz', true],
         ]),
       ),
     ).toEqual(['vendedor_ambiguo']);
-    expect(errores([f(2, { vendedor: 'Nel' })], conVend([['Nelly Zavala', true]]))).toEqual([
+    expect(errores([f(2, { vendedor: 'Per' })], conVend([['Perla Ejemplo', true]]))).toEqual([
       'vendedor_no_encontrado',
     ]);
-    expect(errores([f(2, { vendedor: 'Nelly' })], conVend([['Nelly Zavala', false]]))).toEqual([
+    expect(errores([f(2, { vendedor: 'Perla' })], conVend([['Perla Ejemplo', false]]))).toEqual([
       'vendedor_no_encontrado',
     ]);
     expect(
       errores(
-        [f(2, { vendedor: 'Nelly' })],
+        [f(2, { vendedor: 'Perla' })],
         conVend([
-          ['Nelly Zavala', false],
-          ['Nelly Ruiz', true],
+          ['Perla Ejemplo', false],
+          ['Perla Ruiz', true],
         ]),
       ),
     ).toEqual([]);
@@ -310,10 +310,10 @@ describe('planificar: vendedora por prefijo', () => {
   it('un aviso por resolución distinta, con el conteo de notas', () => {
     const p = planificar(
       [
-        f(2, { vendedor: 'Nelly' }),
-        f(3, { nota: 'KZR-9', id: 'ZZ02', vendedor: 'Nelly', tarjeta: '2 17/09/2026' }),
+        f(2, { vendedor: 'Perla' }),
+        f(3, { nota: 'KZR-9', id: 'ZZ02', vendedor: 'Perla', tarjeta: '2 17/09/2026' }),
       ],
-      conVend([['Nelly Zavala', true]]),
+      conVend([['Perla Ejemplo', true]]),
       HOY,
     );
     const av = p.avisos.filter((a) => a.codigo === 'vendedor_por_prefijo');

@@ -21,7 +21,7 @@ describe('calcularCambios (R-08)', () => {
     ]);
   });
   it('una edición sin cambios no produce nada (no-op)', () => {
-    expect(calcularCambios({ nombre: 'Nelly', telefono: null }, { nombre: 'Nelly', telefono: null })).toEqual(
+    expect(calcularCambios({ nombre: 'Perla', telefono: null }, { nombre: 'Perla', telefono: null })).toEqual(
       [],
     );
   });

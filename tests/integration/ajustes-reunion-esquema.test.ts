@@ -27,16 +27,16 @@ async function resultado(fn: () => Promise<unknown>) {
 }
 
 let adminId = '';
-let b: { clienteId: string; casaId: string; nellyId: string; olgaId: string; categoriaId: string };
+let b: { clienteId: string; casaId: string; perlaId: string; olgaId: string; categoriaId: string };
 
 beforeEach(async () => {
   adminId = await reiniciarConAdmin();
   b = await app(async (db) => ({
     clienteId: await idDe(db, sql`INSERT INTO cliente (nombre) VALUES ('Gloria') RETURNING id`),
     casaId: await idDe(db, sql`INSERT INTO vendedor (nombre, tipo) VALUES ('Kazero', 'casa') RETURNING id`),
-    nellyId: await idDe(
+    perlaId: await idDe(
       db,
-      sql`INSERT INTO vendedor (nombre, tipo) VALUES ('Nelly', 'revendedora') RETURNING id`,
+      sql`INSERT INTO vendedor (nombre, tipo) VALUES ('Perla', 'revendedora') RETURNING id`,
     ),
     olgaId: await idDe(
       db,
@@ -146,7 +146,7 @@ const nuevoPago = (ej: Ejecutor, metodo: string, monto: string, o: { vendedor?: 
     ej,
     sql`INSERT INTO pago (idempotency_key, fecha, monto, metodo, pagador_cliente_id, pagador_vendedor_id, admin_id)
         VALUES (${randomUUID()}, '2026-10-12', ${monto}, ${metodo}, ${o.vendedor ? null : b.clienteId},
-                ${o.vendedor ? b.nellyId : null}, ${adminId}) RETURNING id`,
+                ${o.vendedor ? b.perlaId : null}, ${adminId}) RETURNING id`,
   );
 const aplicar = (ej: Ejecutor, pagoId: string, pedidoId: string, monto: string) =>
   idDe(
@@ -159,7 +159,7 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
   it('pieza_una_ubicacion y pieza_custodia_solo_si_aplica (CHECK)', async () => {
     const [ex] = (
       await q(
-        sql`INSERT INTO exhibidor (vendedor_id, nombre, fecha_envio) VALUES (${b.nellyId}, 'Feria', '2026-10-01') RETURNING id`,
+        sql`INSERT INTO exhibidor (vendedor_id, nombre, fecha_envio) VALUES (${b.perlaId}, 'Feria', '2026-10-01') RETURNING id`,
       )
     ).rows as { id: string }[];
     const alta = (estado: string, exhibidorId: string | null, custodiaId: string | null) =>
@@ -169,11 +169,11 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
                       ${exhibidorId}, ${custodiaId})`),
       );
     // Una pieza nueva siempre nace en Kazero (trigger pieza_alta_sin_custodia): se entrega después del alta.
-    expect(await alta('disponible', null, b.nellyId)).toBe('pieza_alta_custodia');
-    expect(await alta('vendida', null, b.nellyId)).toBe('pieza_alta_custodia');
+    expect(await alta('disponible', null, b.perlaId)).toBe('pieza_alta_custodia');
+    expect(await alta('vendida', null, b.perlaId)).toBe('pieza_alta_custodia');
     // Por UPDATE: un cambio manual que conserva la vendedora choca con el CHECK.
     const p = await nuevaPieza('AF20');
-    await entregar(p, b.nellyId);
+    await entregar(p, b.perlaId);
     expect(await resultado(() => q(sql`UPDATE pieza SET estado = 'regalo' WHERE id = ${p}`))).toBe(
       'pieza_custodia_solo_si_aplica',
     );
@@ -195,11 +195,11 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
             }
           };
           await intento(sql`INSERT INTO pieza (codigo, categoria_id, descripcion, precio, fecha_alta, estado, exhibidor_id, vendedor_custodia_id)
-            VALUES ('XB01', ${b.categoriaId}, 'Anillo', '10', '2026-10-01', 'apartada', ${ex!.id}, ${b.nellyId})`);
+            VALUES ('XB01', ${b.categoriaId}, 'Anillo', '10', '2026-10-01', 'apartada', ${ex!.id}, ${b.perlaId})`);
           const id = await idDe(
             tx,
             sql`INSERT INTO pieza (codigo, categoria_id, descripcion, precio, fecha_alta, vendedor_custodia_id)
-                VALUES ('XC01', ${b.categoriaId}, 'Anillo', '10', '2026-10-01', ${b.nellyId}) RETURNING id`,
+                VALUES ('XC01', ${b.categoriaId}, 'Anillo', '10', '2026-10-01', ${b.perlaId}) RETURNING id`,
           );
           await intento(
             sql`INSERT INTO movimiento_pieza (pieza_id, tipo, a_estado, admin_id) VALUES (${id}, 'alta', 'disponible', ${adminId})`,
@@ -216,10 +216,10 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
 
   it('regreso_vendedora: solo deshace la entrega vigente (no se repite ni se inventa)', async () => {
     const p = await nuevaPieza('AF21');
-    expect(await resultado(() => regresar(p, b.nellyId))).toBe('movimiento_coherente');
-    await entregar(p, b.nellyId);
-    expect(await resultado(() => regresar(p, b.nellyId))).toBe('ok');
-    expect(await resultado(() => regresar(p, b.nellyId))).toBe('movimiento_coherente');
+    expect(await resultado(() => regresar(p, b.perlaId))).toBe('movimiento_coherente');
+    await entregar(p, b.perlaId);
+    expect(await resultado(() => regresar(p, b.perlaId))).toBe('ok');
+    expect(await resultado(() => regresar(p, b.perlaId))).toBe('movimiento_coherente');
     // Entregada y luego sacada de la custodia por un cambio manual (D-12): ya no hay entrega que regresar.
     await entregar(p, b.olgaId);
     await enTx(async (tx) => {
@@ -237,7 +237,7 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
 
   it('pieza_cambio_custodia: nunca de una vendedora a otra, ni ganarla o perderla estando apartada', async () => {
     const p1 = await nuevaPieza('AF12');
-    expect(await resultado(() => entregar(p1, b.nellyId))).toBe('ok');
+    expect(await resultado(() => entregar(p1, b.perlaId))).toBe('ok');
     expect(
       await resultado(() => q(sql`UPDATE pieza SET vendedor_custodia_id = ${b.olgaId} WHERE id = ${p1}`)),
     ).toBe('pieza_cambio_custodia');
@@ -262,9 +262,9 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
       await mov(tx, p2, 'apartado', 'disponible', 'apartada', { pedidoId: ped });
     });
     expect(
-      await resultado(() => q(sql`UPDATE pieza SET vendedor_custodia_id = ${b.nellyId} WHERE id = ${p2}`)),
+      await resultado(() => q(sql`UPDATE pieza SET vendedor_custodia_id = ${b.perlaId} WHERE id = ${p2}`)),
     ).toBe('pieza_cambio_custodia');
-    expect(await resultado(() => regresar(p1, b.nellyId))).toBe('ok');
+    expect(await resultado(() => regresar(p1, b.perlaId))).toBe('ok');
     // Un cambio manual (defecto) la saca de la custodia.
     await entregar(p1, b.olgaId);
     expect(
@@ -288,15 +288,15 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
           await mov(tx, p, 'entrega_vendedora', 'disponible', 'disponible', { vendedorId: enMovimiento });
         }),
       );
-    expect(await entregaCon(b.nellyId, b.olgaId)).toBe('movimiento_coherente');
-    expect(await entregaCon(b.nellyId, undefined)).toBe('movimiento_coherente');
+    expect(await entregaCon(b.perlaId, b.olgaId)).toBe('movimiento_coherente');
+    expect(await entregaCon(b.perlaId, undefined)).toBe('movimiento_coherente');
     // Entrega sin cambiar la custodia (la pieza sigue en Kazero).
     expect(
       await resultado(() =>
-        enTx((tx) => mov(tx, p, 'entrega_vendedora', 'disponible', 'disponible', { vendedorId: b.nellyId })),
+        enTx((tx) => mov(tx, p, 'entrega_vendedora', 'disponible', 'disponible', { vendedorId: b.perlaId })),
       ),
     ).toBe('movimiento_coherente');
-    await entregar(p, b.nellyId);
+    await entregar(p, b.perlaId);
     const regresoCon = (vendedorId: string) =>
       resultado(() =>
         enTx(async (tx) => {
@@ -308,10 +308,10 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
     // Regreso que no quita la custodia.
     expect(
       await resultado(() =>
-        enTx((tx) => mov(tx, p, 'regreso_vendedora', 'disponible', 'disponible', { vendedorId: b.nellyId })),
+        enTx((tx) => mov(tx, p, 'regreso_vendedora', 'disponible', 'disponible', { vendedorId: b.perlaId })),
       ),
     ).toBe('movimiento_coherente');
-    expect(await regresoCon(b.nellyId)).toBe('ok');
+    expect(await regresoCon(b.perlaId)).toBe('ok');
   });
 
   it('movimiento_coherente: un movimiento devolucion exige su devolución registrada', async () => {
@@ -329,10 +329,10 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
 
   it('kazero_app puede cambiar la custodia (UPDATE por columna) y v_pieza deriva la ubicación', async () => {
     const enKazero = await nuevaPieza('AA01');
-    const conNelly = await nuevaPieza('AA02');
+    const conPerla = await nuevaPieza('AA02');
     const enExhibidor = await nuevaPieza('AA03');
     const vendida = await nuevaPieza('AA04');
-    await entregar(conNelly, b.nellyId);
+    await entregar(conPerla, b.perlaId);
     const exId = await app((db) =>
       idDe(
         db,
@@ -354,19 +354,19 @@ describe('ubicación de la pieza: custodia de vendedora (D-8, D-9)', () => {
       {
         codigo: 'AA02',
         ubicacion: 'vendedora',
-        vendedor_custodia_id: b.nellyId,
-        vendedor_custodia_nombre: 'Nelly',
+        vendedor_custodia_id: b.perlaId,
+        vendedor_custodia_nombre: 'Perla',
       },
       { codigo: 'AA03', ubicacion: 'exhibidor', vendedor_custodia_id: null, vendedor_custodia_nombre: null },
       { codigo: 'AA04', ubicacion: 'fuera', vendedor_custodia_id: null, vendedor_custodia_nombre: null },
     ]);
     expect(enKazero).toBeTruthy();
     const m = await q(
-      sql`SELECT tipo, vendedor_id, vendedor_nombre FROM v_movimiento_pieza WHERE pieza_id = ${conNelly} ORDER BY orden`,
+      sql`SELECT tipo, vendedor_id, vendedor_nombre FROM v_movimiento_pieza WHERE pieza_id = ${conPerla} ORDER BY orden`,
     );
     expect(m.rows).toEqual([
       { tipo: 'alta', vendedor_id: null, vendedor_nombre: null },
-      { tipo: 'entrega_vendedora', vendedor_id: b.nellyId, vendedor_nombre: 'Nelly' },
+      { tipo: 'entrega_vendedora', vendedor_id: b.perlaId, vendedor_nombre: 'Perla' },
     ]);
   });
 });

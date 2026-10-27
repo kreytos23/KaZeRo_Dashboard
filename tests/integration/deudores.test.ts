@@ -16,7 +16,7 @@ import { reiniciarConAdmin, urlApp } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 let adminId = '';
-let nellyId = '';
+let perlaId = '';
 let rosaId = '';
 let conTel = '';
 let sinTel = '';
@@ -59,22 +59,22 @@ const sumarDias = (iso: string, d: number) =>
 beforeEach(async () => {
   adminId = await reiniciarConAdmin();
   n = 0;
-  nellyId = await app((db) =>
-    crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
+  perlaId = await app((db) =>
+    crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' }),
   );
   rosaId = await app((db) =>
     crearVendedor(db, { nombre: 'Rosa', tipo: 'revendedora', comisionPct: '10.00' }),
   );
-  conTel = await app((db) => crearCliente(db, { nombre: 'Danya', telefono: '5512345678' }));
+  conTel = await app((db) => crearCliente(db, { nombre: 'Clienta', telefono: '5512345678' }));
   sinTel = await app((db) => crearCliente(db, { nombre: 'Lupe' }));
 });
 
 describe('reporteDeudores', () => {
   it('solo pedidos abiertos con saldo, con montos de v_pedido, teléfono nulo y días/atrasado', async () => {
-    const a = await pedido(nellyId, conTel, 100000, 40000);
-    const b = await pedido(nellyId, sinTel, 50000);
+    const a = await pedido(perlaId, conTel, 100000, 40000);
+    const b = await pedido(perlaId, sinTel, 50000);
     const r1 = await pedido(rosaId, conTel, 30000);
-    const liquidado = await pedido(nellyId, conTel, 20000, 20000);
+    const liquidado = await pedido(perlaId, conTel, 20000, 20000);
     const cancelado = await pedido(rosaId, sinTel, 20000);
     const { version } = await fila(cancelado);
     await app((db) =>
@@ -90,11 +90,11 @@ describe('reporteDeudores', () => {
     const ids = r.grupos.flatMap((g) => g.pedidos.map((p) => p.pedidoId));
     expect(ids.sort()).toEqual([a, b, r1].sort());
     expect(ids).not.toContain(liquidado);
-    expect(r.grupos.map((g) => g.vendedorNombre)).toEqual(['Nelly', 'Rosa']);
+    expect(r.grupos.map((g) => g.vendedorNombre)).toEqual(['Perla', 'Rosa']);
     const pa = r.grupos[0]!.pedidos.find((p) => p.pedidoId === a)!;
     expect(pa).toMatchObject({
       folio: fa.folio,
-      clienteNombre: 'Danya',
+      clienteNombre: 'Clienta',
       telefono: '5512345678',
       totalCentavos: numericACentavos(fa.total),
       pagadoCentavos: numericACentavos(fa.pagado),
@@ -108,7 +108,7 @@ describe('reporteDeudores', () => {
   });
 
   it('filtra por vendedora', async () => {
-    await pedido(nellyId, conTel, 100000);
+    await pedido(perlaId, conTel, 100000);
     const r1 = await pedido(rosaId, conTel, 30000);
     const r = await app((db) => reporteDeudores(db, { vendedorId: rosaId }));
     expect(r.numPedidos).toBe(1);
@@ -125,13 +125,13 @@ describe('reporteDeudores', () => {
 
 describe('resumenDeVendedora', () => {
   it('suma por cobrar, comisión estimada del mes abierto y pendientes de pago', async () => {
-    await pedido(nellyId, conTel, 100000, 40000);
-    await pedido(nellyId, sinTel, 50000);
+    await pedido(perlaId, conTel, 100000, 40000);
+    await pedido(perlaId, sinTel, 50000);
     await pedido(rosaId, sinTel, 70000);
-    await pedido(nellyId, conTel, 20000, 20000); // liquidado hoy: comisión 18% = 3600
+    await pedido(perlaId, conTel, 20000, 20000); // liquidado hoy: comisión 18% = 3600
     const hoy = await app(async (db) => (await db.select().from(vPedido).limit(1))[0]!.fecha);
 
-    const r = await app((db) => resumenDeVendedora(db, nellyId, hoy));
+    const r = await app((db) => resumenDeVendedora(db, perlaId, hoy));
     expect(r.porCobrarCentavos).toBe(60000 + 50000);
     expect(r.pedidosConSaldo).toBe(2);
     expect(r.comisionEnCurso.montoCentavos).toBe(3600);
@@ -143,7 +143,7 @@ describe('resumenDeVendedora', () => {
     await app((db) =>
       cerrarMesComisiones(db, { key: randomUUID(), adminId, mes: r.comisionEnCurso.mes, hoy: mesSig }),
     );
-    const despues = await app((db) => resumenDeVendedora(db, nellyId, mesSig));
+    const despues = await app((db) => resumenDeVendedora(db, perlaId, mesSig));
     expect(despues.pendientes).toMatchObject([{ mes: r.comisionEnCurso.mes, montoCentavos: 3600 }]);
     expect(despues.comisionEnCurso.montoCentavos).toBe(0);
     const rosa = await app((db) => resumenDeVendedora(db, rosaId, mesSig));

@@ -14,15 +14,15 @@ const indice: IndiceBusqueda = {
       null,
     ],
     ['p2', 'AF120', 'Pulsera hilo rosa', 'vendida', null, null],
-    ['p3', 'X/1', '<img src=x onerror=alert(1)>', 'disponible', null, 'Con Nelly'],
+    ['p3', 'X/1', '<img src=x onerror=alert(1)>', 'disponible', null, 'Con Perla'],
   ],
   clientes: [
-    ['c1', 'Danya', '5to norte'],
+    ['c1', 'Clienta', '5to norte'],
     ['c2', 'Rocío Santibañez', null],
     ['c3', 'Thelina', null],
   ],
   vendedores: [
-    ['v1', 'Nelly'],
+    ['v1', 'Perla'],
     ['v2', 'Ana'],
   ],
   pedidos: [['p1', 34, 'Gloria Roldán', 'abierto']],
@@ -41,8 +41,8 @@ describe('búsqueda global (diseño §8)', () => {
   it('el código exacto gana incluso con espacios y minúsculas', () => {
     expect(claves('  af 12 ')[0]).toBe('pieza:p1');
   });
-  it('palabras con prefijo en cualquier orden: "dan 5to"', () => {
-    expect(claves('dan 5to')).toEqual(['cliente:c1']);
+  it('palabras con prefijo en cualquier orden: "cli 5to"', () => {
+    expect(claves('cli 5to')).toEqual(['cliente:c1']);
   });
   it('sin acentos ni mayúsculas, en la consulta y en el índice', () => {
     expect(claves('santibanez')).toEqual(['cliente:c2']);
@@ -57,7 +57,7 @@ describe('búsqueda global (diseño §8)', () => {
   });
   it('busca en descripción y vendedores', () => {
     expect(claves('serpiente')).toEqual(['pieza:p1']);
-    expect(motor.buscar('nelly')[0]).toMatchObject({ tipo: 'vendedor', href: '/panel/vendedores/v1' });
+    expect(motor.buscar('perla')[0]).toMatchObject({ tipo: 'vendedor', href: '/panel/vendedores/v1' });
   });
   it('los recientes suben en el empate', () => {
     expect(claves('af', ['pieza:p2'])[0]).toBe('pieza:p2');
@@ -94,7 +94,7 @@ describe('búsqueda global (diseño §8)', () => {
 describe('ubicación (índice v4)', () => {
   it('el subtítulo suma la ubicación solo cuando viene (exhibidor o vendedora)', () => {
     expect(motor.buscar('AF12')[0]!.subtitulo).toBe('Disponible');
-    expect(motor.buscar('X/1')[0]!.subtitulo).toBe('Disponible · Con Nelly');
+    expect(motor.buscar('X/1')[0]!.subtitulo).toBe('Disponible · Con Perla');
   });
 });
 
@@ -103,7 +103,7 @@ describe('miniaturas (índice v2)', () => {
     const [af12] = motor.buscar('AF12');
     expect(af12!.miniatura).toBe('/api/piezas/p1/imagen?v=9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d&t=mini');
     expect(motor.buscar('pulsera hilo')[0]!.miniatura).toBeNull();
-    expect(motor.buscar('danya')[0]!.miniatura).toBeNull();
+    expect(motor.buscar('clienta')[0]!.miniatura).toBeNull();
   });
 });
 

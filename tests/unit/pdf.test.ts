@@ -24,7 +24,9 @@ describe('nombres de archivo', () => {
     expect(nombreArchivoDeudores('2026-11-12', null)).toBe('deudores-2026-11-12.pdf');
   });
   it('con vendedora: minúsculas, sin acentos ni ñ, solo [a-z0-9-]', () => {
-    expect(nombreArchivoDeudores('2026-11-12', 'Nelly Zavala')).toBe('deudores-2026-11-12-nelly-zavala.pdf');
+    expect(nombreArchivoDeudores('2026-11-12', 'Perla Ejemplo')).toBe(
+      'deudores-2026-11-12-perla-ejemplo.pdf',
+    );
     expect(nombreArchivoComisiones('2026-11', 'María Ñandú  Pérez!')).toBe(
       'comisiones-2026-11-maria-nandu-perez.pdf',
     );

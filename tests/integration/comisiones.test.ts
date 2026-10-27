@@ -17,7 +17,7 @@ import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 let adminId = '';
-let nellyId = '';
+let perlaId = '';
 let rosaId = '';
 let clienteId = '';
 let n = 0;
@@ -32,7 +32,7 @@ const datosPedido = (vendedorId: string) => ({
 });
 
 /** Pedido de una pieza liquidado con un solo cobro; `fecha` reescribe la fecha de cobro (el servicio no admite futuras). */
-async function liquidado(precioCentavos: number, fecha: string, vendedorId = nellyId) {
+async function liquidado(precioCentavos: number, fecha: string, vendedorId = perlaId) {
   const codigo = `CM${String(++n).padStart(3, '0')}`;
   await app((db) =>
     altaPieza(db, {
@@ -77,19 +77,19 @@ const pagar = (corteId: string, vendedorId: string, key = randomUUID()) =>
   app((db) => registrarPagoComision(db, { key, adminId, corteId, vendedorId, metodo: 'efectivo' }));
 const anular = (pagoId: string, motivo = 'Se pagó dos veces', key = randomUUID()) =>
   app((db) => anularPagoComision(db, { key, adminId, pagoId, motivo }));
-const nelly = (rep: Awaited<ReturnType<typeof reporte>>) =>
-  rep.vendedoras.find((v) => v.vendedorId === nellyId)!;
+const perla = (rep: Awaited<ReturnType<typeof reporte>>) =>
+  rep.vendedoras.find((v) => v.vendedorId === perlaId)!;
 
 beforeEach(async () => {
   adminId = await reiniciarConAdmin();
   n = 0;
-  nellyId = await app((db) =>
-    crearVendedor(db, { nombre: 'Nelly', tipo: 'revendedora', comisionPct: '18.00' }),
+  perlaId = await app((db) =>
+    crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' }),
   );
   rosaId = await app((db) =>
     crearVendedor(db, { nombre: 'Rosa', tipo: 'revendedora', comisionPct: '10.00' }),
   );
-  clienteId = await app((db) => crearCliente(db, { nombre: 'Danya' }));
+  clienteId = await app((db) => crearCliente(db, { nombre: 'Clienta' }));
 });
 
 describe('comisiones', () => {
@@ -103,12 +103,12 @@ describe('comisiones', () => {
         precioCentavos: 100000,
       }),
     );
-    const p = await app((db) => crearPedido(db, { ...datosPedido(nellyId), codigos: ['CMX1'] }));
+    const p = await app((db) => crearPedido(db, { ...datosPedido(perlaId), codigos: ['CMX1'] }));
     await cobrar(p.id, 40000, '2026-10-10');
     expect((await reporte('2026-11-01', '2026-11-20')).numPedidos).toBe(0);
     await cobrar(p.id, 60000, '2026-11-05');
     const r = await reporte('2026-11-01', '2026-11-20');
-    const v = nelly(r);
+    const v = perla(r);
     expect(v.pedidosDetalle).toMatchObject([
       {
         pedidoId: p.id,
@@ -116,8 +116,8 @@ describe('comisiones', () => {
         montoCentavos: 18000,
         pct: '18.00',
         fechaLiquidacion: '2026-11-05',
-        vendedorNombre: 'Nelly',
-        clienteNombre: 'Danya',
+        vendedorNombre: 'Perla',
+        clienteNombre: 'Clienta',
       },
     ]);
     expect(v.estadoPago).toBe('estimado');
@@ -132,13 +132,13 @@ describe('comisiones', () => {
       db.select().from(comisionLinea).where(eq(comisionLinea.corteId, c.corteId)),
     );
     expect(lineas).toHaveLength(1);
-    expect(lineas[0]).toMatchObject({ pedidoId: p.id, vendedorId: nellyId, pct: '18.00' });
+    expect(lineas[0]).toMatchObject({ pedidoId: p.id, vendedorId: perlaId, pct: '18.00' });
     for (const l of lineas)
       expect(numericACentavos(l.monto)).toBe(comisionCentavos(numericACentavos(l.base), l.pct));
     const r = await reporte('2026-11-01', '2026-12-01');
     expect(r).toMatchObject({ cerrado: true, totalCentavos: 18000, numPedidos: 1, cerrable: false });
     expect(r.cerradoAt).toBeTruthy();
-    expect(nelly(r)).toMatchObject({
+    expect(perla(r)).toMatchObject({
       comisionCentavos: 18000,
       pct: '18.00',
       estadoPago: 'pendiente',
@@ -151,18 +151,18 @@ describe('comisiones', () => {
     await liquidado(100000, '2026-12-03');
     await app((db) =>
       actualizarVendedor(db, {
-        id: nellyId,
+        id: perlaId,
         version: 1,
         adminId,
         motivo: 'Prueba',
-        nombre: 'Nelly',
+        nombre: 'Perla',
         tipo: 'revendedora',
         comisionPct: '20.00',
         activo: true,
       }),
     );
-    expect(nelly(await reporte('2026-11-01', '2026-12-05')).comisionCentavos).toBe(18000);
-    expect(nelly(await reporte('2026-12-01', '2026-12-05')).comisionCentavos).toBe(20000);
+    expect(perla(await reporte('2026-11-01', '2026-12-05')).comisionCentavos).toBe(18000);
+    expect(perla(await reporte('2026-12-01', '2026-12-05')).comisionCentavos).toBe(20000);
   });
 
   it('C-4: un pago atrasado de un pedido liquidado después del cierre entra en el mes siguiente', async () => {
@@ -170,7 +170,7 @@ describe('comisiones', () => {
     await cerrar('2026-11-01', '2026-12-01');
     const tarde = await liquidado(50000, '2026-11-29');
     const dic = await reporte('2026-12-01', '2026-12-10');
-    expect(nelly(dic).pedidosDetalle.map((d) => d.pedidoId)).toEqual([tarde.id]);
+    expect(perla(dic).pedidosDetalle.map((d) => d.pedidoId)).toEqual([tarde.id]);
     const c = await cerrar('2026-12-01', '2027-01-01');
     expect(c).toMatchObject({ numPedidos: 1, totalCentavos: 9000 });
   });
@@ -234,12 +234,12 @@ describe('comisiones', () => {
   it('carrera: dos pagos a la vez de la misma vendedora y corte (keys distintas) → uno OK y el otro ya_pagado', async () => {
     await liquidado(100000, '2026-11-05');
     const c = await cerrar('2026-11-01', '2026-12-01');
-    const r = await Promise.allSettled([pagar(c.corteId, nellyId), pagar(c.corteId, nellyId)]);
+    const r = await Promise.allSettled([pagar(c.corteId, perlaId), pagar(c.corteId, perlaId)]);
     expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
     const rechazo = r.find((x) => x.status === 'rejected') as PromiseRejectedResult;
     expect(rechazo.reason).toMatchObject({
       codigo: 'ya_pagado',
-      message: 'La comisión de Nelly de Noviembre 2026 ya está pagada.',
+      message: 'La comisión de Perla de Noviembre 2026 ya está pagada.',
     });
     const cuenta = await app((db) =>
       db.execute(sql`SELECT count(*)::int AS n FROM pago_comision WHERE anulado_at IS NULL`),
@@ -263,20 +263,20 @@ describe('comisiones', () => {
   it('pago: registrar, doble envío, ya pagado, anular, anular otra vez y volver a pagar', async () => {
     await liquidado(100000, '2026-11-05');
     // En curso aún no hay corte.
-    await expect(pagar(randomUUID(), nellyId)).rejects.toMatchObject({ codigo: 'no_encontrado' });
+    await expect(pagar(randomUUID(), perlaId)).rejects.toMatchObject({ codigo: 'no_encontrado' });
     const c = await cerrar('2026-11-01', '2026-12-01');
     const key = randomUUID();
-    const p1 = await pagar(c.corteId, nellyId, key);
+    const p1 = await pagar(c.corteId, perlaId, key);
     expect(p1.montoCentavos).toBe(18000);
-    expect(await pagar(c.corteId, nellyId, key)).toEqual(p1);
-    await expect(pagar(c.corteId, nellyId)).rejects.toMatchObject({
+    expect(await pagar(c.corteId, perlaId, key)).toEqual(p1);
+    await expect(pagar(c.corteId, perlaId)).rejects.toMatchObject({
       codigo: 'ya_pagado',
-      message: 'La comisión de Nelly de Noviembre 2026 ya está pagada.',
+      message: 'La comisión de Perla de Noviembre 2026 ya está pagada.',
     });
-    let v = nelly(await reporte('2026-11-01', '2026-12-01'));
+    let v = perla(await reporte('2026-11-01', '2026-12-01'));
     expect(v.estadoPago).toBe('pagado');
     expect(v.pago).toMatchObject({ id: p1.pagoId, metodo: 'efectivo', montoCentavos: 18000, nota: null });
-    expect(await app((db) => pendientesDeVendedora(db, nellyId))).toEqual([]);
+    expect(await app((db) => pendientesDeVendedora(db, perlaId))).toEqual([]);
     await expect(anular(p1.pagoId, '   ')).rejects.toMatchObject({
       codigo: 'motivo_invalido',
       campo: 'motivo',
@@ -287,16 +287,16 @@ describe('comisiones', () => {
       codigo: 'pago_anulado',
       message: 'Ese pago ya estaba deshecho.',
     });
-    v = nelly(await reporte('2026-11-01', '2026-12-01'));
+    v = perla(await reporte('2026-11-01', '2026-12-01'));
     expect(v.estadoPago).toBe('pendiente');
-    expect((await pagar(c.corteId, nellyId)).montoCentavos).toBe(18000);
-    expect(nelly(await reporte('2026-11-01', '2026-12-01')).estadoPago).toBe('pagado');
+    expect((await pagar(c.corteId, perlaId)).montoCentavos).toBe(18000);
+    expect(perla(await reporte('2026-11-01', '2026-12-01')).estadoPago).toBe('pagado');
   });
 
   it('pago: valida método, nota y fecha', async () => {
     await liquidado(100000, '2026-11-05');
     const c = await cerrar('2026-11-01', '2026-12-01');
-    const base = { key: randomUUID(), adminId, corteId: c.corteId, vendedorId: nellyId };
+    const base = { key: randomUUID(), adminId, corteId: c.corteId, vendedorId: perlaId };
     await expect(app((db) => registrarPagoComision(db, { ...base, metodo: 'cheque' }))).rejects.toMatchObject(
       { codigo: 'metodo_invalido', campo: 'metodo' },
     );
@@ -320,7 +320,7 @@ describe('comisiones', () => {
     );
     const p = await app((db) =>
       crearPedido(db, {
-        ...datosPedido(nellyId),
+        ...datosPedido(perlaId),
         codigos: ['CMZ1'],
         descuentoManualCentavos: 5000,
         descuentoManualMotivo: 'Regalo',
@@ -339,18 +339,18 @@ describe('comisiones', () => {
     const f = hoy.rows[0]!.f;
     const mes = `${f.slice(0, 7)}-01`;
     const r = await reporte(mes, '2999-01-01');
-    expect(nelly(r).pedidosDetalle).toMatchObject([{ pedidoId: p.id, baseCentavos: 0, montoCentavos: 0 }]);
+    expect(perla(r).pedidosDetalle).toMatchObject([{ pedidoId: p.id, baseCentavos: 0, montoCentavos: 0 }]);
   });
 
   it('pendientesDeVendedora lista el mes cerrado mientras no se pague y lo quita al pagar', async () => {
     await liquidado(100000, '2026-11-05');
     const c = await cerrar('2026-11-01', '2026-12-01');
-    expect(await app((db) => pendientesDeVendedora(db, nellyId))).toEqual([
+    expect(await app((db) => pendientesDeVendedora(db, perlaId))).toEqual([
       { mes: '2026-11-01', nombre: 'Noviembre 2026', montoCentavos: 18000 },
     ]);
     expect(await app((db) => pendientesDeVendedora(db, rosaId))).toEqual([]);
-    await pagar(c.corteId, nellyId);
-    expect(await app((db) => pendientesDeVendedora(db, nellyId))).toEqual([]);
+    await pagar(c.corteId, perlaId);
+    expect(await app((db) => pendientesDeVendedora(db, perlaId))).toEqual([]);
   });
 
   it('un mes que no es el abierto ni está cerrado → no_encontrado', async () => {

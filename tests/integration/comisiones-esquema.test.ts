@@ -25,15 +25,15 @@ async function resultado(fn: () => Promise<unknown>) {
 }
 
 let adminId = '';
-let b: { clienteId: string; nellyId: string; olgaId: string };
+let b: { clienteId: string; perlaId: string; olgaId: string };
 
 beforeEach(async () => {
   adminId = await reiniciarConAdmin();
   b = await app(async (db) => ({
     clienteId: await idDe(db, sql`INSERT INTO cliente (nombre) VALUES ('Gloria') RETURNING id`),
-    nellyId: await idDe(
+    perlaId: await idDe(
       db,
-      sql`INSERT INTO vendedor (nombre, tipo) VALUES ('Nelly', 'revendedora') RETURNING id`,
+      sql`INSERT INTO vendedor (nombre, tipo) VALUES ('Perla', 'revendedora') RETURNING id`,
     ),
     olgaId: await idDe(
       db,
@@ -51,7 +51,7 @@ const nuevoPedido = (o: OpPedido = {}) => {
     idDe(
       db,
       sql`INSERT INTO pedido (cliente_id, vendedor_id, admin_id, fecha, total, estado, liquidado_at, cuenta_tarjeta)
-          VALUES (${b.clienteId}, ${b.nellyId}, ${adminId}, '2026-10-10', ${o.total ?? '149.00'}, ${estado}, ${liq}, false)
+          VALUES (${b.clienteId}, ${b.perlaId}, ${adminId}, '2026-10-10', ${o.total ?? '149.00'}, ${estado}, ${liq}, false)
           RETURNING id`,
     ),
   );
@@ -65,10 +65,10 @@ const nuevoCorte = (mes = '2026-10-01') =>
 type OpLinea = { vendedorId?: string; base?: string; monto?: string };
 const linea = (corteId: string, pedidoId: string, o: OpLinea = {}) =>
   q(sql`INSERT INTO comision_linea (corte_id, vendedor_id, pedido_id, fecha_liquidacion, base, pct, monto)
-        VALUES (${corteId}, ${o.vendedorId ?? b.nellyId}, ${pedidoId}, '2026-10-10', ${o.base ?? '149.00'}, '20.00',
+        VALUES (${corteId}, ${o.vendedorId ?? b.perlaId}, ${pedidoId}, '2026-10-10', ${o.base ?? '149.00'}, '20.00',
                 ${o.monto ?? '29.80'})`);
 
-const pagoCom = (corteId: string, monto: string, vendedorId = b.nellyId) =>
+const pagoCom = (corteId: string, monto: string, vendedorId = b.perlaId) =>
   app((db) =>
     idDe(
       db,
@@ -129,7 +129,7 @@ describe('pago_comision (0019: pago_comision_validar y pago_comision_solo_anular
       await resultado(() =>
         q(sql`INSERT INTO pago_comision (corte_id, vendedor_id, fecha, monto, metodo, admin_id, anulado_at,
                 anulacion_motivo, anulado_por)
-              VALUES (${corte}, ${b.nellyId}, '2026-11-05', '29.80', 'efectivo', ${adminId}, now(), 'x', ${adminId})`),
+              VALUES (${corte}, ${b.perlaId}, '2026-11-05', '29.80', 'efectivo', ${adminId}, now(), 'x', ${adminId})`),
       ),
     ).toBe('pago_comision_nace_vigente');
     const pagoId = await pagoCom(corte, '29.80');
