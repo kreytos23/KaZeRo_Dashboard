@@ -34,6 +34,8 @@ describe('autorizarCron', () => {
 
 const barrer = vi.fn();
 vi.mock('@/server/imagenes/barrido', () => ({ barrerImagenesHuerfanas: (o: unknown) => barrer(o) }));
+const rotar = vi.fn();
+vi.mock('@/server/auth/rotacion', () => ({ rotarAccesoLogCron: () => rotar() }));
 vi.mock('@/server/idempotencia', () => ({ limpiarIdempotenciaCron: async () => 0 }));
 vi.mock('@/server/imagenes/almacen', () => ({ almacenImagenes: () => ({}) }));
 vi.mock('@/db/client', () => ({ conDbLectura: (fn: (db: unknown) => unknown) => fn({}) }));
@@ -43,6 +45,7 @@ describe('GET /api/tareas/limpiar-imagenes', () => {
   beforeEach(() => {
     vi.stubEnv('CRON_SECRET', SECRETO);
     barrer.mockReset().mockResolvedValue({ revisados: 0, borrados: 0 });
+    rotar.mockReset().mockResolvedValue(3);
   });
   it('sin cabecera o con un secreto equivocado: 401 JSON, sin barrer', async () => {
     const { GET } = await import('@/app/api/tareas/limpiar-imagenes/route');
@@ -67,7 +70,12 @@ describe('GET /api/tareas/limpiar-imagenes', () => {
     const { GET } = await import('@/app/api/tareas/limpiar-imagenes/route');
     const res = await GET(req(`Bearer ${SECRETO}`));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ revisados: 0, borrados: 0, idempotenciaBorradas: 0 });
+    expect(await res.json()).toEqual({
+      revisados: 0,
+      borrados: 0,
+      idempotenciaBorradas: 0,
+      accesoLogBorradas: 3,
+    });
     expect(res.headers.get('cache-control')).toBe('private, no-store');
     expect(barrer).toHaveBeenCalledTimes(1);
     expect(barrer.mock.calls[0]![0]).not.toHaveProperty('simular', true);
@@ -78,6 +86,31 @@ describe('GET /api/tareas/limpiar-imagenes', () => {
     const res = await GET(req(`Bearer ${SECRETO}`));
     expect(res.status).toBe(500);
     expect(await res.text()).not.toContain('secreto');
+  });
+  it('si la rotación falla, las otras dos tareas siguen y el JSON lo refleja (sin filtrar el error)', async () => {
+    rotar.mockRejectedValue(new Error('token=secreto'));
+    const { GET } = await import('@/app/api/tareas/limpiar-imagenes/route');
+    const res = await GET(req(`Bearer ${SECRETO}`));
+    expect(res.status).toBe(500);
+    const txt = await res.text();
+    expect(txt).not.toContain('secreto');
+    expect(JSON.parse(txt)).toMatchObject({ revisados: 0, idempotenciaBorradas: 0, accesoLogBorradas: null });
+  });
+  it('si fallan las tres tareas: 500 genérico', async () => {
+    barrer.mockRejectedValue(new Error('x'));
+    rotar.mockRejectedValue(new Error('y'));
+    vi.doMock('@/server/idempotencia', () => ({
+      limpiarIdempotenciaCron: async () => {
+        throw new Error('z');
+      },
+    }));
+    vi.resetModules();
+    const { GET } = await import('@/app/api/tareas/limpiar-imagenes/route');
+    const res = await GET(req(`Bearer ${SECRETO}`));
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'barrido_fallido' });
+    vi.doUnmock('@/server/idempotencia');
+    vi.resetModules();
   });
   it('avisa en el log (sin el valor) cuando CRON_SECRET existe pero es demasiado corto', () => {
     const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});

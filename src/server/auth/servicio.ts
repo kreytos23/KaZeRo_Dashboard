@@ -19,6 +19,9 @@ export const POLITICA = {
   refrescoMin: 60,
 } as const;
 
+export const MAX_FALLOS_IP = 30;
+export const VENTANA_IP_MIN = 15;
+
 type Red = { ip: string | null; userAgent: string | null };
 type Evento = (typeof accesoLog.$inferInsert)['evento'];
 
@@ -76,6 +79,35 @@ async function minutosBloqueo(db: Ejecutor, email: string, ahora: Date): Promise
   return Math.max(1, Math.ceil((libreEn - ahora.getTime()) / MIN));
 }
 
+/**
+ * Minutos de bloqueo por IP (0 = libre): cuenta password_fallido/totp_fallido de esa IP en la ventana.
+ * IP nula → 0: no se puede limitar (el intento se registra igual).
+ */
+export async function minutosBloqueoIp(db: Ejecutor, ip: string | null, ahora: Date): Promise<number> {
+  if (!ip) return 0;
+  const filas = await db
+    .select({ createdAt: accesoLog.createdAt })
+    .from(accesoLog)
+    .where(
+      and(
+        eq(accesoLog.ip, ip),
+        gt(accesoLog.createdAt, masMinutos(ahora, -VENTANA_IP_MIN)),
+        inArray(accesoLog.evento, ['password_fallido', 'totp_fallido']),
+      ),
+    )
+    .orderBy(desc(accesoLog.createdAt))
+    .limit(MAX_FALLOS_IP);
+  if (filas.length < MAX_FALLOS_IP) return 0;
+  // Con ≥ MAX fallos, el bloqueo termina cuando el MAX-ésimo más reciente sale de la ventana.
+  const libreEn = masMinutos(filas[MAX_FALLOS_IP - 1]!.createdAt, VENTANA_IP_MIN).getTime();
+  return Math.max(1, Math.ceil((libreEn - ahora.getTime()) / MIN));
+}
+
+/** Bloqueo combinado: el mayor entre el de correo y el de IP, para que el mensaje sea idéntico. */
+async function bloqueoTotal(tx: Ejecutor, email: string, ip: string | null, ahora: Date) {
+  return Math.max(await minutosBloqueo(tx, email, ahora), await minutosBloqueoIp(tx, ip, ahora));
+}
+
 type ResultadoLogin =
   | { ok: true; preToken: string }
   | { ok: false; motivo: 'credenciales' | 'bloqueado'; minutosRestantes?: number };
@@ -90,7 +122,7 @@ export async function iniciarLogin(
   // Los fallos se devuelven (no se lanzan) para que su registro sí se confirme.
   return db.transaction(async (tx): Promise<ResultadoLogin> => {
     await bloquearCorreo(tx, email);
-    const bloqueo = await minutosBloqueo(tx, email, ahora);
+    const bloqueo = await bloqueoTotal(tx, email, e.ip, ahora);
     if (bloqueo > 0) {
       await registrarAcceso(tx, email, 'bloqueado', e, ahora);
       return { ok: false, motivo: 'bloqueado', minutosRestantes: bloqueo };
@@ -160,7 +192,7 @@ export async function verificarSegundoFactor(
         .for('update');
       if (!pre) return { ok: false, motivo: 'sesion' };
 
-      const bloqueo = await minutosBloqueo(tx, email, ahora);
+      const bloqueo = await bloqueoTotal(tx, email, e.ip, ahora);
       if (bloqueo > 0) {
         await tx.update(sesion).set({ revocadaAt: ahora }).where(eq(sesion.id, pre.sesionId));
         await registrarAcceso(tx, email, 'bloqueado', e, ahora);

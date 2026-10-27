@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
 import { crearAdmin } from '@/server/auth/admin';
 import {
+  MAX_FALLOS_IP,
   POLITICA,
   cerrarSesion,
   cerrarTodas,
@@ -274,5 +275,50 @@ describe('sesiones', () => {
     await app((db) => cerrarTodas(db, adminId, t));
     expect(await app((db) => validarSesion(db, a.token, t))).toBeNull();
     expect(await app((db) => validarSesion(db, b.token, t))).toBeNull();
+  });
+});
+
+describe('límite de intentos por IP', () => {
+  const t = new Date('2026-10-08T12:00:00Z');
+  const IP_A = '198.51.100.1';
+  const IP_B = '198.51.100.2';
+  const sembrar = (ip: string | null, desde: Date, n = MAX_FALLOS_IP) =>
+    app(async (db) => {
+      for (let i = 0; i < n; i++)
+        await registrarAcceso(db, `otro${i}@x.test`, 'password_fallido', { ip, userAgent: 'v' }, desde);
+    });
+  const entrar = (ip: string | null, ahora = t) =>
+    app((db) => iniciarLogin(db, { email: EMAIL, password: PASSWORD, ip, userAgent: 'v' }, ahora));
+
+  it('con 30 fallos de la IP contra correos distintos, el login correcto desde esa IP queda bloqueado', async () => {
+    await sembrar(IP_A, new Date(t.getTime() - min(1)));
+    const r = await entrar(IP_A);
+    expect(r).toMatchObject({ ok: false, motivo: 'bloqueado' });
+    expect((await entrar(IP_B)).ok).toBe(true);
+  });
+
+  it('pasada la ventana la IP vuelve a entrar', async () => {
+    await sembrar(IP_A, new Date(t.getTime() - min(16)));
+    expect((await entrar(IP_A)).ok).toBe(true);
+  });
+
+  it('el paso TOTP también se bloquea por IP, sin quemar el código', async () => {
+    const pre = await entrar(IP_B);
+    if (!pre.ok) throw new Error('login falló');
+    await sembrar(IP_A, new Date(t.getTime() - min(1)));
+    const r = await app((db) =>
+      verificarSegundoFactor(
+        db,
+        { preToken: pre.preToken, codigo: generarCodigoTotp(secreto, t), ip: IP_A, userAgent: 'v' },
+        llaveTotp(),
+        t,
+      ),
+    );
+    expect(r).toMatchObject({ ok: false, motivo: 'bloqueado' });
+  });
+
+  it('sin IP no se puede limitar por IP', async () => {
+    await sembrar(null, new Date(t.getTime() - min(1)));
+    expect((await entrar(null)).ok).toBe(true);
   });
 });

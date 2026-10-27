@@ -1,4 +1,5 @@
 import { conDbLectura } from '@/db/client';
+import { rotarAccesoLogCron } from '@/server/auth/rotacion';
 import { limpiarIdempotenciaCron } from '@/server/idempotencia';
 import { almacenImagenes } from '@/server/imagenes/almacen';
 import { barrerImagenesHuerfanas } from '@/server/imagenes/barrido';
@@ -14,7 +15,7 @@ const SIN_CACHE = { 'Cache-Control': 'private, no-store' };
 export async function GET(req: Request) {
   if (!autorizarCron(req))
     return Response.json({ error: 'no_autenticado' }, { status: 401, headers: SIN_CACHE });
-  // Dos tareas independientes: que una falle no impide la otra.
+  // Tres tareas independientes: que una falle no impide las demás.
   let resumen: Awaited<ReturnType<typeof barrerImagenesHuerfanas>> | null = null;
   let idempotenciaBorradas: number | null = null;
   try {
@@ -32,10 +33,20 @@ export async function GET(req: Request) {
   } catch (e) {
     console.error('[limpieza-idempotencia] falló', e instanceof Error ? e.name : typeof e);
   }
-  if (!resumen && idempotenciaBorradas === null)
+  let accesoLogBorradas: number | null = null;
+  try {
+    accesoLogBorradas = await rotarAccesoLogCron();
+    console.info('[rotacion-acceso-log]', JSON.stringify({ accesoLogBorradas })); // solo conteo
+  } catch (e) {
+    console.error('[rotacion-acceso-log] falló', e instanceof Error ? e.name : typeof e);
+  }
+  if (!resumen && idempotenciaBorradas === null && accesoLogBorradas === null)
     return Response.json({ error: 'barrido_fallido' }, { status: 500, headers: SIN_CACHE });
   return Response.json(
-    { ...(resumen ?? { barrido: 'fallido' }), idempotenciaBorradas },
-    { status: resumen && idempotenciaBorradas !== null ? 200 : 500, headers: SIN_CACHE },
+    { ...(resumen ?? { barrido: 'fallido' }), idempotenciaBorradas, accesoLogBorradas },
+    {
+      status: resumen && idempotenciaBorradas !== null && accesoLogBorradas !== null ? 200 : 500,
+      headers: SIN_CACHE,
+    },
   );
 }
