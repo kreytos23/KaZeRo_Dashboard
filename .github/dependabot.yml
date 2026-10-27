@@ -1,12 +1,17 @@
 version: 2
+# Mensual y agrupado para no llenar el repo de PRs. Los avisos de seguridad (security updates) no dependen
+# de este calendario: Dependabot los abre en cuanto se publican.
 updates:
   - package-ecosystem: npm
     directory: /
-    schedule: { interval: weekly }
+    schedule: { interval: monthly }
     open-pull-requests-limit: 5
     groups:
       dependencias-menores:
         update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
-    schedule: { interval: weekly }
+    schedule: { interval: monthly }
+    groups:
+      actions:
+        patterns: ['*']
