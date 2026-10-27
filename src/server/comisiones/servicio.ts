@@ -1,7 +1,7 @@
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { pgConstraint } from '@/db/errors';
 import type { Ejecutor } from '@/db/pool';
-import { comisionLinea, corteComision, pagoComision, vendedor } from '@/db/schema';
+import { comisionLinea, corteComision, metodoPagoComision, pagoComision, vendedor } from '@/db/schema';
 import { comisionCentavos, finDeMes, mesCerrable, nombreMes } from '@/domain/comisiones';
 import { centavosANumeric, numericACentavos } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
@@ -10,8 +10,16 @@ import { conIdempotencia } from '@/server/idempotencia';
 import { validarFecha } from '@/server/pedidos/servicio';
 import { calcularMesAbierto, consultaElegibles, mensajeNoTerminado } from './lecturas';
 
-const METODOS = ['efectivo', 'transferencia', 'otro'] as const;
-type Metodo = (typeof METODOS)[number];
+
+/** Mes del corte y nombre de la vendedora en una sola lectura (`nombre` nulo si la vendedora no existe). */
+async function corteYVendedora(db: Ejecutor, corteId: string, vendedorId: string) {
+  const [r] = await db
+    .select({ mes: corteComision.mes, nombre: vendedor.nombre })
+    .from(corteComision)
+    .leftJoin(vendedor, eq(vendedor.id, vendedorId))
+    .where(eq(corteComision.id, corteId));
+  return r;
+}
 
 const yaPagado = (nombre: string, mes: string) =>
   new ErrorNegocio('ya_pagado', `La comisión de ${nombre} de ${nombreMes(mes)} ya está pagada.`);
@@ -84,36 +92,25 @@ export async function registrarPagoComision(
     nota?: string;
   },
 ): Promise<{ pagoId: string; montoCentavos: number }> {
-  if (!METODOS.includes(d.metodo as Metodo))
+  const metodo = metodoPagoComision.enumValues.find((m) => m === d.metodo);
+  if (!metodo)
     throw new ErrorNegocio('metodo_invalido', 'Elige un método de pago válido.', 'metodo');
   const nota = d.nota?.trim() || null;
   if (nota && nota.length > 200)
     throw new ErrorNegocio('nota_invalida', 'La nota admite hasta 200 caracteres.', 'nota');
-  if (d.fecha?.trim()) validarFecha(d.fecha);
-  const payload = {
-    corteId: d.corteId,
-    vendedorId: d.vendedorId,
-    fecha: d.fecha?.trim() || null, // una fecha omitida se resuelve dentro de la transacción
-    metodo: d.metodo,
-    nota,
-  };
+  // Una fecha omitida se resuelve dentro de la transacción (hoy de esa llamada).
+  const fechaPago = d.fecha?.trim() ? validarFecha(d.fecha) : null;
+  const payload = { corteId: d.corteId, vendedorId: d.vendedorId, fecha: fechaPago, metodo, nota };
   return conErroresDeNegocio(() =>
     db.transaction((tx) =>
       conIdempotencia(
         tx,
         { key: d.key, adminId: d.adminId, operacion: 'registrarPagoComision', payload },
         async () => {
-          const fecha = validarFecha(payload.fecha ?? undefined);
-          const [corte] = await tx
-            .select({ mes: corteComision.mes })
-            .from(corteComision)
-            .where(eq(corteComision.id, d.corteId));
+          const fecha = fechaPago ?? hoyMX();
+          const corte = await corteYVendedora(tx, d.corteId, d.vendedorId);
           if (!corte) throw new ErrorNegocio('no_encontrado', 'Ese mes no tiene cierre.');
-          const [v] = await tx
-            .select({ nombre: vendedor.nombre })
-            .from(vendedor)
-            .where(eq(vendedor.id, d.vendedorId));
-          if (!v) throw new ErrorNegocio('no_encontrado', 'La vendedora no existe.');
+          if (!corte.nombre) throw new ErrorNegocio('no_encontrado', 'La vendedora no existe.');
           const [suma] = await tx
             .select({ total: sql<string>`coalesce(sum(${comisionLinea.monto}), 0)::text` })
             .from(comisionLinea)
@@ -122,7 +119,7 @@ export async function registrarPagoComision(
           if (monto === 0)
             throw new ErrorNegocio(
               'sin_comision',
-              `${v.nombre} no tiene comisión en ${nombreMes(corte.mes)}.`,
+              `${corte.nombre} no tiene comisión en ${nombreMes(corte.mes)}.`,
             );
           const [vigente] = await tx
             .select({ id: pagoComision.id })
@@ -134,7 +131,7 @@ export async function registrarPagoComision(
                 isNull(pagoComision.anuladoAt),
               ),
             );
-          if (vigente) throw yaPagado(v.nombre, corte.mes);
+          if (vigente) throw yaPagado(corte.nombre, corte.mes);
           const [pago] = await tx
             .insert(pagoComision)
             .values({
@@ -142,7 +139,7 @@ export async function registrarPagoComision(
               vendedorId: d.vendedorId,
               fecha,
               monto: centavosANumeric(monto),
-              metodo: d.metodo as Metodo,
+              metodo,
               nota,
               adminId: d.adminId,
             })
@@ -154,12 +151,8 @@ export async function registrarPagoComision(
   ).catch(async (e: unknown) => {
     // Carrera de dos pagos simultáneos: el índice único vigente rechaza al segundo.
     if (pgConstraint(e) !== 'pago_comision_vigente_uq') throw e;
-    const [r] = await db
-      .select({ nombre: vendedor.nombre, mes: corteComision.mes })
-      .from(vendedor)
-      .innerJoin(corteComision, eq(corteComision.id, d.corteId))
-      .where(eq(vendedor.id, d.vendedorId));
-    if (!r) throw e;
+    const r = await corteYVendedora(db, d.corteId, d.vendedorId);
+    if (!r?.nombre) throw e;
     throw yaPagado(r.nombre, r.mes);
   });
 }
