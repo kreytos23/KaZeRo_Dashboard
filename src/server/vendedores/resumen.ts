@@ -1,6 +1,6 @@
 import type { Ejecutor } from '@/db/pool';
 import { hoyMX } from '@/domain/fechas';
-import { mesesComisiones, pendientesDeVendedora, reporteComisiones } from '@/server/comisiones/lecturas';
+import { calcularMesAbierto, pendientesDeVendedora, reporteComisiones } from '@/server/comisiones/lecturas';
 import { reporteDeudores } from '@/server/reportes/deudores';
 
 export interface ResumenVendedoraFicha {
@@ -15,7 +15,7 @@ export async function resumenDeVendedora(
   vendedorId: string,
   hoy: string = hoyMX(),
 ): Promise<ResumenVendedoraFicha> {
-  const { abierto } = await mesesComisiones(db, hoy);
+  const abierto = await calcularMesAbierto(db, hoy);
   const [deudas, curso, pendientes] = await Promise.all([
     reporteDeudores(db, { vendedorId, hoy }),
     reporteComisiones(db, abierto, { vendedorId, hoy }),
