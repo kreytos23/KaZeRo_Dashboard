@@ -20,6 +20,11 @@ import { FormCerrarMes, FormRegistrarPagoComision, PagoRegistrado } from './Form
 export const metadata = { title: 'Comisiones' };
 
 const MES_URL = /^\d{4}-(0[1-9]|1[0-2])$/;
+const AVISOS = new Map([
+  ['cerrado', 'Mes cerrado: los pedidos y montos quedaron congelados.'],
+  ['pagado', 'Pago registrado.'],
+  ['deshecho', 'Pago deshecho.'],
+]);
 const fechaMX = (iso: string) =>
   fechaCorta(new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' }));
 
@@ -54,9 +59,15 @@ export default async function Comisiones({
     })),
   ];
   const pdf = `/panel/reportes/comisiones/${mes.slice(0, 7)}/pdf`;
+  const aviso = typeof sp.aviso === 'string' ? AVISOS.get(sp.aviso) : undefined;
   const conFiltro = vendedorId ? `?vendedor=${vendedorId}` : '';
   return (
     <div className="flex flex-col gap-6">
+      {aviso && (
+        <p role="status" className="aviso-exito">
+          {aviso}
+        </p>
+      )}
       <form role="search" method="get" className="flex flex-wrap items-end gap-2">
         <Selector etiqueta="Mes" name="mes" defaultValue={mes.slice(0, 7)} opciones={opcionesMes} />
         <Selector
@@ -96,6 +107,7 @@ export default async function Comisiones({
           {r.cerrable ? (
             <FormCerrarMes
               mes={mes}
+              vendedor={vendedorId}
               nombre={r.nombre}
               numPedidos={r.numPedidos}
               totalTexto={formatoMXN(r.totalCentavos)}
@@ -138,6 +150,8 @@ export default async function Comisiones({
               <div className="flex flex-col gap-4 border-t border-borde px-4 py-3">
                 {r.cerrado && r.corteId && x.estadoPago === 'pendiente' && (
                   <FormRegistrarPagoComision
+                    mes={mes}
+                    vendedor={vendedorId}
                     corteId={r.corteId}
                     vendedorId={x.vendedorId}
                     montoTexto={formatoMXN(x.comisionCentavos)}
@@ -146,6 +160,8 @@ export default async function Comisiones({
                 )}
                 {x.pago && (
                   <PagoRegistrado
+                    mes={mes}
+                    vendedor={vendedorId}
                     pagoId={x.pago.id}
                     resumen={`Pagado el ${fechaCorta(x.pago.fecha)} · ${ETIQUETA_METODO[x.pago.metodo]}${
                       x.pago.nota ? ` · ${x.pago.nota}` : ''
