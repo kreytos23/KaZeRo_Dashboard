@@ -90,13 +90,15 @@ test.describe('reportes', () => {
     // (hace 2 meses en el primer intento, el siguiente si el anterior llegó a cerrar). El pedido liquidado
     // hace 2 meses entra en el cierre que toque, así que cada intento ejecuta el flujo completo.
     const { dia } = mesPasado(2);
+    const clienta = await sembrarCliente(`Clienta Com ${sufijo}`);
+    // Liquidado el día 10 de hace 2 meses: $149 al 10 % = $14.90.
+    await sembrarPedidoConAbonos(clienta, vendedoraId, `R${m}C1`, dia, [{ fecha: dia, centavos: 14900 }]);
+
+    // Con el pedido ya sembrado, la BD dice qué mes toca cerrar.
     const abierto = await mesAbiertoComisiones();
     const mes = abierto.slice(0, 7);
     const nombre = nombreMes(abierto);
     mesCerrado = mes;
-    const clienta = await sembrarCliente(`Clienta Com ${sufijo}`);
-    // Liquidado el día 10 de hace 2 meses: $149 al 10 % = $14.90.
-    await sembrarPedidoConAbonos(clienta, vendedoraId, `R${m}C1`, dia, [{ fecha: dia, centavos: 14900 }]);
 
     // El mes abierto por defecto es el que toca cerrar, y ya se puede cerrar.
     await irA(page, '/panel/reportes/comisiones');
