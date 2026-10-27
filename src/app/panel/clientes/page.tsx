@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { conDbLectura } from '@/db/client';
 import { Campo } from '@/features/ui/Campo';
+import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarClientes } from '@/server/clientes/servicio';
@@ -26,13 +27,14 @@ export default async function PaginaClientes({
       </FormAccion>
       <form className="flex gap-2" role="search">
         <Campo etiqueta="Filtrar clientes" name="q" type="search" defaultValue={q} maxLength={120} />
-        <button className="min-h-11 self-end rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave">
-          Filtrar
-        </button>
+        <button className="boton-secundario self-end">Filtrar</button>
       </form>
       <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4">
         {clientes.map((c) => (
-          <li key={c.id} className="relative flex min-h-14 flex-wrap items-center gap-x-2 py-2 text-dato">
+          <li
+            key={c.id}
+            className="fila-enlace relative flex min-h-14 flex-wrap items-center gap-x-2 py-2 text-dato"
+          >
             {/* Enlace extendido a toda la fila: el toque no exige apuntar al nombre. */}
             <Link
               href={`/panel/clientes/${c.id}`}
@@ -44,6 +46,18 @@ export default async function PaginaClientes({
           </li>
         ))}
       </ul>
+      {clientes.length === 0 &&
+        (q ? (
+          <EstadoVacio
+            titulo={`No hay clientes que coincidan con «${q}».`}
+            accion={{ href: '/panel/clientes', texto: 'Quitar filtro' }}
+          />
+        ) : (
+          <EstadoVacio
+            titulo="Aún no hay clientes."
+            detalle="Agrega la primera con el formulario de arriba."
+          />
+        ))}
     </section>
   );
 }

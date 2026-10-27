@@ -5,7 +5,7 @@ import { ErroresCampo } from '@/features/ui/errores-campo';
 import { prepararFoto } from './preparar';
 
 const BOTON =
-  'flex min-h-11 cursor-pointer items-center rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-secundario';
+  'boton-secundario cursor-pointer has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-secundario';
 
 /**
  * Dos controles: "Tomar foto" abre la cámara (capture) y "Elegir foto" la galería (sin capture: en Android,

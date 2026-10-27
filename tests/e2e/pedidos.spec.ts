@@ -1,7 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
-  RUTA_ESTADO,
+  abrirAccion,
+  elegirOpcion,
+  fijarFecha,
   irA,
+  RUTA_ESTADO,
   sembrarCliente,
   sembrarCompras,
   sembrarExhibidorConPieza,
@@ -49,7 +52,7 @@ test('nuevo pedido con alta rápida de cliente, piezas en ráfaga (una de exhibi
   await irA(page, '/panel/pedidos/nuevo');
   await page.getByRole('combobox', { name: 'Cliente' }).fill(`Ana Pedido ${m}`);
   await page.getByRole('option', { name: `Crear cliente «Ana Pedido ${m}»` }).click();
-  await page.getByLabel('Vendedor').selectOption({ label: `Casa ${m}` });
+  await elegirOpcion(page, 'Vendedor', `Casa ${m}`);
   await agregarPieza(page, `n${m}01`);
   await agregarPieza(page, `N${m}02`);
   await expect(resumen(page)).toContainText('$298.00');
@@ -121,6 +124,7 @@ test('cancelar regresa la pieza a su exhibidor abierto y libera la posición', a
   await expect(page.getByRole('link', { name: `KZR-${folio}` })).toBeVisible();
 
   await irA(page, `/panel/pedidos/${folio}`);
+  await abrirAccion(page, 'Cancelar pedido');
   await page.getByLabel('Motivo de la cancelación').fill('Cambio de opinión');
   // Sin la casilla de confirmación el formulario no se envía.
   await page.getByRole('button', { name: 'Cancelar pedido' }).click();
@@ -148,9 +152,9 @@ test('cancelar un pedido con abono muestra el saldo a favor del cliente y libera
   await page.getByLabel('Monto', { exact: true }).fill('50');
   await page.getByRole('button', { name: 'Registrar pago' }).click();
   await expect(estadoCon(page, 'Pago registrado.')).toBeVisible();
-  // El aviso de cancelación ya advierte que lo abonado pasa a saldo a favor.
+  // El panel de cancelación ya advierte que lo abonado pasa a saldo a favor.
+  await abrirAccion(page, 'Cancelar pedido');
   await expect(page.getByText('quedará como saldo a favor')).toBeVisible();
-
   await page.getByLabel('Motivo de la cancelación').fill('No pudo pagar');
   await page.getByLabel('Entiendo que cancelar no se puede deshacer').check();
   await page.getByRole('button', { name: 'Cancelar pedido' }).click();
@@ -222,32 +226,32 @@ test('el listado de pedidos filtra por estado, cliente y fechas', async ({ page 
 
   // Estado.
   await page.getByLabel('Folio o cliente').fill(`Filtro`);
-  await page.getByLabel('Estado').selectOption({ label: 'Abierto' });
+  await elegirOpcion(page, 'Estado', 'Abierto');
   await page.getByRole('button', { name: 'Filtrar' }).click();
   await expect(page).toHaveURL(/estado=abierto/);
   await expect(folioA).toBeVisible();
   await expect(folioL).toHaveCount(0);
-  await page.getByLabel('Estado').selectOption({ label: 'Liquidado' });
+  await elegirOpcion(page, 'Estado', 'Liquidado');
   await page.getByRole('button', { name: 'Filtrar' }).click();
   await expect(page).toHaveURL(/estado=liquidado/);
   await expect(folioL).toBeVisible();
   await expect(folioA).toHaveCount(0);
 
   // Cliente.
-  await page.getByLabel('Estado').selectOption({ label: 'Todos' });
-  await page.getByLabel('Cliente', { exact: true }).selectOption({ label: `FiltroAbierto ${m}` });
+  await elegirOpcion(page, 'Estado', 'Todos');
+  await elegirOpcion(page, 'Cliente', `FiltroAbierto ${m}`, true);
   await page.getByRole('button', { name: 'Filtrar' }).click();
   await expect(page).toHaveURL(/cliente=/);
   await expect(folioA).toBeVisible();
   await expect(folioL).toHaveCount(0);
 
   // Fechas: «Hasta» en el pasado no deja nada; el rango que incluye hoy sí.
-  await page.getByLabel('Hasta').fill('2020-01-01');
+  await fijarFecha(page, 'Hasta', '2020-01-01');
   await page.getByRole('button', { name: 'Filtrar' }).click();
   await expect(page).toHaveURL(/hasta=2020-01-01/);
   await expect(page.getByText('No hay pedidos con esos filtros.')).toBeVisible();
-  await page.getByLabel('Hasta').fill('');
-  await page.getByLabel('Desde').fill(hoy());
+  await fijarFecha(page, 'Hasta', '');
+  await fijarFecha(page, 'Desde', hoy());
   await page.getByRole('button', { name: 'Filtrar' }).click();
   await expect(page).toHaveURL(/desde=/);
   await expect(folioA).toBeVisible();

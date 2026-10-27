@@ -2,6 +2,7 @@
 
 import { startTransition, useActionState, useState } from 'react';
 import { Campo } from '@/features/ui/Campo';
+import { BotonEnvio } from '@/features/ui/FormAccion';
 import { useHidratado } from '@/features/ui/hidratado';
 import { accionAgregarAdmin, accionRegenerarTotp } from './acciones';
 import type { EstadoEnrolamiento } from './tipos';
@@ -38,11 +39,7 @@ function Enrolamiento({
         Guárdalos ahora; no se volverán a mostrar.
       </p>
       <p className="text-meta">{nota}</p>
-      <button
-        type="button"
-        onClick={onOcultar}
-        className="min-h-11 self-start rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
-      >
+      <button type="button" onClick={onOcultar} className="boton-secundario self-start">
         Ya los guardé, ocultar
       </button>
     </div>
@@ -80,7 +77,7 @@ function useAccion(accion: Accion) {
     for (const i of form.querySelectorAll<HTMLInputElement>('input[type="password"]')) i.value = '';
   };
   const hidratado = useHidratado();
-  return { estado, pendiente: pendiente || !hidratado, hidratado, onSubmit };
+  return { estado, pendiente, hidratado, onSubmit };
 }
 
 function Alta({ onOcultar, emailActual }: { onOcultar: () => void; emailActual: string }) {
@@ -143,13 +140,7 @@ function Alta({ onOcultar, emailActual }: { onOcultar: () => void; emailActual: 
           {estado.error}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={pendiente}
-        className="min-h-11 self-start rounded-lg bg-primario px-4 font-medium text-white enabled:hover:bg-primario-fuerte disabled:opacity-60"
-      >
-        Agregar administrador
-      </button>
+      <BotonEnvio textoBoton="Agregar administrador" pendiente={pendiente} hidratado={hidratado} />
     </form>
   );
 }
@@ -189,13 +180,12 @@ function Regenerar({ onOcultar, emailActual }: { onOcultar: () => void; emailAct
           {estado.error}
         </p>
       )}
-      <button
-        type="submit"
-        disabled={pendiente}
-        className="min-h-11 self-start rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave disabled:opacity-60"
-      >
-        Regenerar mi TOTP
-      </button>
+      <BotonEnvio
+        textoBoton="Regenerar mi TOTP"
+        pendiente={pendiente}
+        hidratado={hidratado}
+        className="boton-secundario self-start"
+      />
     </form>
   );
 }

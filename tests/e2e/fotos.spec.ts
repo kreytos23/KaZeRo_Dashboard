@@ -1,7 +1,7 @@
 ﻿import { expect, test, type Page } from '@playwright/test';
 import sharp from 'sharp';
 import { chunksWebp } from '../apoyo/imagenes';
-import { RUTA_ESTADO, irA } from './utilidades';
+import { abrirAccion, irA, RUTA_ESTADO } from './utilidades';
 
 test.use({ storageState: RUTA_ESTADO });
 
@@ -25,12 +25,11 @@ async function fotoConGps() {
   return { name: 'pieza-gps.jpg', mimeType: 'image/jpeg', buffer };
 }
 
-/** Abre el desplegable de la foto solo si está cerrado (tras guardar, la ficha lo conserva abierto). */
+/** Abre el panel de la foto desde «Más acciones» solo si está cerrado (tras guardar, la ficha lo conserva abierto). */
 async function abrirFoto(page: Page, resumen: string) {
-  const detalles = page.locator('details').filter({ has: page.getByText(resumen, { exact: true }) });
-  if (!(await detalles.evaluate((d: HTMLDetailsElement) => d.open)))
-    await detalles.getByText(resumen, { exact: true }).click();
-  await expect(detalles).toHaveJSProperty('open', true);
+  const panel = page.getByRole('region', { name: resumen, exact: true });
+  if (!(await panel.isVisible())) await abrirAccion(page, resumen);
+  await expect(panel).toBeVisible();
 }
 
 async function altaPieza(page: Page, codigo: string, descripcion: string, conFoto: boolean) {

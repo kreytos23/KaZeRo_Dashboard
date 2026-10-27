@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useContext, useEffect, useId, useRef, useState } from 'react';
+import { useContext, useEffect, useId, useRef, useState, type ComponentProps } from 'react';
 import { normalizarCodigo } from '@/domain/codigos';
 import { formatoMXN, numericACentavos, pesosACentavos } from '@/domain/dinero';
 import { MAX_PIEZAS_PEDIDO, calcularTotales, formatoFolio } from '@/domain/pedidos';
@@ -13,7 +13,7 @@ import { SelectorCliente, type ClienteElegido } from '@/features/pedidos/Selecto
 import { textoLealtadPrevia } from '@/features/pedidos/texto-lealtad';
 import type { PreviaPedido } from '@/features/pedidos/tipos';
 import { vendedorPorDefecto } from '@/features/pedidos/vendedor-por-defecto';
-import { AreaTexto, Campo, Selector } from '@/features/ui/Campo';
+import { AreaTexto, Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { ErroresCampo } from '@/features/ui/errores-campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { marcarIndiceSucio } from '@/search/eventos';
@@ -33,6 +33,21 @@ function ErrorCodigos({ id }: { id: string }) {
     <p id={id} className="text-meta text-error">
       {error}
     </p>
+  );
+}
+
+/**
+ * Campo para agregar piezas. El error del servidor sobre la lista (`codigos`) se marca aquí —`aria-invalid` y
+ * `aria-describedby` solo cuando hay error—: es el control donde se corrige, y recibe el foco al fallar.
+ */
+function CampoCodigoPieza({ idError, ...props }: { idError: string } & ComponentProps<typeof Campo>) {
+  const hayError = Boolean(useContext(ErroresCampo).codigos);
+  return (
+    <Campo
+      {...props}
+      aria-invalid={hayError ? true : undefined}
+      aria-describedby={hayError ? idError : undefined}
+    />
   );
 }
 
@@ -124,7 +139,8 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
 
         <div className="flex items-end gap-2">
           <div className="flex-1">
-            <Campo
+            <CampoCodigoPieza
+              idError={idErrorCodigos}
               etiqueta="Código de pieza"
               name="_codigo"
               value={codigo}
@@ -141,11 +157,7 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
               maxLength={40}
             />
           </div>
-          <button
-            type="button"
-            onClick={() => agregar(codigo)}
-            className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
-          >
+          <button type="button" onClick={() => agregar(codigo)} className="boton-secundario">
             Agregar pieza
           </button>
         </div>
@@ -153,7 +165,6 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
 
         <ul
           aria-label="Piezas del pedido"
-          aria-describedby={idErrorCodigos}
           className="tarjeta flex flex-col divide-y divide-borde px-4 empty:hidden"
         >
           {codigos.map((c) => {
@@ -215,15 +226,13 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
         </ul>
         <ErrorCodigos id={idErrorCodigos} />
 
-        <label className="flex min-h-11 items-center gap-2">
-          <input
-            type="checkbox"
-            name="cuentaTarjeta"
-            checked={cuentaTarjeta}
-            onChange={(e) => setCuentaTarjeta(e.target.checked)}
-          />{' '}
+        <CampoCasilla
+          name="cuentaTarjeta"
+          checked={cuentaTarjeta}
+          onChange={(e) => setCuentaTarjeta(e.target.checked)}
+        >
           Cuenta para la tarjeta de lealtad
-        </label>
+        </CampoCasilla>
         <Campo
           etiqueta="Descuento manual"
           name="descuentoManual"

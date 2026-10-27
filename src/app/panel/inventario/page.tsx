@@ -4,6 +4,7 @@ import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { FotoPieza } from '@/features/imagenes/FotoPieza';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { CampoConLista } from '@/features/ui/CampoConLista';
+import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPieza, vistaUbicacion } from '@/features/ui/estado-visual';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -56,21 +57,18 @@ export default async function PaginaInventario({
     qs.set('pagina', String(p));
     return `?${qs}`;
   };
+  const filtrado = Boolean(
+    f.q || f.estado || f.categoria || f.material || f.proveedor || f.ubicacion || f.vendedor || f.pagina > 1,
+  );
   return (
     <section className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Inventario</h1>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href="/panel/inventario/nueva"
-            className="flex min-h-11 items-center rounded-lg bg-primario px-4 font-medium text-white hover:bg-primario-fuerte"
-          >
+          <Link href="/panel/inventario/nueva" className="boton-primario">
             Nueva pieza
           </Link>
-          <Link
-            href="/panel/inventario/lote"
-            className="flex min-h-11 items-center rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
-          >
+          <Link href="/panel/inventario/lote" className="boton-secundario">
             Alta por lote
           </Link>
         </div>
@@ -128,18 +126,29 @@ export default async function PaginaInventario({
           maxLength={80}
           textoNuevo="Filtrar por"
         />
-        <button className="min-h-11 rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave">
-          Filtrar
-        </button>
+        <button className="boton-secundario">Filtrar</button>
       </form>
       {piezas.length === 0 ? (
-        <p className="tarjeta p-4 text-dato text-tinta-suave">No hay piezas con esos filtros.</p>
+        filtrado ? (
+          <EstadoVacio
+            titulo="No hay piezas con esos filtros."
+            detalle="Prueba con otros datos o quita los filtros para ver todo el inventario."
+            accion={{ href: '/panel/inventario', texto: 'Quitar filtros' }}
+          />
+        ) : (
+          <EstadoVacio
+            titulo="Aún no hay piezas en el inventario."
+            detalle="Da de alta la primera, o pega varias a la vez desde Excel con el alta por lote."
+            accion={{ href: '/panel/inventario/nueva', texto: 'Nueva pieza' }}
+            principal
+          />
+        )
       ) : (
         <>
           {/* < md: una tarjeta por pieza con código, descripción, precio, estado y ubicación a la vista. */}
           <ul aria-label="Piezas del inventario" className="flex flex-col gap-2 md:hidden">
             {piezas.map((p) => (
-              <li key={p.id} className="tarjeta relative flex gap-3 p-3">
+              <li key={p.id} className="tarjeta tarjeta-enlace relative flex gap-3 p-3">
                 <FotoPieza piezaId={p.id} clave={p.imagenClave} alt="" variante="mini" />
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <div className="flex items-baseline justify-between gap-2">

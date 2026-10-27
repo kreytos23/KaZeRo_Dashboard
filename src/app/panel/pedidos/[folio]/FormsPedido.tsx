@@ -1,10 +1,9 @@
 'use client';
 
 import { Fragment, useState } from 'react';
-import Link from 'next/link';
 import { centavosANumeric, numericACentavos } from '@/domain/dinero';
 import { CampoKey } from '@/features/pedidos/CampoKey';
-import { AreaTexto, Campo, Selector } from '@/features/ui/Campo';
+import { AreaTexto, Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { accionCancelarPedido, accionRegistrarPago } from '../acciones';
 import { ETIQUETA_METODO } from '../etiquetas';
@@ -121,46 +120,31 @@ export function FormRegistrarPago(p: Props) {
   );
 }
 
-export function EditarPedido({ folio, abierto }: { folio: number; abierto: boolean }) {
-  if (!abierto) return null;
-  return (
-    <Link
-      href={`/panel/pedidos/${folio}/editar`}
-      className="flex min-h-11 items-center self-start rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
-    >
-      Editar pedido
-    </Link>
-  );
-}
-
+/**
+ * Cancelar el pedido: vive dentro del panel «Cancelar pedido» del menú «Más acciones» (el título lo pone el panel).
+ * Se mantiene montado aunque el pedido ya no esté abierto, para que el aviso «Pedido cancelado.» no desaparezca.
+ */
 export function FormCancelarPedido(p: Props) {
   const marca = `${p.version}-${p.saldo}`;
   return (
-    <section aria-labelledby="cancelar-pedido" className="flex flex-col gap-2">
+    <FormAccion accion={accionCancelarPedido} textoBoton="Cancelar pedido" sinControles={!p.abierto}>
       {p.abierto && (
-        <h2 id="cancelar-pedido" className="text-lg font-semibold">
-          Cancelar pedido
-        </h2>
+        <Fragment key={marca}>
+          <input type="hidden" name="pedidoId" value={p.pedidoId} />
+          <input type="hidden" name="folio" value={p.folio} />
+          <input type="hidden" name="version" value={p.version} />
+          <CampoKey />
+          <p className="aviso-atencion">
+            Se {p.piezas === 1 ? 'liberará 1 pieza' : `liberarán ${p.piezas} piezas`}
+            {p.hayPagado ? ` y ${p.pagadoTexto} quedará como saldo a favor` : ''}. Esta acción no se puede
+            deshacer.
+          </p>
+          <AreaTexto etiqueta="Motivo de la cancelación" name="motivo" rows={2} maxLength={200} required />
+          <CampoCasilla name="confirmo" required>
+            Entiendo que cancelar no se puede deshacer
+          </CampoCasilla>
+        </Fragment>
       )}
-      <FormAccion accion={accionCancelarPedido} textoBoton="Cancelar pedido" sinControles={!p.abierto}>
-        {p.abierto && (
-          <Fragment key={marca}>
-            <input type="hidden" name="pedidoId" value={p.pedidoId} />
-            <input type="hidden" name="folio" value={p.folio} />
-            <input type="hidden" name="version" value={p.version} />
-            <CampoKey />
-            <p className="aviso-atencion">
-              Se {p.piezas === 1 ? 'liberará 1 pieza' : `liberarán ${p.piezas} piezas`}
-              {p.hayPagado ? ` y ${p.pagadoTexto} quedará como saldo a favor` : ''}. Esta acción no se puede
-              deshacer.
-            </p>
-            <AreaTexto etiqueta="Motivo de la cancelación" name="motivo" rows={2} maxLength={200} required />
-            <label className="flex min-h-11 items-center gap-2">
-              <input type="checkbox" name="confirmo" required /> Entiendo que cancelar no se puede deshacer
-            </label>
-          </Fragment>
-        )}
-      </FormAccion>
-    </section>
+    </FormAccion>
   );
 }

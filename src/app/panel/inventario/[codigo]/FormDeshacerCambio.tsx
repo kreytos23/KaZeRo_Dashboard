@@ -1,9 +1,10 @@
 'use client';
 
 import { Fragment, startTransition, useActionState, useEffect, useId, useRef } from 'react';
-import { Campo } from '@/features/ui/Campo';
+import { Campo, CampoCasilla } from '@/features/ui/Campo';
 import { ErroresCampo, useEnfocarPrimerInvalido } from '@/features/ui/errores-campo';
 import type { EstadoAccion } from '@/features/ui/estado';
+import { BotonEnvio } from '@/features/ui/FormAccion';
 import { useHidratado } from '@/features/ui/hidratado';
 import { marcarIndiceSucio } from '@/search/eventos';
 import { accionDeshacerCambio } from '../acciones';
@@ -36,7 +37,6 @@ export function FormDeshacerCambio({
     marcarIndiceSucio();
     aviso.current?.focus();
   }, [estado]);
-  const errorConfirmo = estado.campos?.confirmo;
 
   return (
     <div className="mt-2 flex flex-col gap-2">
@@ -72,26 +72,9 @@ export function FormDeshacerCambio({
                 required
                 maxLength={200}
               />
-              <div className="flex flex-col gap-1">
-                <label className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
-                  <input
-                    id={idConfirmo}
-                    type="checkbox"
-                    name="confirmo"
-                    value="si"
-                    required
-                    aria-invalid={errorConfirmo ? true : undefined}
-                    aria-describedby={errorConfirmo ? `${idConfirmo}-error` : undefined}
-                    className="size-5 cursor-pointer"
-                  />
-                  Confirmo que quiero deshacer este cambio.
-                </label>
-                {errorConfirmo && (
-                  <span id={`${idConfirmo}-error`} className="text-error">
-                    {errorConfirmo}
-                  </span>
-                )}
-              </div>
+              <CampoCasilla name="confirmo" value="si" required>
+                <span className="font-medium">Confirmo que quiero deshacer este cambio.</span>
+              </CampoCasilla>
             </Fragment>
           </ErroresCampo.Provider>
           {estado.error && (
@@ -99,13 +82,12 @@ export function FormDeshacerCambio({
               {estado.campos ? 'Revisa los campos marcados.' : estado.error}
             </p>
           )}
-          <button
-            type="submit"
-            disabled={pendiente || !hidratado}
-            className="min-h-11 cursor-pointer self-start rounded-lg border border-secundario bg-white px-4 font-medium text-secundario enabled:hover:bg-secundario-suave disabled:opacity-60"
-          >
-            Deshacer este cambio
-          </button>
+          <BotonEnvio
+            textoBoton="Deshacer este cambio"
+            pendiente={pendiente}
+            hidratado={hidratado}
+            className="boton-secundario self-start"
+          />
         </form>
       )}
     </div>

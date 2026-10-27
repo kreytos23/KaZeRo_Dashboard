@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { RUTA_ESTADO, abrirMenuSiMovil, irA } from './utilidades';
+import { abrirMenuSiMovil, elegirOpcion, irA, RUTA_ESTADO } from './utilidades';
 
 test.use({ storageState: RUTA_ESTADO });
 
@@ -62,7 +62,7 @@ test('dos formularios con el mismo campo describen cada uno su propio error', as
   await page.getByRole('button', { name: 'Agregar vendedor' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Vendedor agregado.' })).toBeVisible();
   await irA(page, '/panel/exhibidores');
-  await page.getByLabel('Vendedor', { exact: true }).selectOption({ label: `Vend ids ${m}` });
+  await elegirOpcion(page, 'Vendedor', `Vend ids ${m}`, true);
   await page.getByLabel('Nombre del exhibidor').fill(`Exh ids ${m}`);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Exhibidor creado.' })).toBeVisible();

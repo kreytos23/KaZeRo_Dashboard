@@ -10,22 +10,13 @@ export default function Panel() {
         Usa el buscador (tecla /) para encontrar piezas, clientes, vendedores y folios.
       </p>
       <div className="flex flex-wrap gap-2">
-        <Link
-          href="/panel/pedidos/nuevo"
-          className="flex min-h-11 items-center rounded-lg bg-primario px-4 font-medium text-white hover:bg-primario-fuerte"
-        >
+        <Link href="/panel/pedidos/nuevo" className="boton-primario">
           Nuevo pedido
         </Link>
-        <Link
-          href="/panel/inventario/nueva"
-          className="flex min-h-11 items-center rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
-        >
+        <Link href="/panel/inventario/nueva" className="boton-secundario">
           Nueva pieza
         </Link>
-        <Link
-          href="/panel/exhibidores"
-          className="flex min-h-11 items-center rounded-lg border border-secundario bg-white px-4 font-medium text-secundario hover:bg-secundario-suave"
-        >
+        <Link href="/panel/exhibidores" className="boton-secundario">
           Exhibidores
         </Link>
       </div>

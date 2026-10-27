@@ -61,10 +61,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
               <h2 id="pedidos-cliente" className="text-lg font-semibold">
                 Pedidos
               </h2>
-              <Link
-                href={`/panel/pedidos/nuevo?cliente=${c.id}`}
-                className="flex min-h-11 items-center rounded-lg bg-primario px-4 font-medium text-white hover:bg-primario-fuerte"
-              >
+              <Link href={`/panel/pedidos/nuevo?cliente=${c.id}`} className="boton-primario">
                 Nuevo pedido
               </Link>
             </div>

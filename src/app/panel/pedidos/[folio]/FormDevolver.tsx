@@ -2,7 +2,8 @@
 
 import { Fragment } from 'react';
 import { CampoKey } from '@/features/pedidos/CampoKey';
-import { AreaTexto, Campo } from '@/features/ui/Campo';
+import { AreaTexto, Campo, CampoCasilla } from '@/features/ui/Campo';
+import { Desplegable } from '@/features/ui/Desplegable';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { accionDevolverPieza } from '../acciones';
 
@@ -20,15 +21,8 @@ interface Props {
 /** «Devolver por defecto» de una línea de un pedido liquidado: el monto pasa a saldo a favor de la clienta. */
 export function FormDevolver({ pedidoId, folio, itemId, codigo, montoTexto, hoy, fechaPedido }: Props) {
   return (
-    <details className="py-1">
-      <summary className="flex min-h-11 cursor-pointer items-center text-dato font-medium text-secundario">
-        Devolver por defecto
-      </summary>
-      <FormAccion
-        accion={accionDevolverPieza}
-        textoBoton={`Devolver ${codigo}`}
-        className="mt-2 flex flex-col gap-3"
-      >
+    <Desplegable etiqueta="Devolver por defecto">
+      <FormAccion accion={accionDevolverPieza} textoBoton={`Devolver ${codigo}`}>
         <Fragment>
           <input type="hidden" name="pedidoId" value={pedidoId} />
           <input type="hidden" name="folio" value={folio} />
@@ -48,11 +42,11 @@ export function FormDevolver({ pedidoId, folio, itemId, codigo, montoTexto, hoy,
             Pasarán {montoTexto} a saldo a favor de la clienta y {codigo} quedará en «Defecto». Esta acción no
             se puede deshacer.
           </p>
-          <label className="flex min-h-11 items-center gap-2">
-            <input type="checkbox" name="confirmo" required /> Confirmo la devolución de {codigo}
-          </label>
+          <CampoCasilla name="confirmo" required>
+            Confirmo la devolución de {codigo}
+          </CampoCasilla>
         </Fragment>
       </FormAccion>
-    </details>
+    </Desplegable>
   );
 }

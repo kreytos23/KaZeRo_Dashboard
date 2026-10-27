@@ -122,7 +122,7 @@ export function BuscadorGlobal() {
         onClick={() => setAbierto(true)}
         onKeyDown={onKeyDown}
         onBlur={() => setAbierto(false)}
-        className="min-h-11 w-full rounded-lg border border-borde-campo bg-white px-3"
+        className="campo"
       />
       <div
         role="status"
@@ -136,7 +136,7 @@ export function BuscadorGlobal() {
         role="listbox"
         aria-label="Resultados"
         hidden={!visible}
-        className="absolute inset-x-4 z-10 mt-1 overflow-hidden md:inset-x-auto md:w-full rounded-lg border border-borde bg-white shadow"
+        className="lista-combo absolute inset-x-4 z-10 mt-1 overflow-hidden md:inset-x-auto md:w-full rounded-lg border border-borde bg-white shadow"
       >
         {visible &&
           resultados.map((r, i) => (

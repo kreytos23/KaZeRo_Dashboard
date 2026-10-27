@@ -2,7 +2,7 @@
 
 import { Fragment, useEffect, useRef } from 'react';
 import { CampoKey } from '@/features/pedidos/CampoKey';
-import { AreaTexto, Campo, Selector } from '@/features/ui/Campo';
+import { AreaTexto, Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { marcarIndiceSucio } from '@/search/eventos';
 import { accionEditarPedido } from '../../acciones';
@@ -65,13 +65,10 @@ export function FormEditar(p: Props) {
           <fieldset className="flex flex-col gap-1">
             <legend className="text-meta font-medium">Piezas del pedido</legend>
             {p.piezas.map((x) => (
-              <label key={x.codigo} className="flex min-h-11 items-center gap-2">
-                <input type="checkbox" name="quitar" value={x.codigo} />
-                <span>
-                  Quitar <span className="font-mono">{x.codigo}</span>
-                  <span className="text-tinta-suave"> · {x.descripcion}</span>
-                </span>
-              </label>
+              <CampoCasilla key={x.codigo} name="quitar" value={x.codigo}>
+                Quitar <span className="font-mono">{x.codigo}</span>
+                <span className="text-tinta-suave"> · {x.descripcion}</span>
+              </CampoCasilla>
             ))}
           </fieldset>
           <AreaTexto

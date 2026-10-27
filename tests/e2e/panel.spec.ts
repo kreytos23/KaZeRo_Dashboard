@@ -1,5 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
-import { RUTA_ESTADO, RUTA_ESTADO_REGEN, datosAdmin, datosAdminRegen, irA } from './utilidades';
+import {
+  abrirAccion,
+  datosAdmin,
+  datosAdminRegen,
+  elegirOpcion,
+  irA,
+  RUTA_ESTADO,
+  RUTA_ESTADO_REGEN,
+  textosDeOpciones,
+} from './utilidades';
 
 test.use({ storageState: RUTA_ESTADO });
 
@@ -25,7 +34,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
 
   await irA(page, '/panel/vendedores');
   await page.getByLabel('Nombre').fill(`Nelly ${m}`);
-  await page.getByLabel('Tipo').selectOption('revendedora');
+  await elegirOpcion(page, 'Tipo', 'Revendedora');
   await page.getByLabel('Comisión (%)').fill('18');
   await page.getByRole('button', { name: 'Agregar vendedor' }).click();
   await expect(estadoCon(page, 'Vendedor agregado.')).toBeVisible();
@@ -65,7 +74,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await expect(page).toHaveURL(new RegExp(`/panel/inventario/${codigo}$`));
 
   await irA(page, '/panel/exhibidores');
-  await page.getByLabel('Vendedor', { exact: true }).selectOption({ label: `Nelly ${m}` });
+  await elegirOpcion(page, 'Vendedor', `Nelly ${m}`, true);
   await page.getByLabel('Nombre del exhibidor').fill(`Exhibidor ${m}`);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
   await expect(estadoCon(page, 'Exhibidor creado.')).toBeVisible();
@@ -101,13 +110,12 @@ test('alta individual, ficha de pieza con destinos válidos y estados', async ({
   await page.getByRole('button', { name: 'Guardar pieza' }).click();
   await expect(page).toHaveURL(new RegExp(`/panel/inventario/${codigo}$`));
 
-  const nuevo = page.getByLabel('Nuevo estado');
-  await expect(nuevo.locator('option')).toHaveText(['Regalo', 'Defecto', 'Guardada']);
-  await nuevo.selectOption({ label: 'Defecto' });
+  await expect.poll(() => textosDeOpciones(page, 'Nuevo estado')).toEqual(['Regalo', 'Defecto', 'Guardada']);
+  await elegirOpcion(page, 'Nuevo estado', 'Defecto');
   await page.getByRole('button', { name: 'Cambiar estado' }).click();
   await expect(estadoCon(page, 'Estado actualizado.')).toBeVisible();
   // Desde Defecto solo se puede volver a Disponible.
-  await expect(nuevo.locator('option')).toHaveText(['Disponible']);
+  await expect.poll(() => textosDeOpciones(page, 'Nuevo estado')).toEqual(['Disponible']);
 });
 
 test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async ({ page }, info) => {
@@ -128,7 +136,7 @@ test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async
   await expect(cambios.getByText('Sin cambios registrados.')).toBeVisible();
 
   // Editar sin dinero: el motivo es opcional.
-  await page.getByText('Editar pieza', { exact: true }).click();
+  await abrirAccion(page, 'Editar pieza');
   await expect(page.getByLabel('Motivo del cambio (opcional)')).not.toHaveAttribute('required', '');
   await page.getByLabel('Descripción').fill(`Pulsera océano ${m}`);
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
@@ -160,7 +168,7 @@ test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async
 
   // Regalo: el formulario de estado desaparece en el mismo render, pero el índice se marca sucio.
   const reindexado = page.waitForRequest((r) => r.url().includes('/api/busqueda/indice'));
-  await page.getByLabel('Nuevo estado').selectOption({ label: 'Regalo' });
+  await elegirOpcion(page, 'Nuevo estado', 'Regalo');
   await page.getByRole('button', { name: 'Cambiar estado' }).click();
   await reindexado;
   await expect(page.getByLabel('Nuevo estado')).toHaveCount(0);
@@ -220,13 +228,13 @@ test('editar un exhibidor abierto y renombrar un catálogo, ambos con historial'
 
   await irA(page, '/panel/vendedores');
   await page.getByLabel('Nombre').fill(`Edith ${m}`);
-  await page.getByLabel('Tipo').selectOption('consignacion');
+  await elegirOpcion(page, 'Tipo', 'Negocio a consignación');
   await page.getByLabel('Comisión (%)').fill('10');
   await page.getByRole('button', { name: 'Agregar vendedor' }).click();
   await expect(estadoCon(page, 'Vendedor agregado.')).toBeVisible();
 
   await irA(page, '/panel/exhibidores');
-  await page.getByLabel('Vendedor', { exact: true }).selectOption({ label: `Edith ${m}` });
+  await elegirOpcion(page, 'Vendedor', `Edith ${m}`, true);
   await page.getByLabel('Nombre del exhibidor').fill(`Vitrina ${m}`);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
   await expect(estadoCon(page, 'Exhibidor creado.')).toBeVisible();

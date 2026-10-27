@@ -148,14 +148,14 @@ export function SelectorCliente({
           }
         }}
         onBlur={() => setAbierto(false)}
-        className="min-h-11 rounded-lg border border-borde-campo bg-white px-3 aria-invalid:border-2 aria-invalid:border-error"
+        className="campo"
       />
       <ul
         id={`${id}-lista`}
         role="listbox"
         aria-label="Clientes"
         hidden={!visible}
-        className="absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-lg border border-borde bg-white shadow"
+        className="lista-combo absolute inset-x-0 top-full z-10 mt-1 overflow-hidden rounded-lg border border-borde bg-white shadow"
       >
         {visible &&
           opciones.map((o, i) => (
