@@ -63,7 +63,7 @@ async function cobrar(pedidoId: string, montoCentavos: number, fecha: string) {
     db.transaction(async (tx) => {
       await tx.execute(sql`ALTER TABLE aplicacion_pago DISABLE TRIGGER USER`);
       await tx.execute(
-        sql`UPDATE aplicacion_pago SET fecha = ${fecha}::date WHERE pedido_id = ${pedidoId} AND fecha = (SELECT max(fecha) FROM aplicacion_pago WHERE pedido_id = ${pedidoId})`,
+        sql`UPDATE aplicacion_pago SET fecha = ${fecha}::date WHERE id = (SELECT id FROM aplicacion_pago WHERE pedido_id = ${pedidoId} ORDER BY created_at DESC LIMIT 1)`,
       );
       await tx.execute(sql`ALTER TABLE aplicacion_pago ENABLE TRIGGER USER`);
     }),
@@ -77,8 +77,8 @@ const pagar = (corteId: string, vendedorId: string, key = randomUUID()) =>
   app((db) => registrarPagoComision(db, { key, adminId, corteId, vendedorId, metodo: 'efectivo' }));
 const anular = (pagoId: string, motivo = 'Se pagó dos veces', key = randomUUID()) =>
   app((db) => anularPagoComision(db, { key, adminId, pagoId, motivo }));
-const nelly = async (rep: ReturnType<typeof reporte>) =>
-  (await rep).vendedoras.find((v) => v.vendedorId === nellyId)!;
+const nelly = (rep: Awaited<ReturnType<typeof reporte>>) =>
+  rep.vendedoras.find((v) => v.vendedorId === nellyId)!;
 
 beforeEach(async () => {
   adminId = await reiniciarConAdmin();
@@ -108,7 +108,7 @@ describe('comisiones', () => {
     expect((await reporte('2026-11-01', '2026-11-20')).numPedidos).toBe(0);
     await cobrar(p.id, 60000, '2026-11-05');
     const r = await reporte('2026-11-01', '2026-11-20');
-    const v = await nelly(Promise.resolve(r));
+    const v = nelly(r);
     expect(v.pedidosDetalle).toMatchObject([
       {
         pedidoId: p.id,
@@ -138,7 +138,7 @@ describe('comisiones', () => {
     const r = await reporte('2026-11-01', '2026-12-01');
     expect(r).toMatchObject({ cerrado: true, totalCentavos: 18000, numPedidos: 1, cerrable: false });
     expect(r.cerradoAt).toBeTruthy();
-    expect(await nelly(Promise.resolve(r))).toMatchObject({
+    expect(nelly(r)).toMatchObject({
       comisionCentavos: 18000,
       pct: '18.00',
       estadoPago: 'pendiente',
@@ -161,12 +161,8 @@ describe('comisiones', () => {
         activo: true,
       }),
     );
-    expect((await nelly(Promise.resolve(await reporte('2026-11-01', '2026-12-05')))).comisionCentavos).toBe(
-      18000,
-    );
-    expect((await nelly(Promise.resolve(await reporte('2026-12-01', '2026-12-05')))).comisionCentavos).toBe(
-      20000,
-    );
+    expect(nelly(await reporte('2026-11-01', '2026-12-05')).comisionCentavos).toBe(18000);
+    expect(nelly(await reporte('2026-12-01', '2026-12-05')).comisionCentavos).toBe(20000);
   });
 
   it('C-4: un pago atrasado de un pedido liquidado después del cierre entra en el mes siguiente', async () => {
@@ -174,7 +170,7 @@ describe('comisiones', () => {
     await cerrar('2026-11-01', '2026-12-01');
     const tarde = await liquidado(50000, '2026-11-29');
     const dic = await reporte('2026-12-01', '2026-12-10');
-    expect((await nelly(Promise.resolve(dic))).pedidosDetalle.map((d) => d.pedidoId)).toEqual([tarde.id]);
+    expect(nelly(dic).pedidosDetalle.map((d) => d.pedidoId)).toEqual([tarde.id]);
     const c = await cerrar('2026-12-01', '2027-01-01');
     expect(c).toMatchObject({ numPedidos: 1, totalCentavos: 9000 });
   });
@@ -192,6 +188,10 @@ describe('comisiones', () => {
         motivo: 'Roto',
       }),
     );
+    const dev = await app((db) =>
+      db.execute(sql`SELECT count(*)::int AS n FROM devolucion WHERE pedido_item_id = ${item.id}`),
+    );
+    expect(dev.rows[0]!['n']).toBe(1);
     const cerrado = await reporte('2026-11-01', '2026-12-05');
     expect(cerrado.totalCentavos).toBe(18000);
     expect(c.totalCentavos).toBe(18000);
@@ -231,6 +231,22 @@ describe('comisiones', () => {
     expect(cuenta.rows[0]!['n']).toBe(1);
   });
 
+  it('carrera: dos pagos a la vez de la misma vendedora y corte (keys distintas) → uno OK y el otro ya_pagado', async () => {
+    await liquidado(100000, '2026-11-05');
+    const c = await cerrar('2026-11-01', '2026-12-01');
+    const r = await Promise.allSettled([pagar(c.corteId, nellyId), pagar(c.corteId, nellyId)]);
+    expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+    const rechazo = r.find((x) => x.status === 'rejected') as PromiseRejectedResult;
+    expect(rechazo.reason).toMatchObject({
+      codigo: 'ya_pagado',
+      message: 'La comisión de Nelly de Noviembre 2026 ya está pagada.',
+    });
+    const cuenta = await app((db) =>
+      db.execute(sql`SELECT count(*)::int AS n FROM pago_comision WHERE anulado_at IS NULL`),
+    );
+    expect(cuenta.rows[0]!['n']).toBe(1);
+  });
+
   it('mes sin pedidos: el corte queda con 0 líneas y la vendedora sin comisión', async () => {
     await liquidado(100000, '2026-10-05');
     await cerrar('2026-10-01', '2026-11-01');
@@ -257,7 +273,7 @@ describe('comisiones', () => {
       codigo: 'ya_pagado',
       message: 'La comisión de Nelly de Noviembre 2026 ya está pagada.',
     });
-    let v = await nelly(Promise.resolve(await reporte('2026-11-01', '2026-12-01')));
+    let v = nelly(await reporte('2026-11-01', '2026-12-01'));
     expect(v.estadoPago).toBe('pagado');
     expect(v.pago).toMatchObject({ id: p1.pagoId, metodo: 'efectivo', montoCentavos: 18000, nota: null });
     expect(await app((db) => pendientesDeVendedora(db, nellyId))).toEqual([]);
@@ -271,12 +287,10 @@ describe('comisiones', () => {
       codigo: 'pago_anulado',
       message: 'Ese pago ya estaba deshecho.',
     });
-    v = await nelly(Promise.resolve(await reporte('2026-11-01', '2026-12-01')));
+    v = nelly(await reporte('2026-11-01', '2026-12-01'));
     expect(v.estadoPago).toBe('pendiente');
     expect((await pagar(c.corteId, nellyId)).montoCentavos).toBe(18000);
-    expect((await nelly(Promise.resolve(await reporte('2026-11-01', '2026-12-01')))).estadoPago).toBe(
-      'pagado',
-    );
+    expect(nelly(await reporte('2026-11-01', '2026-12-01')).estadoPago).toBe('pagado');
   });
 
   it('pago: valida método, nota y fecha', async () => {
@@ -325,9 +339,7 @@ describe('comisiones', () => {
     const f = hoy.rows[0]!.f;
     const mes = `${f.slice(0, 7)}-01`;
     const r = await reporte(mes, '2999-01-01');
-    expect((await nelly(Promise.resolve(r))).pedidosDetalle).toMatchObject([
-      { pedidoId: p.id, baseCentavos: 0, montoCentavos: 0 },
-    ]);
+    expect(nelly(r).pedidosDetalle).toMatchObject([{ pedidoId: p.id, baseCentavos: 0, montoCentavos: 0 }]);
   });
 
   it('pendientesDeVendedora lista el mes cerrado mientras no se pague y lo quita al pagar', async () => {

@@ -159,7 +159,8 @@ export async function registrarPagoComision(
       .from(vendedor)
       .innerJoin(corteComision, eq(corteComision.id, d.corteId))
       .where(eq(vendedor.id, d.vendedorId));
-    throw yaPagado(r!.nombre, r!.mes);
+    if (!r) throw e;
+    throw yaPagado(r.nombre, r.mes);
   });
 }
 
