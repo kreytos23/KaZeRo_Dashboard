@@ -23,11 +23,12 @@ const slug = (t: string) =>
     .replace(/^-+|-+$/g, '');
 const tarjeta = (page: Page, nombre: string): Locator => page.locator('details', { hasText: nombre });
 
-/** Día 10 del mes anterior a hoy: un mes ya terminado, así que cerrable. */
-function mesPasado() {
+/** Mes terminado, `atras` meses antes del actual (1 = el pasado), con su día 10 y nombre. */
+function mesPasado(atras: number) {
   const [a, m] = hoyMX().split('-').map(Number) as [number, number];
-  const fecha = m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, '0')}`;
-  return { mes: fecha, dia: `${fecha}-10`, nombre: nombreMes(`${fecha}-01`) };
+  const d = new Date(Date.UTC(a, m - 1 - atras, 1));
+  const mes = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+  return { mes, dia: `${mes}-10`, nombre: nombreMes(`${mes}-01`) };
 }
 
 /** Pulsa «Descargar PDF», espera la descarga y devuelve el nombre y los primeros bytes del archivo. */
@@ -44,6 +45,7 @@ test.describe('reportes', () => {
   let vendedora = '';
   let vendedoraId = '';
   let otra = '';
+  let mesCerrado = '';
 
   test('deudores: el pedido con abono aparece con su saldo, se filtra por vendedora y se descarga el PDF', async ({
     page,
@@ -83,12 +85,18 @@ test.describe('reportes', () => {
   }, info) => {
     const m = marca(info.project.name);
     const sufijo = `${m}${info.retry ? ` r${info.retry}` : ''}`;
-    const { mes, dia, nombre } = mesPasado();
+    // Un mes cerrado no se reabre y la BD sobrevive al reintento: el intento 0 cierra hace 2 meses y el
+    // reintento (CI permite uno) el mes siguiente, que ya es el abierto. El pedido liquidado hace 2 meses
+    // entra en el cierre que toque, así que cada intento ejecuta el flujo completo.
+    expect(info.retry, 'solo hay dos meses terminados que cerrar en orden').toBeLessThanOrEqual(1);
+    const { dia } = mesPasado(2);
+    const { mes, nombre } = mesPasado(2 - info.retry);
+    mesCerrado = mes;
     const clienta = await sembrarCliente(`Clienta Com ${sufijo}`);
-    // Liquidado el día 10 del mes pasado: $149 al 10 % = $14.90.
+    // Liquidado el día 10 de hace 2 meses: $149 al 10 % = $14.90.
     await sembrarPedidoConAbonos(clienta, vendedoraId, `R${m}C1`, dia, [{ fecha: dia, centavos: 14900 }]);
 
-    // El mes abierto por defecto es el pasado, y ya se puede cerrar.
+    // El mes abierto por defecto es el que toca cerrar, y ya se puede cerrar.
     await irA(page, '/panel/reportes/comisiones');
     await expect(page.getByRole('heading', { name: new RegExp(`^${nombre}:`) })).toBeVisible();
     const card = tarjeta(page, vendedora);
@@ -97,19 +105,21 @@ test.describe('reportes', () => {
 
     await page.getByRole('checkbox', { name: /Confirmo cerrar/ }).check();
     await page.getByRole('button', { name: `Cerrar ${nombre}` }).click();
-    // Al cerrar, el mes abierto pasa al siguiente y el formulario (con su aviso) desaparece.
+    // Al cerrar vuelve al mes recién cerrado, con su aviso (el formulario ya no está).
+    await expect(page).toHaveURL(new RegExp(`mes=${mes}`));
+    await expect(page.getByRole('status').filter({ hasText: 'Mes cerrado' })).toBeVisible();
     await expect(page.getByRole('checkbox', { name: /Confirmo cerrar/ })).toHaveCount(0);
-
-    await irA(page, `/panel/reportes/comisiones?mes=${mes}`);
     await expect(tarjeta(page, vendedora)).toContainText('Pago pendiente');
 
     await page.getByRole('button', { name: 'Registrar pago' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Pago registrado.' })).toBeVisible();
     await expect(tarjeta(page, vendedora)).toContainText('Pagado');
 
     await abrirAccion(page, 'Deshacer pago');
     const panel = page.getByRole('region', { name: 'Deshacer pago', exact: true });
     await panel.getByLabel('Motivo').fill('Prueba E2E: pago duplicado');
     await panel.getByRole('button', { name: 'Deshacer pago' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Pago deshecho.' })).toBeVisible();
     await expect(tarjeta(page, vendedora)).toContainText('Pago pendiente');
 
     const pdf = await descargarPdf(page, page.getByRole('link', { name: 'Descargar PDF', exact: true }));
@@ -120,7 +130,8 @@ test.describe('reportes', () => {
   test('ficha de la vendedora: por cobrar y el mes con pago pendiente, con enlaces a los reportes', async ({
     page,
   }) => {
-    const { mes, nombre } = mesPasado();
+    const mes = mesCerrado;
+    const nombre = nombreMes(`${mes}-01`);
     await irA(page, `/panel/vendedores/${vendedoraId}`);
     const bloque = page.getByRole('region', { name: 'Cobranza y comisiones' });
     const cobrar = bloque.getByRole('link', { name: /^Por cobrar: \$99\.00 en 1 pedido$/ });
