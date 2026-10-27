@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { estaActivaBarra } from '@/app/panel/barra-inferior';
+import { estaActiva } from '@/app/panel/rutas';
 
-describe('estaActivaBarra', () => {
+const BARRA = ['/panel', '/panel/pedidos', '/panel/pedidos/nuevo', '/panel/inventario', '/panel/reportes'];
+
+describe('estaActiva', () => {
   it.each([
     ['/panel', '/panel', true],
     ['/panel/pedidos', '/panel', false],
@@ -12,7 +14,11 @@ describe('estaActivaBarra', () => {
     ['/panel/inventario/x', '/panel/inventario', true],
     ['/panel/inventarios', '/panel/inventario', false],
     ['/panel/reportes', '/panel/reportes', true],
-  ])('%s con %s -> %s', (ruta, href, esperado) => {
-    expect(estaActivaBarra(ruta, href)).toBe(esperado);
+  ])('con la barra: %s con %s -> %s', (ruta, href, esperado) => {
+    expect(estaActiva(ruta, href, BARRA)).toBe(esperado);
+  });
+
+  it('sin rutas que compitan, Pedidos sigue marcado en «Nuevo pedido» (menú de escritorio)', () => {
+    expect(estaActiva('/panel/pedidos/nuevo', '/panel/pedidos')).toBe(true);
   });
 });

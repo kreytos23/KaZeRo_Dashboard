@@ -88,6 +88,9 @@
   --scale-tiny: 0.99; /* menú al cerrarse */
   --distance-micro: 4px; /* entrada de avisos y mensajes de error */
   --distance-small: 6px; /* sacudida de error */
+  --z-barra: 20; /* barra inferior del celular */
+  --z-popover: 30; /* listas de combo y menús: por encima de la barra */
+  --alto-barra-inferior: calc(6rem + env(safe-area-inset-bottom)); /* lo que el contenido deja libre bajo la barra */
   --blur-small: 2px; /* entrada de avisos y paneles */
   /* Acordeón (21) */
   --acc-expand: var(--duration-fast);
@@ -660,6 +663,7 @@
   }
   /* Listas de los combobox (cliente, pieza, catálogo, buscador): aparecen con la misma entrada que los menús. */
   .lista-combo {
+    z-index: var(--z-popover);
     transform-origin: top;
     animation: menu-entra var(--duration-fast) var(--ease-smooth-out);
   }
@@ -1058,6 +1062,6 @@
 
 @media (max-width: 47.99rem) {
   html {
-    scroll-padding-bottom: 6rem;
+    scroll-padding-bottom: var(--alto-barra-inferior);
   }
 }
