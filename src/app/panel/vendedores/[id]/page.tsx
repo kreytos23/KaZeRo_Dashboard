@@ -14,6 +14,7 @@ import { FormAccion } from '@/features/ui/FormAccion';
 import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
+import { ErrorNegocio } from '@/server/errores';
 import { listarExhibidores } from '@/server/exhibidores/servicio';
 import { piezasDeVendedora } from '@/server/piezas/custodia';
 import { saldoFavorDeVendedor } from '@/server/pedidos/lecturas';
@@ -39,7 +40,10 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
       piezasDeVendedora(db, id.data),
       resumenDeVendedora(db, id.data),
     ]),
-  );
+  ).catch((e: unknown) => {
+    if (e instanceof ErrorNegocio && e.codigo === 'no_encontrado') notFound();
+    throw e;
+  });
   if (!v) notFound();
   return (
     <section className="flex flex-col gap-6">
