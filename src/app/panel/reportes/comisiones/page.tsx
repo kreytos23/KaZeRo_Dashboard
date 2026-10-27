@@ -132,7 +132,7 @@ export default async function Comisiones({
         <div className="grid items-start gap-4 lg:grid-cols-2">
           {vendedoras.map((x) => (
             <details key={x.vendedorId} open className="tarjeta">
-              <summary className="flex min-h-14 cursor-pointer flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3">
+              <summary className="flex min-h-14 cursor-pointer flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 ps-4 pe-10">
                 <span className="flex flex-col">
                   <span className="text-lg font-semibold">{x.vendedorNombre}</span>
                   <span className="text-meta text-tinta-suave">

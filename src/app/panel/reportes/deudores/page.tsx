@@ -49,7 +49,7 @@ export default async function Deudores({
         <div className="grid items-start gap-4 lg:grid-cols-2">
           {r.grupos.map((g) => (
             <details key={g.vendedorId} open className="tarjeta">
-              <summary className="flex min-h-14 cursor-pointer flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-3">
+              <summary className="flex min-h-14 cursor-pointer flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 ps-4 pe-10">
                 <span className="text-lg font-semibold">{g.vendedorNombre}</span>
                 <span className="text-monto font-semibold tabular-nums">
                   {formatoMXN(g.saldoCentavos)}
