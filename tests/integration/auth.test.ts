@@ -315,6 +315,23 @@ describe('límite de intentos por IP', () => {
       ),
     );
     expect(r).toMatchObject({ ok: false, motivo: 'bloqueado' });
+    // El código no se quemó: desde otra IP el mismo código sigue valiendo.
+    const otra = await app((db) =>
+      verificarSegundoFactor(
+        db,
+        { preToken: pre.preToken, codigo: generarCodigoTotp(secreto, t), ip: IP_B, userAgent: 'v' },
+        llaveTotp(),
+        t,
+      ),
+    );
+    expect(otra.ok).toBe(true);
+  });
+
+  it('límite exacto: 29 fallos todavía permiten entrar; 30 bloquean', async () => {
+    await sembrar(IP_A, new Date(t.getTime() - min(1)), MAX_FALLOS_IP - 1);
+    expect((await entrar(IP_A)).ok).toBe(true);
+    await sembrar(IP_A, new Date(t.getTime() - min(1)), 1);
+    expect(await entrar(IP_A)).toMatchObject({ ok: false, motivo: 'bloqueado' });
   });
 
   it('sin IP no se puede limitar por IP', async () => {

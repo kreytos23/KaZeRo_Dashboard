@@ -7,9 +7,10 @@ import { hashCodigoRecuperacion, hashToken, nuevoToken } from './tokens';
 import { pasoTotpValido } from './totp';
 
 /**
- * Riesgo aceptado: el bloqueo es por correo, así que quien conozca el correo del admin puede mantenerlo
- * bloqueado (5 intentos malos cada 15 min). Para un panel de un solo admin es preferible a un bloqueo
- * por IP, que se evade rotando IPs. Recuperación: esperar 15 min o borrar los fallos en la BD.
+ * Dos límites. Por correo: 5 fallos en 15 min bloquean ese correo; quien lo conozca puede mantener bloqueado
+ * al admin (riesgo aceptado: en un panel de un solo admin es preferible). Por IP: 30 fallos en 15 min
+ * bloquean esa IP, que sale de x-forwarded-for (confiable en Vercel, que lo fija el borde). Recuperación:
+ * esperar 15 min o borrar los fallos en la BD.
  */
 export const POLITICA = {
   maxFallos: 5,
@@ -121,6 +122,8 @@ export async function iniciarLogin(
   // Una sola transacción por intento: contar fallos, verificar y registrar el resultado sin carreras.
   // Los fallos se devuelven (no se lanzan) para que su registro sí se confirme.
   return db.transaction(async (tx): Promise<ResultadoLogin> => {
+    // El candado serializa por correo; intentos simultáneos desde una misma IP con correos distintos pueden
+    // pasar de MAX_FALLOS_IP por una carrera mínima (aceptado).
     await bloquearCorreo(tx, email);
     const bloqueo = await bloqueoTotal(tx, email, e.ip, ahora);
     if (bloqueo > 0) {
