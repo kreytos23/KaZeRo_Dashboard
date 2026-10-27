@@ -1,11 +1,21 @@
 import { describe, expect, it, vi } from 'vitest';
+import { fechaCorta } from '@/domain/fechas';
 import { cacheControlPara, decidirAcceso } from '@/server/seguridad/acceso';
 import type { ReporteComisiones } from '@/server/comisiones/lecturas';
 
 vi.mock('server-only', () => ({}));
 
 const { nombreArchivoComisiones, nombreArchivoDeudores } = await import('@/server/pdf/nombres');
+const { textoCierre } = await import('@/server/pdf/ComisionesPdf');
 const { pdfComisiones, pdfDeudores } = await import('@/server/pdf/generar');
+
+describe('texto de cierre', () => {
+  it('muestra el día en hora de México: un cierre a las 02:00 UTC cae el día anterior', () => {
+    expect(textoCierre('2026-12-02T02:00:00.000Z')).toBe(`Mes cerrado el ${fechaCorta('2026-12-01')}`);
+    expect(textoCierre('2026-12-02T10:00:00.000Z')).toBe(`Mes cerrado el ${fechaCorta('2026-12-02')}`);
+    expect(textoCierre(null)).toBe('Mes cerrado');
+  });
+});
 
 describe('nombres de archivo', () => {
   it('sin vendedora', () => {

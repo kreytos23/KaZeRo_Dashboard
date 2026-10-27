@@ -17,6 +17,11 @@ const L_RESUMEN: ('l' | 'r')[] = ['l', 'r', 'r', 'r', 'r'];
 const A_DETALLE = [12, 32, 20, 18, 18];
 const L_DETALLE: ('l' | 'r')[] = ['l', 'l', 'l', 'r', 'r'];
 
+/** «Mes cerrado el 1 dic 2026»: el instante de cierre (UTC) se muestra en el día de México. */
+export function textoCierre(cerradoAt: string | null): string {
+  return `Mes cerrado${cerradoAt ? ` el ${fechaCorta(hoyMX(new Date(cerradoAt)))}` : ''}`;
+}
+
 export function ComisionesPdf({ r, logo }: { r: ReporteComisiones; logo: Buffer }) {
   return (
     <Document title={`Comisiones — ${r.nombre}`} author="KaZeRo">
@@ -27,7 +32,7 @@ export function ComisionesPdf({ r, logo }: { r: ReporteComisiones; logo: Buffer 
           meta={[
             `Generado el ${fechaCorta(hoyMX())}`,
             r.cerrado
-              ? `Mes cerrado${r.cerradoAt ? ` el ${fechaCorta(r.cerradoAt.slice(0, 10))}` : ''}`
+              ? textoCierre(r.cerradoAt)
               : 'Estimado, sin cerrar',
           ]}
         />
