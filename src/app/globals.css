@@ -114,6 +114,16 @@
 }
 
 @layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  /* Radix compensa la barra que quita; con el canal reservado ya no hace falta y causaba el salto. */
+  body[data-scroll-locked] {
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+  }
+
   body {
     background-color: var(--color-crema);
     color: var(--color-tinta);
