@@ -1,8 +1,8 @@
 import { Image, StyleSheet, Text, View, type ViewProps } from '@react-pdf/renderer';
 
-export const LEMA = 'Vida, moda y estilo';
-export const COLOR_ATRASO = '#b42318';
-export const COLOR_SUAVE = '#6b6b6b';
+const LEMA = 'Vida, moda y estilo';
+const COLOR_ATRASO = '#b42318';
+const COLOR_SUAVE = '#6b6b6b';
 
 export const estilos = StyleSheet.create({
   pagina: { padding: 36, paddingBottom: 54, fontFamily: 'Helvetica', fontSize: 10, color: '#222' },
@@ -37,8 +37,6 @@ export const estilos = StyleSheet.create({
   },
 });
 
-export const der = { textAlign: 'right' as const };
-
 /** Anchos de columna en %, alineados entre cabecera y filas. */
 export function Fila({
   celdas,
@@ -52,9 +50,16 @@ export function Fila({
   estilo?: ViewProps['style'];
 }) {
   return (
-    <View style={[estilos.fila, estilo ?? {}]} wrap={false}>
+    <View style={[estilos.fila, estilo]} wrap={false}>
       {celdas.map((c, i) => (
-        <Text key={i} style={[{ width: `${anchos[i]}%`, paddingRight: 3 }, alinear[i] === 'r' ? der : {}]}>
+        <Text
+          key={i}
+          style={{
+            width: `${anchos[i]}%`,
+            paddingRight: 3,
+            textAlign: alinear[i] === 'r' ? 'right' : 'left',
+          }}
+        >
           {c}
         </Text>
       ))}
@@ -69,9 +74,7 @@ export function Encabezado({ logo, titulo, meta }: { logo: Buffer; titulo: strin
         {/* Image de react-pdf, no un <img>: el PDF no usa alt. */}
         {/* eslint-disable-next-line jsx-a11y/alt-text */}
         <Image src={logo} style={estilos.logo} />
-        <View>
-          <Text style={estilos.lema}>{LEMA}</Text>
-        </View>
+        <Text style={estilos.lema}>{LEMA}</Text>
       </View>
       <Text style={estilos.titulo}>{titulo}</Text>
       {meta.map((m) => (
