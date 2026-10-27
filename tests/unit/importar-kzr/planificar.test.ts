@@ -142,6 +142,7 @@ describe('planificar: errores', () => {
       clave: claveNota(8),
       hash,
       pedidoId: 'ped-1',
+      clienteId: null,
       ...extra,
     });
     expect(errores([f(2, { id: 'ZZ02' })], snap({ origenes: [origen()] }))).toEqual(['origen_cambiado']);
@@ -157,8 +158,7 @@ describe('planificar: errores', () => {
     expect(errores([f(2, { tarjeta: '1.N' })])).toEqual(['tarjeta_formato_no_soportado']);
     expect(errores([f(2, { tarjeta: '1 27/10/2026' })])).toEqual(['tarjeta_fecha_futura']);
   });
-  it('cliente que no existe, repetido por nombre; vendedora que no existe, inactiva', () => {
-    expect(errores([f(2, { cliente: 'Nadie' })])).toEqual(['cliente_no_encontrado']);
+  it('cliente repetido por nombre; vendedora que no existe, inactiva', () => {
     const dos = snap({ clientes: [...snap().clientes, { id: 'c3', nombre: 'CLIENTA UNO' }] });
     expect(errores([f(2)], dos)).toEqual(['cliente_ambiguo']);
     expect(errores([f(2, { vendedor: 'Nadie - X' })])).toEqual(['vendedor_no_encontrado']);
@@ -179,7 +179,7 @@ describe('planificar: idempotencia y avisos', () => {
   it('una nota ya importada con el mismo contenido queda «ya_aplicada» sin validar la BD de nuevo', () => {
     const hash = hashFuente(agruparNotas([f(2)]).notas[0]!);
     const s = snap({
-      origenes: [{ lote: LOTE_KZR, clave: claveNota(8), hash, pedidoId: 'ped-1' }],
+      origenes: [{ lote: LOTE_KZR, clave: claveNota(8), hash, pedidoId: 'ped-1', clienteId: null }],
       pedidosPorFolio: [{ folio: 8, id: 'ped-1' }],
       piezas: [pz('ZZ01', { estado: 'apartada' })],
       tarjetas: [{ clienteId: C1, ciclo: 1, posicion: 1 }],
@@ -252,5 +252,119 @@ describe('planificar: tope de piezas y piezas en exhibidor', () => {
     expect(errores([f(2)], snap({ piezas: [pz('ZZ01', { estado: 'vendida' })] }))).toEqual([
       'pieza_no_disponible',
     ]);
+  });
+});
+
+describe('planificar: vendedora por prefijo', () => {
+  const conVend = (nombres: [string, boolean][]) =>
+    snap({ vendedores: nombres.map(([nombre, activo], i) => ({ id: `v${i}`, nombre, activo })) });
+  it('sin coincidencia exacta, acepta una vendedora activa única que empieza con el texto + palabra completa', () => {
+    const p = planificar([f(2, { vendedor: 'Nelly - Clienta' })], conVend([['Nelly Zavala', true]]), HOY);
+    expect(p.errores).toEqual([]);
+    expect((p.notas[0] as NotaNueva).vendedorId).toBe('v0');
+    expect(p.avisos).toEqual([
+      expect.objectContaining({
+        codigo: 'vendedor_por_prefijo',
+        mensaje: expect.stringContaining('Nelly Zavala'),
+      }),
+    ]);
+  });
+  it('la coincidencia exacta tiene prioridad sobre el prefijo', () => {
+    const p = planificar(
+      [f(2, { vendedor: 'Nelly' })],
+      conVend([
+        ['Nelly Zavala', true],
+        ['Nelly', true],
+      ]),
+      HOY,
+    );
+    expect((p.notas[0] as NotaNueva).vendedorId).toBe('v1');
+    expect(p.avisos).toEqual([]);
+  });
+  it('ambigua si hay más de una; no encontrada si es parte de una palabra o la vendedora está inactiva', () => {
+    expect(
+      errores(
+        [f(2, { vendedor: 'Nelly' })],
+        conVend([
+          ['Nelly Zavala', true],
+          ['Nelly Ruiz', true],
+        ]),
+      ),
+    ).toEqual(['vendedor_ambiguo']);
+    expect(errores([f(2, { vendedor: 'Nel' })], conVend([['Nelly Zavala', true]]))).toEqual([
+      'vendedor_no_encontrado',
+    ]);
+    expect(errores([f(2, { vendedor: 'Nelly' })], conVend([['Nelly Zavala', false]]))).toEqual([
+      'vendedor_no_encontrado',
+    ]);
+    expect(
+      errores(
+        [f(2, { vendedor: 'Nelly' })],
+        conVend([
+          ['Nelly Zavala', false],
+          ['Nelly Ruiz', true],
+        ]),
+      ),
+    ).toEqual([]);
+  });
+  it('un aviso por resolución distinta, con el conteo de notas', () => {
+    const p = planificar(
+      [
+        f(2, { vendedor: 'Nelly' }),
+        f(3, { nota: 'KZR-9', id: 'ZZ02', vendedor: 'Nelly', tarjeta: '2 17/09/2026' }),
+      ],
+      conVend([['Nelly Zavala', true]]),
+      HOY,
+    );
+    const av = p.avisos.filter((a) => a.codigo === 'vendedor_por_prefijo');
+    expect(av).toHaveLength(1);
+    expect(av[0]!.mensaje).toContain('2 nota(s)');
+  });
+});
+
+describe('planificar: clientes por crear', () => {
+  it('cliente inexistente → se planea crear con el nombre del Excel (espacios colapsados), sin error', () => {
+    const p = planificar([f(2, { cliente: '  Nadie   Nuevo ' })], snap(), HOY);
+    expect(p.errores).toEqual([]);
+    expect(p.clientesPorCrear).toEqual([expect.objectContaining({ nombre: 'Nadie Nuevo' })]);
+    expect(p.notas[0]).toMatchObject({ clienteId: null, ciclo: 1, posicion: 1 });
+  });
+  it('se deduplica por nombre normalizado entre notas, y comparten tarjeta desde su primera nota', () => {
+    const p = planificar(
+      [
+        f(2, { cliente: 'Nadie Nuevo', tarjeta: '1 10/09/2026' }),
+        f(3, { nota: 'KZR-9', id: 'ZZ02', cliente: 'NADIE  nuevo', tarjeta: '2 11/09/2026' }),
+      ],
+      snap(),
+      HOY,
+    );
+    expect(p.clientesPorCrear).toHaveLength(1);
+    expect(p.notas.map((n) => (n as NotaNueva).posicion)).toEqual([1, 2]);
+    expect(p.notas.every((n) => (n as NotaNueva).clienteNuevo === p.clientesPorCrear[0]!.clave)).toBe(true);
+  });
+  it('mismo lugar para el mismo cliente nuevo → lugar_ocupado', () => {
+    expect(
+      errores([
+        f(2, { cliente: 'Nadie Nuevo' }),
+        f(3, { nota: 'KZR-9', id: 'ZZ02', cliente: 'Nadie Nuevo' }),
+      ]),
+    ).toEqual(['lugar_ocupado']);
+  });
+  it('el plan y su hash incluyen al cliente por crear; el reporte lo lista solo con iniciales', () => {
+    const a = planificar([f(2, { cliente: 'Nadie Nuevo' })], snap(), HOY);
+    const b = planificar([f(2, { cliente: 'Otro Nuevo' })], snap(), HOY);
+    expect(a.hash).not.toBe(b.hash);
+    const texto = renderizarReporte(a).join(' ');
+    expect(texto).toContain('Clientes por crear: 1 (N. N.)');
+    expect(texto).not.toContain('Nadie');
+  });
+  it('si ya existe uno con ese nombre (creado entre tanto) se liga, no se crea', () => {
+    const s = snap({ clientes: [...snap().clientes, { id: 'c9', nombre: 'Nadie Nuevo' }] });
+    const p = planificar([f(2, { cliente: 'nadie nuevo' })], s, HOY);
+    expect(p.clientesPorCrear).toEqual([]);
+    expect(p.notas[0]).toMatchObject({ clienteId: 'c9', clienteNuevo: null });
+  });
+  it('un nombre de más de 120 caracteres es un error', () => {
+    expect(errores([f(2, { cliente: 'A'.repeat(121) })])).toEqual(['cliente_nombre_invalido']);
   });
 });

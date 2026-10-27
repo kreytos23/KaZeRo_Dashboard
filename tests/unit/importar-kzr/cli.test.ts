@@ -23,6 +23,7 @@ const RAMAS = [
   rama('respaldo-1', 'br-r1', 'br-prod', '2026-10-26T08:00:00Z'),
 ];
 const plan = (errores: PlanKzr['errores'] = []): PlanKzr => ({
+  clientesPorCrear: [],
   notas: [],
   errores,
   avisos: [],
@@ -32,7 +33,7 @@ const plan = (errores: PlanKzr['errores'] = []): PlanKzr => ({
 const resultado = (): ResultadoKzr => ({
   modo: 'ensayo',
   plan: plan(),
-  insertados: { pedidos: 0, items: 0, piezasApartadas: 0, movimientos: 0, origen: 0 },
+  insertados: { pedidos: 0, items: 0, piezasApartadas: 0, movimientos: 0, origen: 0, clientes: 0 },
   yaAplicadas: 0,
   verificacion: { ok: true, diferencias: [] },
   siguienteFolio: 1,

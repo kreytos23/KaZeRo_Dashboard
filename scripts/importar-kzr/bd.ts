@@ -19,6 +19,7 @@ import {
 import { normalizarCodigo } from '../../src/domain/codigos';
 import { centavosANumeric, numericACentavos } from '../../src/domain/dinero';
 import { pctBpsANumeric } from '../../src/domain/pedidos';
+import { crearCliente } from '../../src/server/clientes/servicio';
 import { fijarContextoAuditoria } from '../../src/server/auditoria/servicio';
 import {
   apartarPiezas,
@@ -27,7 +28,7 @@ import {
 } from '../../src/server/pedidos/comun';
 import { asegurarAdminMigracion } from '../migrar-excel/aplicar';
 import { parsearNota } from './parsear';
-import { claveNota, planificar } from './planificar';
+import { claveCliente, claveNota, nombreCliente, planificar } from './planificar';
 import {
   LOTE_KZR,
   HOJA_KZR,
@@ -76,6 +77,7 @@ export interface ResultadoKzr {
     piezasApartadas: number;
     movimientos: number;
     origen: number;
+    clientes: number;
   };
   yaAplicadas: number;
   verificacion: { ok: boolean; diferencias: string[] };
@@ -87,7 +89,8 @@ export interface ResultadoKzr {
 export async function cargarSnapshot(tx: Ejecutor, filas: readonly FilaExcel[]): Promise<Snapshot> {
   const codigos = [...new Set(filas.flatMap((f) => (f.id ? [normalizarCodigo(f.id)] : [])))];
   const folios = [...new Set(filas.flatMap((f) => parsearNota(f.nota) ?? []))];
-  const claves = folios.map(claveNota);
+  const nombres = [...new Set(filas.flatMap((f) => (f.cliente ? [nombreCliente(f.cliente)] : [])))];
+  const claves = [...folios.map(claveNota), ...nombres.map(claveCliente)];
   const [clientes, vendedores, piezas, pedidosPorFolio, origenes, tarjetas, max, seq] = await Promise.all([
     tx.select({ id: cliente.id, nombre: cliente.nombre }).from(cliente),
     tx.select({ id: vendedor.id, nombre: vendedor.nombre, activo: vendedor.activo }).from(vendedor),
@@ -115,6 +118,7 @@ export async function cargarSnapshot(tx: Ejecutor, filas: readonly FilaExcel[]):
             clave: origenExcel.clave,
             hash: origenExcel.hashContenido,
             pedidoId: origenExcel.pedidoId,
+            clienteId: origenExcel.clienteId,
           })
           .from(origenExcel)
           .where(inArray(origenExcel.clave, claves))
@@ -180,12 +184,13 @@ async function insertarNota(
   n: NotaNueva,
   piezas: PiezaBloqueada[],
   adminId: string,
+  clienteId: string,
 ): Promise<{ pedidoId: string; items: number; movimientos: number }> {
   const [p] = await tx
     .insert(pedido)
     .values({
       folio: n.folio,
-      clienteId: n.clienteId,
+      clienteId,
       vendedorId: n.vendedorId,
       fecha: n.fecha,
       cuentaTarjeta: true,
@@ -219,6 +224,7 @@ async function verificar(
   nuevas: NotaNueva[],
   pedidoIds: Map<number, string>,
   antes: { pedidos: number },
+  clienteDe: (n: NotaNueva) => string,
 ): Promise<string[]> {
   const dif: string[] = [];
   if (!nuevas.length) return dif;
@@ -255,7 +261,7 @@ async function verificar(
     }
     if (f.folio !== n.folio) dif.push(`${k}: folio ${f.folio}`);
     if (f.estado !== 'abierto') dif.push(`${k}: estado ${f.estado}`);
-    if (f.clienteId !== n.clienteId || f.vendedorId !== n.vendedorId)
+    if (f.clienteId !== clienteDe(n) || f.vendedorId !== n.vendedorId)
       dif.push(`${k}: cliente o vendedora distintos`);
     if (f.cicloTarjeta !== n.ciclo || f.posicionTarjeta !== n.posicion)
       dif.push(`${k}: lugar de la tarjeta distinto`);
@@ -283,7 +289,7 @@ async function verificar(
  */
 async function bloquear(tx: Ejecutor, plan: PlanKzr) {
   const nuevas = plan.notas.filter((n): n is NotaNueva => n.estado === 'nueva');
-  const clientes = [...new Set(nuevas.map((n) => n.clienteId))].sort();
+  const clientes = [...new Set(nuevas.flatMap((n) => (n.clienteId ? [n.clienteId] : [])))].sort();
   if (clientes.length)
     await tx
       .select({ id: cliente.id })
@@ -327,7 +333,8 @@ export async function aplicarKzr(
         const tocaFueraDeLoBloqueado = plan.notas.some(
           (n) =>
             n.estado === 'nueva' &&
-            (!bloqueados.clientes.has(n.clienteId) || n.items.some((i) => !bloqueados.piezas.has(i.piezaId))),
+            ((n.clienteId !== null && !bloqueados.clientes.has(n.clienteId)) ||
+              n.items.some((i) => !bloqueados.piezas.has(i.piezaId))),
         );
         if (tocaFueraDeLoBloqueado) throw new ErrorPlanCambio(o.hashEsperado ?? previo.hash, plan.hash);
         if (o.hashEsperado !== undefined && o.hashEsperado !== plan.hash)
@@ -337,10 +344,18 @@ export async function aplicarKzr(
         const porId = bloqueados.piezas;
         const pedidosAntes = await contarPedidos(tx);
         const pedidoIds = new Map<number, string>();
-        const ins = { pedidos: 0, items: 0, piezasApartadas: 0, movimientos: 0, origen: 0 };
+        const ins = { pedidos: 0, items: 0, piezasApartadas: 0, movimientos: 0, origen: 0, clientes: 0 };
+        // Clientes que no existen: se crean con el servicio de la app (misma validación) y se registran en origen_excel.
+        const creados = new Map<string, string>();
+        for (const c of plan.clientesPorCrear) {
+          const id = await crearCliente(tx, { nombre: c.nombre });
+          creados.set(c.clave, id);
+          ins.clientes++;
+        }
+        const clienteDe = (n: NotaNueva) => n.clienteId ?? creados.get(n.clienteNuevo!)!;
         for (const n of nuevas) {
           const piezas = n.items.map((i) => porId.get(i.piezaId)!);
-          const r = await insertarNota(tx, n, piezas, adminId);
+          const r = await insertarNota(tx, n, piezas, adminId, clienteDe(n));
           pedidoIds.set(n.folio, r.pedidoId);
           ins.pedidos++;
           ins.items += r.items;
@@ -348,10 +363,20 @@ export async function aplicarKzr(
           ins.movimientos += r.movimientos;
         }
         if (nuevas.length) {
+          const deClientes = plan.clientesPorCrear.map((c) => ({
+            lote: LOTE_KZR,
+            clave: c.clave,
+            hoja: HOJA_KZR,
+            filas: nuevas.filter((n) => n.clienteNuevo === c.clave).flatMap((n) => n.filas),
+            hashContenido: c.clave.slice('kzr-cliente:'.length),
+            datos: { tipo: 'cliente' },
+            clienteId: creados.get(c.clave)!,
+          }));
           const r = await tx
             .insert(origenExcel)
-            .values(
-              nuevas.map((n) => ({
+            .values([
+              ...deClientes,
+              ...nuevas.map((n) => ({
                 lote: LOTE_KZR,
                 clave: n.clave,
                 hoja: HOJA_KZR,
@@ -365,11 +390,19 @@ export async function aplicarKzr(
                 },
                 pedidoId: pedidoIds.get(n.folio)!,
               })),
-            )
+            ])
             .returning({ x: sql`1` });
           ins.origen = r.length;
         }
-        const diferencias = await verificar(tx, nuevas, pedidoIds, { pedidos: pedidosAntes });
+        const diferencias = await verificar(tx, nuevas, pedidoIds, { pedidos: pedidosAntes }, clienteDe);
+        if (creados.size) {
+          const hay = (
+            await tx.execute(
+              sql`SELECT count(*)::int AS c FROM cliente WHERE id IN (SELECT x::uuid FROM jsonb_array_elements_text(${JSON.stringify([...creados.values()])}::jsonb) x)`,
+            )
+          ).rows[0]!.c as number;
+          if (hay !== creados.size) diferencias.push(`clientes: esperados ${creados.size}, hay ${hay}`);
+        }
         // El siguiente folio esperado: el mayor entre los pedidos y lo ya entregado, más uno.
         const m = (await tx.execute(sql`SELECT coalesce(max(folio), 0)::int AS m FROM pedido`)).rows[0]!
           .m as number;

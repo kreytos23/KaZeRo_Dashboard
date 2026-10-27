@@ -20,6 +20,7 @@ import {
 } from './parsear';
 import {
   LOTE_KZR,
+  type ClientePorCrear,
   type NotaPlan,
   type PiezaSnapshot,
   type PlanKzr,
@@ -28,6 +29,11 @@ import {
 } from './tipos';
 
 export const claveNota = (folio: number) => `kzr:${folio}`;
+/** Nombre del cliente tal como se crea: recortado y con los espacios colapsados. */
+export const nombreCliente = (t: string) => t.trim().replace(/\s+/g, ' ');
+export const claveCliente = (nombre: string) =>
+  `kzr-cliente:${createHash('sha256').update(normalizar(nombre)).digest('hex')}`;
+const MAX_NOMBRE_CLIENTE = 120;
 const corto = (id: string) => id.slice(0, 8);
 
 function indexarPorNombre<T extends { nombre: string }>(xs: readonly T[]): Map<string, T[]> {
@@ -59,13 +65,17 @@ export function planificar(filas: Parameters<typeof agruparNotas>[0], snap: Snap
     n: ReturnType<typeof agruparNotas>['notas'][number];
     clave: string;
     hash: string;
-    cliente: Snapshot['clientes'][number];
+    cliente: { id: string | null; nombre: string; clave: string };
     vendedor: Snapshot['vendedores'][number];
     items: { p: PiezaSnapshot; fila: number }[];
     fecha: string;
     lugar: number;
   }
   const candidatas: Candidata[] = [];
+  const porPrefijoUsado = new Map<
+    string,
+    { texto: string; v: Snapshot['vendedores'][number]; folio: number; filas: number[]; notas: number }
+  >();
   const notas: NotaPlan[] = [];
 
   for (const n of agrupadas) {
@@ -118,22 +128,60 @@ export function planificar(filas: Parameters<typeof agruparNotas>[0], snap: Snap
 
     // Cliente: exactamente uno, sin importar mayúsculas, acentos ni espacios.
     const cs = clientes.get(normalizar(n.cliente)) ?? [];
-    if (cs.length === 0) err('cliente_no_encontrado', 'El cliente no existe en la BD.');
-    else if (cs.length > 1)
+    if (cs.length > 1)
       err(
         'cliente_ambiguo',
         `Hay ${cs.length} clientes con ese nombre (ids ${cs.map((c) => corto(c.id)).join(', ')}).`,
       );
-    const cliente = cs.length === 1 ? cs[0]! : null;
+    let cliente: Candidata['cliente'] | null = null;
+    if (cs.length === 1) cliente = { id: cs[0]!.id, nombre: cs[0]!.nombre, clave: claveCliente(n.cliente) };
+    else if (cs.length === 0) {
+      // Sin coincidencia exacta: ¿ya se importó antes (origen_excel) o se crea con el nombre del Excel?
+      const nombre = nombreCliente(n.cliente);
+      const clave = claveCliente(nombre);
+      const ligado = (origenes.get(clave) ?? []).find(
+        (o) => o.lote === LOTE_KZR && o.clienteId && snap.clientes.some((c) => c.id === o.clienteId),
+      );
+      if (ligado)
+        cliente = {
+          id: ligado.clienteId,
+          nombre: snap.clientes.find((c) => c.id === ligado.clienteId)!.nombre,
+          clave,
+        };
+      else if (nombre.length > MAX_NOMBRE_CLIENTE)
+        err('cliente_nombre_invalido', `El nombre del cliente excede ${MAX_NOMBRE_CLIENTE} caracteres.`);
+      else cliente = { id: null, nombre, clave };
+    }
 
     // Vendedora: el texto antes de « - »; debe existir y estar activa.
     const vs = vendedores.get(normalizar(n.vendedora)) ?? [];
     const activas = vs.filter((v) => v.activo);
-    if (vs.length === 0) err('vendedor_no_encontrado', 'La vendedora no existe en la BD.');
-    else if (activas.length === 0) err('vendedor_inactivo', 'La vendedora está inactiva.');
+    let vendedor = activas.length === 1 ? activas[0]! : null;
+    if (vs.length === 0) {
+      // Sin coincidencia exacta: una vendedora activa cuyo nombre empiece con el texto y una palabra completa.
+      const q = normalizar(n.vendedora);
+      const porPrefijo = q
+        ? snap.vendedores.filter((v) => v.activo && normalizar(v.nombre).startsWith(`${q} `))
+        : [];
+      if (porPrefijo.length === 0) err('vendedor_no_encontrado', 'La vendedora no existe en la BD.');
+      else if (porPrefijo.length > 1)
+        err('vendedor_ambiguo', `Hay ${porPrefijo.length} vendedoras activas que empiezan con ese nombre.`);
+      else {
+        vendedor = porPrefijo[0]!;
+        const previo = porPrefijoUsado.get(`${q}>${vendedor.id}`);
+        if (previo) previo.notas++;
+        else
+          porPrefijoUsado.set(`${q}>${vendedor.id}`, {
+            texto: n.vendedora,
+            v: vendedor,
+            folio: n.folio,
+            filas: nums,
+            notas: 1,
+          });
+      }
+    } else if (activas.length === 0) err('vendedor_inactivo', 'La vendedora está inactiva.');
     else if (activas.length > 1)
       err('vendedor_ambiguo', `Hay ${activas.length} vendedoras activas con ese nombre.`);
-    const vendedor = activas.length === 1 ? activas[0]! : null;
 
     // Piezas: existen, disponibles, de la vendedora de la nota y no repetidas.
     const items: { p: PiezaSnapshot; fila: number }[] = [];
@@ -201,10 +249,14 @@ export function planificar(filas: Parameters<typeof agruparNotas>[0], snap: Snap
   // está ocupado en una vuelta que no ha llegado al 10, es un error.
   const tamano = REGLAS_LEALTAD.tamanoCiclo;
   const porCliente = new Map<string, Candidata[]>();
-  for (const c of candidatas) porCliente.set(c.cliente.id, [...(porCliente.get(c.cliente.id) ?? []), c]);
+  // Un cliente por crear no tiene tarjeta en la BD: su primera nota abre la vuelta 1 (y cuenta desde ahí).
+  const llaveCliente = (c: Candidata) => c.cliente.id ?? `nuevo:${c.cliente.clave}`;
+  for (const c of candidatas)
+    porCliente.set(llaveCliente(c), [...(porCliente.get(llaveCliente(c)) ?? []), c]);
   for (const [clienteId, lista] of porCliente) {
     lista.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.n.folio - b.n.folio);
     const t = tarjetaDeBd(clienteId);
+    const idCorto = lista[0]!.cliente.id ? corto(clienteId) : 'nuevo';
     for (const c of lista) {
       const nums = c.n.filas.map((f) => f.fila);
       if (t.ocupadas.size >= tamano || t.ocupadas.has(tamano)) {
@@ -215,7 +267,7 @@ export function planificar(filas: Parameters<typeof agruparNotas>[0], snap: Snap
           codigo: 'lugar_ocupado',
           folio: c.n.folio,
           filas: nums,
-          mensaje: `El lugar ${c.lugar} de la tarjeta (vuelta ${t.ciclo}) del cliente ${corto(clienteId)} ya está ocupado.`,
+          mensaje: `El lugar ${c.lugar} de la tarjeta (vuelta ${t.ciclo}) del cliente ${idCorto} ya está ocupado.`,
         });
         continue;
       }
@@ -243,9 +295,10 @@ export function planificar(filas: Parameters<typeof agruparNotas>[0], snap: Snap
         hashFuente: c.hash,
         filas: nums,
         fecha: c.fecha,
-        clienteId,
+        clienteId: c.cliente.id,
+        clienteNuevo: c.cliente.id ? null : c.cliente.clave,
         vendedorId: c.vendedor.id,
-        clienteEtiqueta: `${corto(clienteId)} (${iniciales(c.cliente.nombre)})`,
+        clienteEtiqueta: `${idCorto} (${iniciales(c.cliente.nombre)})`,
         vendedorEtiqueta: `${corto(c.vendedor.id)} (${iniciales(c.vendedor.nombre)})`,
         ciclo: t.ciclo,
         posicion: c.lugar,
@@ -263,15 +316,36 @@ export function planificar(filas: Parameters<typeof agruparNotas>[0], snap: Snap
     }
   }
   notas.sort((a, b) => a.folio - b.folio);
+  for (const u of porPrefijoUsado.values())
+    avisos.push({
+      codigo: 'vendedor_por_prefijo',
+      folio: u.folio,
+      filas: u.filas,
+      mensaje: `Vendedora resuelta por prefijo en ${u.notas} nota(s): «${u.texto}» → «${u.v.nombre}» (${corto(u.v.id)}). Confirma que es la correcta.`,
+    });
+  // Clientes por crear: uno por nombre normalizado, solo si alguna nota nueva los usa.
+  const clientesPorCrear = new Map<string, ClientePorCrear>();
+  for (const c of candidatas)
+    if (
+      !c.cliente.id &&
+      !clientesPorCrear.has(c.cliente.clave) &&
+      notas.some((n) => n.estado === 'nueva' && n.clienteNuevo === c.cliente.clave)
+    )
+      clientesPorCrear.set(c.cliente.clave, { clave: c.cliente.clave, nombre: c.cliente.nombre });
 
   const folios = notas.map((n) => n.folio);
   const siguienteFolio = Math.max(snap.maxFolio, snap.folioSecuencia, 0, ...folios) + 1;
-  const hash = hashDelPlan(notas, siguienteFolio);
-  return { notas, errores, avisos, siguienteFolio, hash };
+  const porCrear = [...clientesPorCrear.values()].sort((a, b) => a.clave.localeCompare(b.clave));
+  const hash = hashDelPlan(notas, siguienteFolio, porCrear);
+  return { clientesPorCrear: porCrear, notas, errores, avisos, siguienteFolio, hash };
 }
 
 /** Hash del plan resuelto: ids, precios, lugares, fechas. No incluye números de fila ni nombres. */
-function hashDelPlan(notas: readonly NotaPlan[], siguienteFolio: number): string {
+function hashDelPlan(
+  notas: readonly NotaPlan[],
+  siguienteFolio: number,
+  clientesPorCrear: readonly ClientePorCrear[],
+): string {
   const canon = notas.map((n) =>
     n.estado === 'ya_aplicada'
       ? { estado: n.estado, folio: n.folio, clave: n.clave, hashFuente: n.hashFuente, pedidoId: n.pedidoId }
@@ -282,6 +356,7 @@ function hashDelPlan(notas: readonly NotaPlan[], siguienteFolio: number): string
           hashFuente: n.hashFuente,
           fecha: n.fecha,
           clienteId: n.clienteId,
+          clienteNuevo: n.clienteNuevo,
           vendedorId: n.vendedorId,
           ciclo: n.ciclo,
           posicion: n.posicion,
@@ -291,7 +366,7 @@ function hashDelPlan(notas: readonly NotaPlan[], siguienteFolio: number): string
         },
   );
   return createHash('sha256')
-    .update(jsonCanonico({ notas: canon, siguienteFolio }))
+    .update(jsonCanonico({ notas: canon, siguienteFolio, clientesPorCrear }))
     .digest('hex');
 }
 
@@ -313,7 +388,7 @@ export function renderizarReporte(plan: PlanKzr, ctx: { archivoSha256?: string }
     subtotal += n.subtotal;
     descuento += n.descuentoLealtad;
     total += n.total;
-    clientes.add(n.clienteId);
+    clientes.add(n.clienteId ?? n.clienteNuevo!);
     vendedores.add(n.vendedorId);
     l.push(
       `  KZR-${n.folio} · ${n.items.length} pieza(s) · cliente ${n.clienteEtiqueta} · vendedora ${n.vendedorEtiqueta} · ` +
@@ -329,6 +404,13 @@ export function renderizarReporte(plan: PlanKzr, ctx: { archivoSha256?: string }
   );
   l.push(
     `Totales por insertar: subtotal ${formatoMXN(subtotal)} − lealtad ${formatoMXN(descuento)} = ${formatoMXN(total)}.`,
+  );
+  l.push(
+    `Clientes por crear: ${plan.clientesPorCrear.length}` +
+      (plan.clientesPorCrear.length
+        ? ` (${plan.clientesPorCrear.map((c) => iniciales(c.nombre)).join(', ')})`
+        : '') +
+      '.',
   );
   l.push(`Siguiente folio tras aplicar: ${plan.siguienteFolio}.`);
   const porCodigo = (xs: Problema[]) => {

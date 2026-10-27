@@ -48,6 +48,7 @@ async function contar() {
     db.execute(
       sql`SELECT (SELECT count(*) FROM pedido)::int AS pedidos, (SELECT count(*) FROM pedido_item)::int AS items,
         (SELECT count(*) FROM movimiento_pieza WHERE tipo = 'apartado')::int AS movs, (SELECT count(*) FROM origen_excel)::int AS origen,
+        (SELECT count(*) FROM cliente)::int AS clientes,
         (SELECT count(*) FROM pieza WHERE estado = 'apartada')::int AS apartadas,
         (SELECT count(*) FROM admin WHERE lower(email) = ${EMAIL_ADMIN_MIGRACION})::int AS admin_mig`,
     ),
@@ -194,7 +195,14 @@ describe('importar notas KZR', () => {
     const antes = await contar();
     const seq = await secuencia();
     const r = await aplicar(filas);
-    expect(r.insertados).toEqual({ pedidos: 0, items: 0, piezasApartadas: 0, movimientos: 0, origen: 0 });
+    expect(r.insertados).toEqual({
+      pedidos: 0,
+      items: 0,
+      piezasApartadas: 0,
+      movimientos: 0,
+      origen: 0,
+      clientes: 0,
+    });
     expect(r.yaAplicadas).toBe(1);
     expect(await contar()).toEqual(antes);
     expect(await secuencia()).toEqual(seq);
@@ -223,7 +231,6 @@ describe('importar notas KZR', () => {
     expect(await erroresDe([fila(2, { estatus: 'Pagado' })])).toEqual(['estatus_no_soportado']);
     expect(await erroresDe([fila(2, { tarjeta: '1.N' })])).toEqual(['tarjeta_formato_no_soportado']);
     expect(await erroresDe([fila(2, { tarjeta: '1 27/10/2026' })])).toEqual(['tarjeta_fecha_futura']);
-    expect(await erroresDe([fila(2, { cliente: 'Nadie' })])).toEqual(['cliente_no_encontrado']);
     expect(await erroresDe([fila(2, { vendedor: 'Nadie - Ana' })])).toEqual(['vendedor_no_encontrado']);
     // Otra nota ya apartó la pieza → no disponible.
     await app((db) =>
@@ -329,6 +336,65 @@ describe('importar notas KZR', () => {
       { c: 1, p: 9 },
       { c: 1, p: 10 },
       { c: 2, p: 1 },
+    ]);
+  });
+
+  it('vendedora por prefijo: «Nelly» liga a «Nelly Zavala»; «Nel» no', async () => {
+    const nelly = await app((db) =>
+      crearVendedor(db, { nombre: 'Nelly Zavala', tipo: 'revendedora', comisionPct: '10.00' }),
+    );
+    expect(await erroresDe([fila(2, { vendedor: 'Nel - Ana' })])).toEqual(['vendedor_no_encontrado']);
+    await aplicar([fila(2, { vendedor: 'Nelly - Ana' })]);
+    const r = (await owner((db) => db.execute(sql`SELECT vendedor_id FROM pedido`))).rows;
+    expect(r).toEqual([{ vendedor_id: nelly }]);
+  });
+
+  it('crea el cliente que falta (una vez por nombre), con origen_excel y tarjeta desde su primera nota', async () => {
+    const filas = [
+      fila(2, { nota: 'KZR-1', id: 'ZZ01', cliente: '  Carla   Nueva ', tarjeta: '1 01/09/2026' }),
+      fila(3, { nota: 'KZR-2', id: 'ZZ02', cliente: 'CARLA nueva', tarjeta: '2 02/09/2026' }),
+    ];
+    const plan = await simular(urlOwner(), filas, HOY);
+    expect(plan.clientesPorCrear).toHaveLength(1);
+    expect(await contar()).toMatchObject({ clientes: 2 }); // simular no crea nada
+    const r = await aplicar(filas, plan.hash);
+    expect(r.insertados).toMatchObject({ clientes: 1, pedidos: 2, origen: 3 });
+    const filasBd = (
+      await owner((db) =>
+        db.execute(sql`SELECT c.nombre, p.ciclo_tarjeta AS c, p.posicion_tarjeta AS p
+          FROM pedido p JOIN cliente c ON c.id = p.cliente_id ORDER BY p.folio`),
+      )
+    ).rows;
+    expect(filasBd).toEqual([
+      { nombre: 'Carla Nueva', c: 1, p: 1 },
+      { nombre: 'Carla Nueva', c: 1, p: 2 },
+    ]);
+    const org = (
+      await owner((db) =>
+        db.execute(
+          sql`SELECT count(*)::int AS n FROM origen_excel WHERE cliente_id IS NOT NULL AND clave LIKE 'kzr-cliente:%'`,
+        ),
+      )
+    ).rows[0];
+    expect(org).toEqual({ n: 1 });
+    // Re-ejecución: no crea clientes ni nada más.
+    const otra = await aplicar(filas);
+    expect(otra.insertados).toMatchObject({ clientes: 0, pedidos: 0, origen: 0 });
+    expect(await contar()).toMatchObject({ clientes: 3, pedidos: 2, origen: 3 });
+  });
+
+  it('un cliente creado entre tanto (en el panel) se liga en vez de crear otro', async () => {
+    const filas = [fila(2, { cliente: 'Dora Panel' })];
+    const plan = await simular(urlOwner(), filas, HOY);
+    expect(plan.clientesPorCrear).toHaveLength(1);
+    const dora = await app((db) => crearCliente(db, { nombre: 'dora  panel' }));
+    // El plan aprobado ya no vale (el hash cambió) y no se escribe nada.
+    await expect(aplicar(filas, plan.hash)).rejects.toBeInstanceOf(ErrorPlanCambio);
+    expect(await contar()).toMatchObject({ pedidos: 0, clientes: 3 });
+    const r = await aplicar(filas);
+    expect(r.insertados).toMatchObject({ clientes: 0, pedidos: 1 });
+    expect((await owner((db) => db.execute(sql`SELECT cliente_id FROM pedido`))).rows).toEqual([
+      { cliente_id: dora },
     ]);
   });
 });

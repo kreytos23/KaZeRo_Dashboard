@@ -27,6 +27,8 @@ export type CodigoProblema =
   | 'estatus_no_soportado'
   | 'cliente_no_encontrado'
   | 'cliente_ambiguo'
+  | 'cliente_nombre_invalido'
+  | 'vendedor_por_prefijo'
   | 'vendedor_no_encontrado'
   | 'vendedor_inactivo'
   | 'vendedor_ambiguo'
@@ -69,7 +71,13 @@ export interface Snapshot {
   /** Folios del Excel que ya existen como pedido. */
   pedidosPorFolio: { folio: number; id: string }[];
   /** `origen_excel` con las claves de las notas del Excel (en cualquier lote). */
-  origenes: { lote: string; clave: string; hash: string; pedidoId: string | null }[];
+  origenes: {
+    lote: string;
+    clave: string;
+    hash: string;
+    pedidoId: string | null;
+    clienteId: string | null;
+  }[];
   /** Posiciones de tarjeta ocupadas (pedidos no cancelados que cuentan). */
   tarjetas: { clienteId: string; ciclo: number; posicion: number }[];
   maxFolio: number;
@@ -91,7 +99,9 @@ export interface NotaNueva {
   hashFuente: string;
   filas: number[];
   fecha: string;
-  clienteId: string;
+  /** null si el cliente no existe y se crea en esta importación (`clienteNuevo` es su clave). */
+  clienteId: string | null;
+  clienteNuevo: string | null;
   vendedorId: string;
   /** Etiquetas cortas para el reporte (id corto + iniciales). */
   clienteEtiqueta: string;
@@ -116,7 +126,15 @@ export interface NotaYaAplicada {
 
 export type NotaPlan = NotaNueva | NotaYaAplicada;
 
+/** Cliente que no existe en la BD y se crea con el nombre del Excel (sin espacios de más). */
+export interface ClientePorCrear {
+  /** `kzr-cliente:<sha256 del nombre normalizado>`: clave en origen_excel. */
+  clave: string;
+  nombre: string;
+}
+
 export interface PlanKzr {
+  clientesPorCrear: ClientePorCrear[];
   notas: NotaPlan[];
   errores: Problema[];
   avisos: Problema[];
