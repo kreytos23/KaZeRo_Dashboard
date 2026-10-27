@@ -63,6 +63,9 @@ for (const senal of ['SIGINT', 'SIGTERM'] as const) {
   });
 }
 
+const PAUSA_CUPO_MS = 20_000;
+const ESPERA_MAX_CUPO_MS = 12 * 60_000;
+
 try {
   // Integración corre un worker de Vitest por rama (cada archivo trunca a sus anchas); E2E usa una sola rama.
   let n = 1;
@@ -73,6 +76,15 @@ try {
     const pedidos = modo === 'integracion' ? trabajadoresPedidos(process.env.KAZERO_TEST_WORKERS) : n;
     const limite = Number(process.env.KAZERO_LIMITE_RAMAS) || LIMITE_RAMAS_NEON;
     n = trabajadoresDisponibles(pedidos, contarRamas(), limite);
+    // Otra corrida de CI en paralelo puede tener ocupado el cupo: se espera a que libere sus ramas (las borra
+    // al terminar) en vez de fallar de inmediato.
+    for (let espera = 0; n < 1 && espera < ESPERA_MAX_CUPO_MS; espera += PAUSA_CUPO_MS) {
+      console.warn(
+        `[test-neon] Sin cupo de ramas (límite ${limite}); se reintenta en ${PAUSA_CUPO_MS / 1000} s…`,
+      );
+      await new Promise((r) => setTimeout(r, PAUSA_CUPO_MS));
+      n = trabajadoresDisponibles(pedidos, contarRamas(), limite);
+    }
     if (n < 1)
       throw new Error(`No caben ramas de prueba (límite ${limite} en el plan). Borra ramas test-* viejas.`);
     if (n < pedidos)
