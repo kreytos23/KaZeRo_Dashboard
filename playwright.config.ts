@@ -16,7 +16,7 @@ export default defineConfig({
     // Las pruebas con @escritorio no dependen del viewport (API, cabeceras, flujos idénticos en ambos): solo corren en escritorio.
     { name: 'movil', use: { ...devices['Pixel 7'] }, grepInvert: /@escritorio/ },
   ],
-  // Requiere `pnpm build` previo. Hereda DATABASE_URL/KAZERO_TOTP_KEY de la rama test-* (scripts/test-neon.ts).
+  // Requiere `pnpm build` previo. Hereda DATABASE_URL/KAZERO_TOTP_KEY de la base de prueba (scripts/test-neon.ts).
   webServer: {
     command: `pnpm start -p ${puerto}`,
     url: `http://localhost:${puerto}/api/health`,

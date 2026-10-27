@@ -2,6 +2,9 @@ import { randomBytes } from 'node:crypto';
 import { Pool, type PoolClient } from '@neondatabase/serverless';
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { migrate } from 'drizzle-orm/neon-serverless/migrator';
+import { configurarProxyLocal } from '../../src/db/proxy-local';
+
+configurarProxyLocal();
 
 /**
  * Límites de la sesión de migración: si un DDL espera un lock (p. ej. una transacción larga de la app
