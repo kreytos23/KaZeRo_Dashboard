@@ -15,6 +15,12 @@ import {
 test.use({ storageState: RUTA_ESTADO });
 
 const marca = (proyecto: string) => (proyecto === 'movil' ? 'M' : 'E');
+/**
+ * El grupo es serial: si una prueba falla, CI reintenta el grupo entero y lo creado en el primer intento sigue en la
+ * base. Nombres (` r1`) y prefijos de código (`R`, solo letras) cambian con cada reintento.
+ */
+const sufijo = (retry: number) => (retry ? ` r${retry}` : '');
+const letrasReintento = (retry: number) => 'R'.repeat(retry);
 const estadoCon = (page: Page, texto: string) => page.getByRole('status').filter({ hasText: texto });
 
 /** Avanza con Tab hasta que `destino` tenga el foco. */
@@ -31,16 +37,32 @@ async function escribirEn(page: Page, destino: Locator, texto: string) {
   await page.keyboard.type(texto);
 }
 
-/** Pone el foco en un campo con Tab y comprueba que la siguiente parada es la esperada (orden visual). */
-/** Con la lista del select abierta, baja con ↓ hasta que la opción buscada tiene el foco (determinista en CI lento). */
+/**
+ * Con la lista del select abierta, baja con ↓ hasta que la opción buscada tiene el foco. Radix mueve el foco en un
+ * `setTimeout` tras cada tecla: si la siguiente llega antes, las dos parten de la misma opción y una se pierde. Por
+ * eso cada ↓ espera a que el foco pase a otra opción antes de la siguiente (y falla si una tecla no lo mueve).
+ */
 async function bajarHasta(page: Page, opcion: Locator, maximo = 30) {
   for (let i = 0; i < maximo; i++) {
     if (await opcion.evaluate((el) => el === document.activeElement)) return;
+    const antes = await page.evaluateHandle(() => document.activeElement);
     await page.keyboard.press('ArrowDown');
+    await page
+      .waitForFunction(
+        (previo) =>
+          document.activeElement !== previo && document.activeElement?.getAttribute('role') === 'option',
+        antes,
+        { timeout: 5_000 },
+      )
+      .catch(() => {
+        throw new Error('↓ no movió el foco a la opción siguiente');
+      });
+    await antes.dispose();
   }
   throw new Error('Opción inalcanzable con flechas');
 }
 
+/** Pulsa Tab y comprueba que la siguiente parada es la esperada (orden visual). */
 async function tabHacia(page: Page, siguiente: Locator) {
   await page.keyboard.press('Tab');
   await expect(siguiente).toBeFocused();
@@ -53,7 +75,7 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
   test('alta de vendedor: orden de Tab, selector con flechas y Enter envía', async ({ page }, info) => {
     const m = marca(info.project.name);
     // El reintento de CI no puede repetir el nombre: el primer intento pudo haber creado ya al vendedor.
-    const vendedor = `Teclado ${m}${info.retry ? ` r${info.retry}` : ''}`;
+    const vendedor = `Teclado ${m}${sufijo(info.retry)}`;
     await irA(page, '/panel/vendedores');
     const nombre = page.getByLabel('Nombre');
     await escribirEn(page, nombre, vendedor);
@@ -83,18 +105,18 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
   });
 
   test('alta de cliente con Enter y edición de su ficha sin ratón', async ({ page }, info) => {
-    const m = marca(info.project.name);
+    const cliente = `Cliente Teclado ${marca(info.project.name)}${sufijo(info.retry)}`;
     await irA(page, '/panel/clientes');
-    await escribirEn(page, page.getByLabel('Nombre', { exact: true }), `Cliente Teclado ${m}`);
+    await escribirEn(page, page.getByLabel('Nombre', { exact: true }), cliente);
     await tabHacia(page, page.getByLabel('Referencia'));
     await page.keyboard.type('Voca 9');
     await page.keyboard.press('Enter');
     await expect(estadoCon(page, 'Cliente agregado.')).toBeVisible();
 
-    const enlace = page.getByRole('link', { name: `Cliente Teclado ${m}` });
+    const enlace = page.getByRole('link', { name: cliente, exact: true });
     await enfocar(page, enlace);
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { name: `Cliente Teclado ${m}` })).toBeVisible();
+    await expect(page.getByRole('heading', { name: cliente, exact: true })).toBeVisible();
     await escribirEn(page, page.getByLabel('Notas'), 'Prefiere oro');
     await enfocar(page, page.getByRole('button', { name: 'Guardar cambios' }));
     await page.keyboard.press('Space');
@@ -103,9 +125,10 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
 
   test('nueva pieza: Sugerir código con teclado y envío con Enter', async ({ page }, info) => {
     const m = marca(info.project.name);
-    const codigo = `K${m}01`;
+    const prefijo = `K${m}${letrasReintento(info.retry)}`;
+    const codigo = `${prefijo}01`;
     await irA(page, '/panel/inventario/nueva');
-    await escribirEn(page, page.getByLabel('Prefijo'), `K${m}`);
+    await escribirEn(page, page.getByLabel('Prefijo'), prefijo);
     await tabHacia(page, page.getByRole('button', { name: 'Sugerir código' }));
     await page.keyboard.press('Enter');
     await expect(page.getByLabel('Código', { exact: true })).toHaveValue(codigo);
@@ -130,8 +153,8 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
 
   test('captura en tanda: Guardar y agregar otra y listas de catálogo sin ratón', async ({ page }, info) => {
     const m = marca(info.project.name);
-    const primero = `KT${m}01`;
-    const segundo = `KT${m}02`;
+    const primero = `KT${m}${letrasReintento(info.retry)}01`;
+    const segundo = `KT${m}${letrasReintento(info.retry)}02`;
     await irA(page, '/panel/inventario/nueva');
     await escribirEn(page, page.getByLabel('Código', { exact: true }), primero);
     await tabHacia(page, page.getByLabel('Categoría', { exact: true }));
@@ -161,7 +184,8 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     page,
   }, info) => {
     const m = marca(info.project.name);
-    const codigo = `K${m}01`;
+    const codigo = `K${m}${letrasReintento(info.retry)}01`;
+    const exhibidor = `Exh Teclado ${m}${sufijo(info.retry)}`;
     // La prueba anterior dejó la pieza en Defecto: se vuelve a Disponible para poder enviarla.
     await irA(page, `/panel/inventario/${codigo}`);
     const nuevo = page.getByLabel('Nuevo estado');
@@ -185,13 +209,13 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await expect(vendedor).toContainText(`Teclado ${m}`);
     await expect(vendedor).toBeFocused(); // al cerrarse, la lista devuelve el foco al campo
     await tabHacia(page, page.getByLabel('Nombre del exhibidor'));
-    await page.keyboard.type(`Exh Teclado ${m}`);
+    await page.keyboard.type(exhibidor);
     await page.keyboard.press('Enter');
     await expect(estadoCon(page, 'Exhibidor creado.')).toBeVisible();
 
-    await enfocar(page, page.getByRole('link', { name: `Exh Teclado ${m}` }));
+    await enfocar(page, page.getByRole('link', { name: exhibidor, exact: true }));
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { name: `Exh Teclado ${m}` })).toBeVisible();
+    await expect(page.getByRole('heading', { name: exhibidor, exact: true })).toBeVisible();
 
     await escribirEn(page, page.getByLabel('Códigos a enviar'), codigo);
     await tabHacia(page, page.getByRole('button', { name: 'Enviar piezas' }));
