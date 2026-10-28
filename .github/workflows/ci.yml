@@ -43,13 +43,23 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
 
+  # Integración y E2E corren contra un Postgres de servicio, no contra ramas Neon: crear hasta ~10 ramas
+  # temporales por corrida agotó la cuota de almacenamiento del proyecto Neon. Producción y previews siguen en
+  # Neon. La app usa el driver WebSocket de Neon, así que llega a Postgres por wsproxy (que solo admite
+  # postgres:5432). No usan secretos: también corren en PRs de forks y de Dependabot.
   integracion:
-    # Se omite (no falla) en PRs desde forks y en PRs de Dependabot: ninguno recibe secretos de Actions
-    # (repo público). El merge a main vuelve a ejecutar todo antes de producción. A Dependabot NO le damos
-    # la API key de Neon a propósito: controla todo el proyecto Neon.
-    if: github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]')
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18.4
+        env: { POSTGRES_PASSWORD: postgres }
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      wsproxy:
+        # Neon solo publica la etiqueta latest: se fija por digest.
+        image: ghcr.io/neondatabase/wsproxy@sha256:7f2e2149aa6a57ba382a140102fba44f5053f3e44389ccc18adcecf896054efb
+        env: { ALLOW_ADDR_REGEX: '^postgres:5432$' }
+        ports: ['5433:80']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -58,16 +68,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:integracion
         env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-          # Una rama Neon temporal por worker (se borran todas al terminar); baja sola si el plan no alcanza.
+          # Sin container, el job ve el wsproxy en localhost. La URL usa el nombre del servicio porque es el
+          # wsproxy (en la red de servicios) quien abre la conexión TCP a Postgres.
+          KAZERO_PG_PRUEBAS_URL: postgresql://postgres:postgres@postgres:5432/postgres
+          KAZERO_PG_WSPROXY: localhost:5433
+          # Una base test_* por worker en el mismo Postgres (se borran al terminar).
           KAZERO_TEST_WORKERS: '3'
-      # Si la corrida se cancela, el proceso muere antes de borrar sus ramas de Neon: se borran aquí.
-      - if: cancelled()
-        run: pnpm exec tsx scripts/limpiar-ramas-ci.ts integracion
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
 
   build:
     needs: [calidad, unit]
@@ -104,8 +110,6 @@ jobs:
   e2e:
     # No espera a integracion: corren en paralelo y el despliegue exige ambas.
     needs: [build]
-    # Mismo guarda que integracion (sin secretos en forks ni Dependabot).
-    if: github.event_name == 'push' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]')
     runs-on: ubuntu-latest
     # Imagen oficial de Playwright con Chromium y sus dependencias del sistema ya instaladas: instalar las
     # dependencias con apt en cada corrida costaba ~5 min. La versión sale de package.json (job build).
@@ -113,6 +117,15 @@ jobs:
       image: mcr.microsoft.com/playwright:v${{ needs.build.outputs.playwright }}-noble
       options: --ipc=host
     timeout-minutes: 20
+    # Mismo Postgres y wsproxy que integracion (ver arriba).
+    services:
+      postgres:
+        image: postgres:18.4
+        env: { POSTGRES_PASSWORD: postgres }
+        options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+      wsproxy:
+        image: ghcr.io/neondatabase/wsproxy@sha256:7f2e2149aa6a57ba382a140102fba44f5053f3e44389ccc18adcecf896054efb
+        env: { ALLOW_ADDR_REGEX: '^postgres:5432$' }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
@@ -124,21 +137,16 @@ jobs:
       - run: tar -xf next-build.tar && rm next-build.tar
       - run: pnpm test:e2e
         env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
-      # Si la corrida se cancela, el proceso muere antes de borrar sus ramas de Neon: se borran aquí.
-      - if: cancelled()
-        run: pnpm exec tsx scripts/limpiar-ramas-ci.ts e2e
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_PROJECT_ID: ${{ secrets.NEON_PROJECT_ID }}
+          # Dentro de un container, los servicios se alcanzan por su nombre.
+          KAZERO_PG_PRUEBAS_URL: postgresql://postgres:postgres@postgres:5432/postgres
+          KAZERO_PG_WSPROXY: wsproxy:80
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with: { name: playwright-report, path: playwright-report, retention-days: 7 }
 
   deploy-preview:
     needs: [e2e, integracion]
-    # Depende de e2e, que se omite en forks y Dependabot; se repite el guarda por claridad.
+    # Forks y Dependabot no reciben secretos (repo público): no hay preview para ellos.
     if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.login != 'dependabot[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 20
