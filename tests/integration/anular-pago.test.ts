@@ -400,7 +400,7 @@ describe('P-6: cancelar con reembolso en efectivo', () => {
     expect(await saldoClienta()).toBe('0.00');
     expect(await saldoVendedora()).toBe('0.00');
     const retiros = await filas<{ monto: string; nota: string; v: boolean }>(
-      sql`SELECT monto::text, nota, vendedor_id IS NOT NULL AS v FROM saldo_favor_mov WHERE tipo::text = 'retiro' ORDER BY monto`,
+      sql`SELECT monto::text, nota, vendedor_id IS NOT NULL AS v FROM saldo_favor_mov WHERE tipo::text = 'retiro' ORDER BY v`,
     );
     expect(retiros).toEqual([
       { monto: '-30.00', nota: 'Se le devolvió en efectivo', v: false },
