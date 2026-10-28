@@ -605,10 +605,11 @@ describe('libro de saldo a favor v2 (D-20..D-22)', () => {
     ).toBe('saldo_favor_origen');
   });
 
-  it('pago_saldo_favor_cliente: solo una clienta paga con su saldo (el de vendedor llega en el Plan 4)', async () => {
+  it('Plan 4b (0024): la vendedora también paga con su saldo (sin pago_saldo_favor_cliente)', async () => {
+    // Sin su aplicación completa lo rechaza el diferido pago_saldo_sin_aplicacion, no el CHECK que se quitó.
     expect(
       await resultado(() => app((db) => nuevoPago(db, 'saldo_favor', '10.00', { vendedor: true }))),
-    ).toBe('pago_saldo_favor_cliente');
+    ).toBe('pago_saldo_sin_aplicacion');
   });
 
   it('compatibilidad: los movimientos de 0012/0013 siguen siendo válidos (sin admin ni nota)', async () => {
