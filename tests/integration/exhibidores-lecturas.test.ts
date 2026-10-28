@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
+import { numericACentavos } from '@/domain/dinero';
 import { crearCliente } from '@/server/clientes/servicio';
 import {
   registrarAjusteExhibidor,
@@ -10,10 +11,9 @@ import {
 import {
   exhibidoresPorEntregar,
   historialDineroExhibidor,
-  resumenDineroExhibidor,
   ventasDeExhibidor,
 } from '@/server/exhibidores/lecturas-dinero';
-import { crearExhibidor, enviarPiezas } from '@/server/exhibidores/servicio';
+import { crearExhibidor, enviarPiezas, obtenerExhibidor } from '@/server/exhibidores/servicio';
 import { crearPedido } from '@/server/pedidos/servicio';
 import { altaPieza } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
@@ -22,6 +22,16 @@ import { reiniciarConAdmin, urlApp } from './utilidades';
 // Plan 4a, Task 3: lecturas del dinero del exhibidor.
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 const PRECIO = 10000;
+/** El resumen de dinero que lee la ficha: sale de la vista del exhibidor. */
+const resumenDelExhibidor = async (id: string) => {
+  const e = (await app((db) => obtenerExhibidor(db, id)))!;
+  return {
+    cobradoCentavos: numericACentavos(e.cobrado),
+    entregadoCentavos: numericACentavos(e.entregado),
+    ajustesCentavos: numericACentavos(e.ajustes),
+    porEntregarCentavos: numericACentavos(e.porEntregar),
+  };
+};
 let adminId = '';
 let perlaId = '';
 let gloriaId = '';
@@ -76,7 +86,7 @@ beforeEach(async () => {
 
 describe('lecturas de dinero del exhibidor', () => {
   it('sin movimientos: todo en cero, sin historial ni ventas', async () => {
-    expect(await app((db) => resumenDineroExhibidor(db, luzId))).toEqual({
+    expect(await resumenDelExhibidor(luzId)).toEqual({
       cobradoCentavos: 0,
       entregadoCentavos: 0,
       ajustesCentavos: 0,
@@ -108,7 +118,7 @@ describe('lecturas de dinero del exhibidor', () => {
         motivo: 'Corrección de caja',
       }),
     );
-    expect(await app((db) => resumenDineroExhibidor(db, luzId))).toEqual({
+    expect(await resumenDelExhibidor(luzId)).toEqual({
       cobradoCentavos: 15000,
       entregadoCentavos: 5000,
       ajustesCentavos: -1000,

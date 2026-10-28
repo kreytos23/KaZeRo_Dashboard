@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { aplicacionPago, exhibidor, pago, saldoFavorMov } from '@/db/schema';
+import { aplicacionPago, pago, saldoFavorMov } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
+import { MSG_COBRO_SIN_SALDO_FAVOR } from '@/server/exhibidores/mensajes';
 import { conIdempotencia } from '@/server/idempotencia';
 import {
+  bloquearExhibidorAbierto,
   bloquearPedido,
   bloquearPiezasDelPedido,
   liquidarSiSaldoCero,
@@ -57,11 +58,7 @@ function validar(d: Omit<DatosPagoPedido, 'key'>) {
       'pagador',
     );
   if (d.exhibidorId && d.metodo === 'saldo_favor')
-    throw new ErrorNegocio(
-      'metodo_invalido',
-      'Un cobro del exhibidor no puede ser con saldo a favor: el dinero lo recibió el exhibidor.',
-      'metodo',
-    );
+    throw new ErrorNegocio('metodo_invalido', MSG_COBRO_SIN_SALDO_FAVOR, 'metodo');
   if (d.fecha?.trim()) validarFecha(d.fecha);
   const nota = d.nota?.trim() || null;
   if (nota && nota.length > 200)
@@ -115,14 +112,7 @@ export async function registrarPagoEnTx(
   // E-4: el exhibidor que cobra debe estar abierto y ser de la vendedora del pedido (la BD lo exige también).
   // Se bloquea después del pedido (D-10) y antes del pago: un cierre concurrente espera a este cobro.
   if (v.exhibidorId) {
-    const [ex] = await tx
-      .select({ estado: exhibidor.estado, vendedorId: exhibidor.vendedorId })
-      .from(exhibidor)
-      .where(eq(exhibidor.id, v.exhibidorId))
-      .for('no key update');
-    if (!ex) throw new ErrorNegocio('no_encontrado', 'El exhibidor no existe.', 'exhibidorId');
-    if (ex.estado === 'cerrado')
-      throw new ErrorNegocio('exhibidor_cerrado', 'El exhibidor está cerrado.', 'exhibidorId');
+    const ex = await bloquearExhibidorAbierto(tx, v.exhibidorId);
     if (ex.vendedorId !== p.vendedorId)
       throw new ErrorNegocio(
         'exhibidor_ajeno',

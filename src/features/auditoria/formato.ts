@@ -41,6 +41,8 @@ const TIPO_VENDEDOR: Readonly<Record<string, string>> = {
 /** Un valor histórico ilegible no debe romper la ficha: se muestra tal cual. */
 function montoLegible(valor: string): string {
   try {
+    // Un monto negativo nunca es válido en la bitácora (costo, precio, total): se muestra tal cual.
+    if (valor.startsWith('-')) return valor;
     return formatoMXN(numericACentavos(valor));
   } catch {
     return valor;

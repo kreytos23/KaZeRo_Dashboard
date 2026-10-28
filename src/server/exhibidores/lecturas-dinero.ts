@@ -11,26 +11,17 @@ import {
   vExhibidor,
   vPedido,
 } from '@/db/schema';
-import { numericACentavos, numericConSigno } from '@/domain/dinero';
+import { numericACentavos } from '@/domain/dinero';
 
 // Plan 4a, Task 3: lo que el exhibidor cobró, entregó y debe entregar (E-5).
 
-export async function resumenDineroExhibidor(db: Ejecutor, exhibidorId: string) {
+/** Lo que le falta entregar al exhibidor (centavos); bajo su bloqueo nadie lo cambia. */
+export async function porEntregarCentavos(db: Ejecutor, exhibidorId: string): Promise<number> {
   const [v] = await db
-    .select({
-      cobrado: vExhibidor.cobrado,
-      entregado: vExhibidor.entregado,
-      ajustes: vExhibidor.ajustes,
-      porEntregar: vExhibidor.porEntregar,
-    })
+    .select({ porEntregar: vExhibidor.porEntregar })
     .from(vExhibidor)
     .where(eq(vExhibidor.id, exhibidorId));
-  return {
-    cobradoCentavos: numericACentavos(v?.cobrado ?? '0'),
-    entregadoCentavos: numericACentavos(v?.entregado ?? '0'),
-    ajustesCentavos: numericConSigno(v?.ajustes ?? '0'),
-    porEntregarCentavos: numericACentavos(v?.porEntregar ?? '0'),
-  };
+  return numericACentavos(v!.porEntregar);
 }
 
 export interface MovimientoDinero {
@@ -44,7 +35,9 @@ export interface MovimientoDinero {
   adminNombre: string;
 }
 
-/** Cobros (pagos del exhibidor), entregas y ajustes, el más reciente primero. */
+const LIMITE_HISTORIAL = 50;
+
+/** Cobros (pagos del exhibidor), entregas y ajustes, el más reciente primero (hasta 50 de cada tipo). */
 export async function historialDineroExhibidor(
   db: Ejecutor,
   exhibidorId: string,
@@ -65,10 +58,11 @@ export async function historialDineroExhibidor(
       .from(pago)
       .innerJoin(vAdmin, eq(vAdmin.id, pago.adminId))
       .leftJoin(cliente, eq(cliente.id, pago.pagadorClienteId))
-      .leftJoin(aplicacionPago, eq(aplicacionPago.pagoId, pago.id))
-      .leftJoin(vPedido, eq(vPedido.id, aplicacionPago.pedidoId))
+      .innerJoin(aplicacionPago, eq(aplicacionPago.pagoId, pago.id))
+      .innerJoin(vPedido, eq(vPedido.id, aplicacionPago.pedidoId))
       .where(eq(pago.exhibidorId, exhibidorId))
-      .orderBy(asc(aplicacionPago.createdAt)),
+      .orderBy(desc(pago.fecha), desc(pago.createdAt))
+      .limit(LIMITE_HISTORIAL),
     db
       .select({
         fecha: entregaExhibidor.fecha,
@@ -81,32 +75,31 @@ export async function historialDineroExhibidor(
       })
       .from(entregaExhibidor)
       .innerJoin(vAdmin, eq(vAdmin.id, entregaExhibidor.adminId))
-      .where(eq(entregaExhibidor.exhibidorId, exhibidorId)),
+      .where(eq(entregaExhibidor.exhibidorId, exhibidorId))
+      .orderBy(desc(entregaExhibidor.fecha), desc(entregaExhibidor.createdAt))
+      .limit(LIMITE_HISTORIAL),
   ]);
-  // Un pago se aplica a una nota; si hubiera varias filas, queda la primera aplicación.
-  const vistos = new Set<string>();
+  // Cada pago del exhibidor se aplica a su nota en la misma transacción: una fila por cobro.
   const filas = [
-    ...cobros
-      .filter((c) => !vistos.has(c.id) && vistos.add(c.id))
-      .map((c) => ({
-        creado: c.creado,
-        m: {
-          fecha: c.fecha,
-          tipo: 'cobro' as const,
-          montoCentavos: numericACentavos(c.monto),
-          folio: c.folio,
-          clienteNombre: c.clienteNombre,
-          metodo: c.metodo,
-          nota: c.nota,
-          adminNombre: c.adminNombre,
-        },
-      })),
+    ...cobros.map((c) => ({
+      creado: c.creado,
+      m: {
+        fecha: c.fecha,
+        tipo: 'cobro' as const,
+        montoCentavos: numericACentavos(c.monto),
+        folio: c.folio,
+        clienteNombre: c.clienteNombre,
+        metodo: c.metodo,
+        nota: c.nota,
+        adminNombre: c.adminNombre,
+      },
+    })),
     ...entregas.map((e) => ({
       creado: e.creado,
       m: {
         fecha: e.fecha,
         tipo: e.tipo,
-        montoCentavos: numericConSigno(e.monto),
+        montoCentavos: numericACentavos(e.monto),
         folio: null,
         clienteNombre: null,
         metodo: e.metodo,
@@ -193,12 +186,6 @@ export async function exhibidoresPorEntregar(db: Ejecutor) {
     vendedorNombre: f.vendedorNombre,
     porEntregarCentavos: numericACentavos(f.porEntregar),
   }));
-}
-
-/** ¿Es la clienta especial «Venta de mostrador»? Su ficha no muestra tarjeta de lealtad. */
-export async function esClienteMostrador(db: Ejecutor, clienteId: string): Promise<boolean> {
-  const [c] = await db.select({ m: cliente.esMostrador }).from(cliente).where(eq(cliente.id, clienteId));
-  return c?.m ?? false;
 }
 
 /**

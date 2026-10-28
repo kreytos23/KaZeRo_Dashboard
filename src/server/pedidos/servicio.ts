@@ -1,15 +1,6 @@
 import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import {
-  aplicacionPago,
-  cliente,
-  pago,
-  pedido,
-  pedidoItem,
-  pieza,
-  saldoFavorMov,
-  vendedor,
-} from '@/db/schema';
+import { aplicacionPago, pago, pedido, pedidoItem, pieza, saldoFavorMov, vendedor } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
 import { descuentoLealtad, siguientePosicion, type Posicion } from '@/domain/lealtad';
@@ -22,10 +13,12 @@ import {
 } from '@/domain/pedidos';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
+import { MSG_FECHA_FUTURA } from '@/server/exhibidores/mensajes';
 import { conIdempotencia } from '@/server/idempotencia';
 import { exigirCustodiaDe } from '@/server/piezas/custodia';
 import {
   apartarPiezas,
+  bloquearCliente,
   bloquearPedido,
   bloquearPiezasDelPedido,
   bloquearPiezasParaApartar,
@@ -75,7 +68,7 @@ export function validarFecha(t: string | undefined, campo = 'fecha'): string {
   if (!t?.trim()) return hoyMX();
   const f = parsearFechaISO(t);
   if (!f) throw new ErrorNegocio('fecha_invalida', 'La fecha no es válida.', campo);
-  if (f > hoyMX()) throw new ErrorNegocio('fecha_invalida', 'La fecha no puede ser futura.', campo);
+  if (f > hoyMX()) throw new ErrorNegocio('fecha_invalida', MSG_FECHA_FUTURA, campo);
   return f;
 }
 
@@ -147,12 +140,7 @@ export async function crearPedidoEnTx(tx: Ejecutor, d: Omit<DatosPedido, 'key'>)
   await fijarContextoAuditoria(tx, { adminId: d.adminId, motivo: null });
   const fecha = validarFecha(v.fecha ?? undefined);
   // 1) Cliente: serializa la asignación de posición (R-23).
-  const [c] = await tx
-    .select({ id: cliente.id })
-    .from(cliente)
-    .where(eq(cliente.id, v.clienteId))
-    .for('no key update');
-  if (!c) throw new ErrorNegocio('no_encontrado', 'El cliente no existe.', 'clienteId');
+  await bloquearCliente(tx, v.clienteId);
   await exigirVendedorActivo(tx, v.vendedorId);
   // 2) Exhibidores → piezas (R-04, R-05): todo o nada.
   const { piezas, faltantes } = await bloquearPiezasParaApartar(tx, v.codigos);

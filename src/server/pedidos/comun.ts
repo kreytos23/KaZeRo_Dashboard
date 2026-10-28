@@ -5,6 +5,7 @@ import { normalizarCodigo } from '@/domain/codigos';
 import { numericACentavos } from '@/domain/dinero';
 import { MAX_PIEZAS_PEDIDO, formatoFolio } from '@/domain/pedidos';
 import { ErrorNegocio } from '@/server/errores';
+import { MSG_EXHIBIDOR_CERRADO } from '@/server/exhibidores/mensajes';
 import type { EstadoPieza } from '@/server/piezas/servicio';
 
 export type EstadoPedido = (typeof pedido.$inferSelect)['estado'];
@@ -269,11 +270,34 @@ export async function pagadoCentavos(tx: Ejecutor, pedidoId: string): Promise<nu
   return numericACentavos(f!.pagado);
 }
 
+/** Bloquea la clienta (NO KEY UPDATE): serializa su tarjeta de lealtad y sus notas (D-10: primero la clienta). */
+export async function bloquearCliente(tx: Ejecutor, clienteId: string): Promise<void> {
+  const [c] = await tx
+    .select({ id: cliente.id })
+    .from(cliente)
+    .where(eq(cliente.id, clienteId))
+    .for('no key update');
+  if (!c) throw new ErrorNegocio('no_encontrado', 'El cliente no existe.', 'clienteId');
+}
+
+/** Exhibidor abierto, bloqueado NO KEY UPDATE (como enviar/regresar/cerrar: serializa el dinero y el cierre). */
+export async function bloquearExhibidorAbierto(tx: Ejecutor, exhibidorId: string) {
+  const [e] = await tx
+    .select({ estado: exhibidor.estado, vendedorId: exhibidor.vendedorId })
+    .from(exhibidor)
+    .where(eq(exhibidor.id, exhibidorId))
+    .for('no key update');
+  if (!e) throw new ErrorNegocio('no_encontrado', 'El exhibidor no existe.', 'exhibidorId');
+  if (e.estado === 'cerrado')
+    throw new ErrorNegocio('exhibidor_cerrado', MSG_EXHIBIDOR_CERRADO, 'exhibidorId');
+  return e;
+}
+
 /** D-10: cliente → pedido, ambos FOR NO KEY UPDATE. cliente_id no es actualizable (R-27), leerlo antes es seguro. */
 export async function bloquearPedido(tx: Ejecutor, pedidoId: string) {
   const [ref] = await tx.select({ clienteId: pedido.clienteId }).from(pedido).where(eq(pedido.id, pedidoId));
   if (!ref) throw new ErrorNegocio('no_encontrado', 'El pedido no existe.');
-  await tx.select({ id: cliente.id }).from(cliente).where(eq(cliente.id, ref.clienteId)).for('no key update');
+  await bloquearCliente(tx, ref.clienteId);
   const [p] = await tx
     .select({
       id: pedido.id,

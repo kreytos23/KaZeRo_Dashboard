@@ -1,18 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { numericConSigno } from '@/domain/dinero';
 import { montoAjusteCentavos, montoMovimiento, rotuloMovimiento } from '@/features/exhibidores/dinero-ui';
-
-describe('numericConSigno', () => {
-  it('lee numeric con o sin signo', () => {
-    expect(numericConSigno('12.50')).toBe(1250);
-    expect(numericConSigno('-12.50')).toBe(-1250);
-    expect(numericConSigno('0.00')).toBe(0);
-  });
-  it('rechaza lo que no es numeric', () => {
-    expect(() => numericConSigno('abc')).toThrow(RangeError);
-    expect(() => numericConSigno('--1')).toThrow(RangeError);
-  });
-});
 
 describe('montoMovimiento', () => {
   it('cobro suma, entrega resta y el ajuste conserva su signo', () => {

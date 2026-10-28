@@ -28,6 +28,17 @@ describe('dinero en centavos', () => {
     expect(numericACentavos('1234.50')).toBe(123450);
     expect(numericACentavos('7')).toBe(700);
   });
+  it('admite negativos (ajustes del exhibidor)', () => {
+    expect(centavosANumeric(-1250)).toBe('-12.50');
+    expect(centavosANumeric(-5)).toBe('-0.05');
+    expect(centavosANumeric(0)).toBe('0.00');
+    expect(numericACentavos('-12.50')).toBe(-1250);
+    expect(numericACentavos('-0.00')).toBe(0);
+    expect(numericACentavos('0.00')).toBe(0);
+    expect(() => numericACentavos('--1')).toThrow(RangeError);
+    expect(() => numericACentavos('abc')).toThrow(RangeError);
+    expect(() => centavosANumeric(1.5)).toThrow(RangeError);
+  });
   it('formatea en pesos mexicanos', () => {
     expect(formatoMXN(123450)).toBe('$1,234.50');
   });

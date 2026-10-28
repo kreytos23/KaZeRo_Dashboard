@@ -10,16 +10,17 @@ export function pesosACentavos(texto: string): number | null {
 }
 
 export function centavosANumeric(c: number): string {
-  if (!Number.isSafeInteger(c) || c < 0) throw new RangeError('Monto en centavos inválido.');
-  return `${Math.trunc(c / 100)}.${String(c % 100).padStart(2, '0')}`;
+  if (!Number.isSafeInteger(c)) throw new RangeError('Monto en centavos inválido.');
+  const a = Math.abs(c);
+  return `${c < 0 ? '-' : ''}${Math.trunc(a / 100)}.${String(a % 100).padStart(2, '0')}`;
 }
 
 export function numericACentavos(n: string): number {
-  const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(n);
+  const m = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(n);
   if (!m) throw new RangeError('Valor numeric inválido.');
-  const c = Number(m[1]) * 100 + Number((m[2] ?? '').padEnd(2, '0'));
+  const c = Number(m[2]) * 100 + Number((m[3] ?? '').padEnd(2, '0'));
   if (!Number.isSafeInteger(c)) throw new RangeError('Valor numeric fuera de rango.');
-  return c;
+  return m[1] && c ? -c : c;
 }
 
 const FORMATO = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
@@ -41,9 +42,4 @@ export function porcentajeANumeric(texto: string): string | null {
   if (!/^\d{1,3}(\.\d{1,2})?$/.test(t)) return null;
   const valor = Number(t);
   return valor > 100 ? null : valor.toFixed(2);
-}
-
-/** Como `numericACentavos`, pero admite el signo menos (los ajustes del exhibidor pueden restar). */
-export function numericConSigno(n: string): number {
-  return n.startsWith('-') ? -numericACentavos(n.slice(1)) : numericACentavos(n);
 }

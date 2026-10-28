@@ -1,4 +1,13 @@
 import { pgCode, pgConstraint } from '@/db/errors';
+import {
+  MSG_COBRO_SIN_SALDO_FAVOR,
+  MSG_EXHIBIDOR_CERRADO,
+  MSG_FECHA_FUTURA,
+  MSG_MOTIVO_AJUSTE,
+  MSG_NOTA_LARGA,
+  mensajeCierreConDinero,
+  mensajeEntregaExcede,
+} from '@/server/exhibidores/mensajes';
 
 export class ErrorNegocio extends Error {
   override name = 'ErrorNegocio';
@@ -163,16 +172,16 @@ const MENSAJES: Record<string, string> = {
   pago_saldo_sin_aplicacion: PEDIDO_INCONSISTENTE,
   devolucion_sin_saldo: PEDIDO_INCONSISTENTE,
   // Plan 4a (0020/0021): el servicio valida antes; estos son la última barrera.
-  entrega_exhibidor_excede: 'La entrega supera el dinero que el exhibidor tiene por entregar.',
-  entrega_exhibidor_cerrado: 'El exhibidor está cerrado.',
-  entrega_exhibidor_fecha: 'La fecha de la entrega no puede ser futura.',
-  entrega_exhibidor_nota: 'La nota admite hasta 200 caracteres.',
-  entrega_exhibidor_ajuste_motivo: 'Escribe el motivo del ajuste (hasta 200 caracteres).',
+  entrega_exhibidor_excede: mensajeEntregaExcede(),
+  entrega_exhibidor_cerrado: MSG_EXHIBIDOR_CERRADO,
+  entrega_exhibidor_fecha: MSG_FECHA_FUTURA,
+  entrega_exhibidor_nota: MSG_NOTA_LARGA,
+  entrega_exhibidor_ajuste_motivo: MSG_MOTIVO_AJUSTE,
   entrega_exhibidor_monto: 'El monto no es válido.',
   entrega_exhibidor_metodo: PEDIDO_INCONSISTENTE,
-  exhibidor_cierre_con_dinero: 'Antes de cerrar, registra la entrega del dinero que tiene por entregar.',
+  exhibidor_cierre_con_dinero: mensajeCierreConDinero(),
   pago_exhibidor_coherente: 'El exhibidor que cobró debe estar abierto y ser de la vendedora del pedido.',
-  pago_exhibidor_sin_saldo: 'Un cobro del exhibidor no puede ser con saldo a favor.',
+  pago_exhibidor_sin_saldo: MSG_COBRO_SIN_SALDO_FAVOR,
   pedido_mostrador_sin_tarjeta: 'Las notas de venta de mostrador no cuentan en tarjeta.',
 };
 

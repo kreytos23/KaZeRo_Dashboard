@@ -1,10 +1,22 @@
 import { eq } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { cliente, entregaExhibidor, exhibidor, vExhibidor } from '@/db/schema';
+import { cliente, entregaExhibidor } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
 import { conIdempotencia } from '@/server/idempotencia';
-import { validarCodigos, bloquearPiezasPorCodigo } from '@/server/pedidos/comun';
+import { porEntregarCentavos } from '@/server/exhibidores/lecturas-dinero';
+import {
+  MSG_MONTO_MAYOR_CERO,
+  MSG_MOTIVO_AJUSTE,
+  MSG_NOTA_LARGA,
+  mensajeEntregaExcede,
+} from '@/server/exhibidores/mensajes';
+import {
+  bloquearCliente,
+  bloquearExhibidorAbierto,
+  bloquearPiezasPorCodigo,
+  validarCodigos,
+} from '@/server/pedidos/comun';
 import { crearPedidoEnTx, validarFecha } from '@/server/pedidos/servicio';
 import { METODOS_PAGO, registrarPagoEnTx, type MetodoPago } from '@/server/pagos/servicio';
 
@@ -12,34 +24,13 @@ import { METODOS_PAGO, registrarPagoEnTx, type MetodoPago } from '@/server/pagos
 // Orden de bloqueo (D-10): cliente → exhibidor → piezas → … (pedido y pago son nuevos en la venta).
 
 export const METODOS_ENTREGA = ['efectivo', 'transferencia', 'otro'] as const;
-type MetodoEntrega = (typeof METODOS_ENTREGA)[number];
+export type MetodoEntrega = (typeof METODOS_ENTREGA)[number];
 
 /** La única clienta de mostrador (E-3); la migración 0021 la siembra. */
 export async function clienteMostradorId(tx: Ejecutor): Promise<string> {
   const [c] = await tx.select({ id: cliente.id }).from(cliente).where(eq(cliente.esMostrador, true));
   if (!c) throw new ErrorNegocio('sin_mostrador', 'Falta la clienta «Venta de mostrador». Avisa al soporte.');
   return c.id;
-}
-
-/** Exhibidor abierto, bloqueado NO KEY UPDATE (como enviar/regresar/cerrar: serializa el dinero y el cierre). */
-async function bloquearExhibidorAbierto(tx: Ejecutor, exhibidorId: string) {
-  const [e] = await tx
-    .select({ estado: exhibidor.estado, vendedorId: exhibidor.vendedorId })
-    .from(exhibidor)
-    .where(eq(exhibidor.id, exhibidorId))
-    .for('no key update');
-  if (!e) throw new ErrorNegocio('no_encontrado', 'El exhibidor no existe.', 'exhibidorId');
-  if (e.estado === 'cerrado')
-    throw new ErrorNegocio('exhibidor_cerrado', 'El exhibidor está cerrado.', 'exhibidorId');
-  return e;
-}
-
-async function porEntregarCentavos(tx: Ejecutor, exhibidorId: string): Promise<number> {
-  const [v] = await tx
-    .select({ porEntregar: vExhibidor.porEntregar })
-    .from(vExhibidor)
-    .where(eq(vExhibidor.id, exhibidorId));
-  return numericACentavos(v!.porEntregar);
 }
 
 export interface DatosVentaExhibidor {
@@ -86,12 +77,7 @@ export async function registrarVentaExhibidor(
           const mostrador = await clienteMostradorId(tx);
           const clienteId = d.clienteId ?? mostrador;
           // D-10: la clienta antes que el exhibidor (crearPedidoEnTx la vuelve a pedir: ya es nuestra).
-          const [c] = await tx
-            .select({ id: cliente.id })
-            .from(cliente)
-            .where(eq(cliente.id, clienteId))
-            .for('no key update');
-          if (!c) throw new ErrorNegocio('no_encontrado', 'La clienta no existe.', 'clienteId');
+          await bloquearCliente(tx, clienteId);
           const ex = await bloquearExhibidorAbierto(tx, d.exhibidorId);
           const { piezas, faltantes } = await bloquearPiezasPorCodigo(tx, codigos);
           const orden = new Map(codigos.map((x, i) => [x, i]));
@@ -141,43 +127,52 @@ export async function registrarVentaExhibidor(
   });
 }
 
-/** Inserta una entrega o ajuste bajo el bloqueo del exhibidor y devuelve lo que queda por entregar. */
+/**
+ * Inserta una entrega o un ajuste bajo el bloqueo del exhibidor y devuelve lo que queda por entregar.
+ * `montoCentavos` ya trae su signo: la entrega es positiva (resta del por entregar), el ajuste suma o resta.
+ */
 async function registrarMovimiento(
   db: Ejecutor,
   o: {
     key: string;
     adminId: string;
     exhibidorId: string;
-    operacion: 'entregaExhibidor' | 'ajusteExhibidor';
-    payload: object;
     tipo: 'entrega' | 'ajuste';
-    montoCentavos: number; // con signo en los ajustes
-    fecha: string | undefined;
+    montoCentavos: number;
+    fecha?: string;
     metodo: MetodoEntrega | null;
-    nota: string | null;
+    nota: string | null; // la nota de la entrega o el motivo del ajuste
   },
 ): Promise<{ porEntregar: string }> {
-  return conErroresDeNegocio(() =>
-    db.transaction((tx) =>
+  return conErroresDeNegocio(async () => {
+    const fechaTexto = o.fecha?.trim() || null;
+    const fecha = validarFecha(fechaTexto ?? undefined);
+    const base = { exhibidorId: o.exhibidorId, montoCentavos: o.montoCentavos, fecha: fechaTexto };
+    const payload =
+      o.tipo === 'entrega' ? { ...base, metodo: o.metodo, nota: o.nota } : { ...base, motivo: o.nota };
+    return db.transaction((tx) =>
       conIdempotencia(
         tx,
-        { key: o.key, adminId: o.adminId, operacion: o.operacion, payload: o.payload },
+        {
+          key: o.key,
+          adminId: o.adminId,
+          operacion: o.tipo === 'entrega' ? 'entregaExhibidor' : 'ajusteExhibidor',
+          payload,
+        },
         async () => {
           await bloquearExhibidorAbierto(tx, o.exhibidorId);
-          const fecha = validarFecha(o.fecha);
           const actual = await porEntregarCentavos(tx, o.exhibidorId);
           const resta = o.tipo === 'entrega' ? o.montoCentavos : -o.montoCentavos;
           if (resta > actual)
             throw new ErrorNegocio(
               'excede',
-              `El exhibidor tiene ${formatoMXN(actual)} por entregar; no puedes registrar ${formatoMXN(resta)}.`,
+              mensajeEntregaExcede(formatoMXN(actual), formatoMXN(resta)),
               'monto',
             );
-          const abs = centavosANumeric(Math.abs(o.montoCentavos));
           await tx.insert(entregaExhibidor).values({
             exhibidorId: o.exhibidorId,
             tipo: o.tipo,
-            monto: o.montoCentavos < 0 ? `-${abs}` : abs,
+            monto: centavosANumeric(o.montoCentavos),
             fecha,
             metodo: o.metodo,
             nota: o.nota,
@@ -186,15 +181,9 @@ async function registrarMovimiento(
           return { porEntregar: centavosANumeric(actual - resta) };
         },
       ),
-    ),
-  );
+    );
+  });
 }
-
-const textoOpcional = (t: string | undefined, max: number, campo: string, mensaje: string) => {
-  const v = t?.trim() || null;
-  if (v && v.length > max) throw new ErrorNegocio(`${campo}_invalida`, mensaje, campo);
-  return v;
-};
 
 export async function registrarEntregaExhibidor(
   db: Ejecutor,
@@ -210,30 +199,12 @@ export async function registrarEntregaExhibidor(
 ): Promise<{ porEntregar: string }> {
   return conErroresDeNegocio(async () => {
     if (!Number.isSafeInteger(d.montoCentavos) || d.montoCentavos <= 0)
-      throw new ErrorNegocio('monto_invalido', 'El monto debe ser mayor que cero.', 'monto');
+      throw new ErrorNegocio('monto_invalido', MSG_MONTO_MAYOR_CERO, 'monto');
     if (!METODOS_ENTREGA.includes(d.metodo))
       throw new ErrorNegocio('metodo_invalido', 'Elige un método de entrega válido.', 'metodo');
-    const fecha = d.fecha?.trim() || undefined;
-    if (fecha) validarFecha(fecha);
-    const nota = textoOpcional(d.nota, 200, 'nota', 'La nota admite hasta 200 caracteres.');
-    return registrarMovimiento(db, {
-      key: d.key,
-      adminId: d.adminId,
-      exhibidorId: d.exhibidorId,
-      operacion: 'entregaExhibidor',
-      payload: {
-        exhibidorId: d.exhibidorId,
-        montoCentavos: d.montoCentavos,
-        fecha: fecha ?? null,
-        metodo: d.metodo,
-        nota,
-      },
-      tipo: 'entrega',
-      montoCentavos: d.montoCentavos,
-      fecha,
-      metodo: d.metodo,
-      nota,
-    });
+    const nota = d.nota?.trim() || null;
+    if (nota && nota.length > 200) throw new ErrorNegocio('nota_invalida', MSG_NOTA_LARGA, 'nota');
+    return registrarMovimiento(db, { ...d, tipo: 'entrega', nota });
   });
 }
 
@@ -254,24 +225,7 @@ export async function registrarAjusteExhibidor(
       throw new ErrorNegocio('monto_invalido', 'El ajuste no puede ser cero.', 'monto');
     const motivo = (d.motivo ?? '').trim();
     if (!motivo || motivo.length > 200)
-      throw new ErrorNegocio(
-        'motivo_invalido',
-        'Escribe el motivo del ajuste (hasta 200 caracteres).',
-        'motivo',
-      );
-    const fecha = d.fecha?.trim() || undefined;
-    if (fecha) validarFecha(fecha);
-    return registrarMovimiento(db, {
-      key: d.key,
-      adminId: d.adminId,
-      exhibidorId: d.exhibidorId,
-      operacion: 'ajusteExhibidor',
-      payload: { exhibidorId: d.exhibidorId, montoCentavos: d.montoCentavos, fecha: fecha ?? null, motivo },
-      tipo: 'ajuste',
-      montoCentavos: d.montoCentavos,
-      fecha,
-      metodo: null,
-      nota: motivo,
-    });
+      throw new ErrorNegocio('motivo_invalido', MSG_MOTIVO_AJUSTE, 'motivo');
+    return registrarMovimiento(db, { ...d, tipo: 'ajuste', metodo: null, nota: motivo });
   });
 }
