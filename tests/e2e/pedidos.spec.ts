@@ -70,7 +70,7 @@ test('nuevo pedido con alta rápida de cliente, piezas en ráfaga (una de exhibi
   await irA(page, '/panel/pedidos/nuevo');
   await page.getByRole('combobox', { name: 'Cliente' }).fill(`Ana Pedido ${m}`);
   await page.getByRole('option', { name: `Crear cliente «Ana Pedido ${m}»` }).click();
-  await elegirOpcion(page, 'Vendedor', `Casa ${m}`);
+  await elegirOpcion(page, 'Vendedor', `Casa ${m}`, true);
   await agregarPieza(page, `n${m}01`);
   await agregarPieza(page, `N${m}02`);
   await expect(resumen(page)).toContainText('$298.00');

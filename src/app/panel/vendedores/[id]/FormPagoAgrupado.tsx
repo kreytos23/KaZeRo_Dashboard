@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useContext, useId, useMemo, useState } from 'react';
 import { formatoMXN, pesosACentavos } from '@/domain/dinero';
 import { fechaCorta } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
@@ -11,6 +11,7 @@ import { CampoCaptura } from '@/features/pagos/CampoCaptura';
 import { avisoSinCaptura, montosDeReparto, resumenReparto } from '@/features/pagos/formato';
 import { CampoKey } from '@/features/pedidos/CampoKey';
 import { Campo, Selector } from '@/features/ui/Campo';
+import { ErroresCampo } from '@/features/ui/errores-campo';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { accionPagoAgrupado } from '../../pedidos/acciones';
 import { ETIQUETA_METODO } from '../../pedidos/etiquetas';
@@ -38,6 +39,8 @@ function Campos({ vendedorId, nombre, pedidos, hoy }: Props) {
   const r = resumenReparto(montoCentavos, montos, pedidos);
   const aviso = avisoSinCaptura(metodo, hayCaptura);
   const sinPedidos = pedidos.length === 0;
+  const errorReparto = useContext(ErroresCampo).aplicaciones;
+  const idReparto = useId();
   return (
     <>
       <input type="hidden" name="vendedorId" value={vendedorId} />
@@ -64,8 +67,16 @@ function Campos({ vendedorId, nombre, pedidos, hoy }: Props) {
       <CampoCaptura onCambio={setHayCaptura} />
       {aviso && <p className="text-meta text-tinta-suave">{aviso}</p>}
 
-      <fieldset className="flex flex-col gap-2">
+      <fieldset
+        className="flex flex-col gap-2"
+        aria-describedby={errorReparto ? `${idReparto}-error` : undefined}
+      >
         <legend className="text-meta font-medium">Reparto entre sus pedidos abiertos</legend>
+        {errorReparto && (
+          <span id={`${idReparto}-error`} className="mensaje-error text-meta text-error">
+            {errorReparto}
+          </span>
+        )}
         {sinPedidos ? (
           <p className="text-meta text-tinta-suave">
             {nombre} no tiene pedidos abiertos con saldo: todo el pago quedará como saldo a favor suyo.
@@ -91,7 +102,8 @@ function Campos({ vendedorId, nombre, pedidos, hoy }: Props) {
                     </div>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                       <label htmlFor={idCampo} className="text-meta text-tinta-suave">
-                        Saldo {formatoMXN(p.saldoCentavos)}. Aplicar
+                        Saldo {formatoMXN(p.saldoCentavos)}.{' '}
+                        <span className="sr-only">{formatoFolio(p.folio)}: </span>Aplicar
                       </label>
                       <input type="hidden" name="pedidoId" value={p.id} />
                       <input
@@ -145,11 +157,13 @@ interface Props {
   nombre: string;
   pedidos: PedidoAbierto[];
   hoy: string;
+  /** numeric del saldo a favor: cambia con cada pago (también el todo-sobrante) y reinicia el formulario. */
+  saldo: string;
 }
 
 export function FormPagoAgrupado(p: Props) {
   // La llave refresca los campos y la llave de idempotencia tras guardar (los saldos de la lista cambian).
-  const marca = p.pedidos.map((x) => `${x.id}:${x.saldoCentavos}`).join('|');
+  const marca = `${p.saldo}|` + p.pedidos.map((x) => `${x.id}:${x.saldoCentavos}`).join('|');
   return (
     <FormAccion accion={accionPagoAgrupado} textoBoton="Registrar pago agrupado">
       <Fragment key={marca}>

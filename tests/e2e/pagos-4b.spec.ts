@@ -21,7 +21,7 @@ const estadoDelPedido = (page: Page, texto: string) => page.getByText(texto, { e
 test('pago agrupado: reparto sugerido, aviso de duplicado y deshacer el pago', async ({ page }, info) => {
   const m = marcaDe(info);
   // Prefijo de pieza propio «PG»: ningún otro spec lo usa.
-  const vendedora = `Revendedora PG ${m}`;
+  const vendedora = `Perla PG ${m}`;
   const antigua = `Clienta Antigua PG ${m}`;
   const nueva = `Clienta Nueva PG ${m}`;
   const vendedoraId = await sembrarVendedora(vendedora);
@@ -85,6 +85,14 @@ test('pago agrupado: reparto sugerido, aviso de duplicado y deshacer el pago', a
   ).toBeVisible();
   await expect(montoSaldoFavor(page)).toHaveText('$502.00');
 
+  // Otro pago seguido, sin recargar y todo sobrante: el formulario se reinició (llave nueva) y sí se guarda.
+  await agrupado.getByLabel('Monto del pago', { exact: true }).fill('50');
+  await agrupado.getByRole('button', { name: 'Registrar pago agrupado', exact: true }).click();
+  await expect(
+    estadoCon(page, 'Pago registrado. Sobraron $50.00: quedan como saldo a favor de la vendedora.'),
+  ).toBeVisible();
+  await expect(montoSaldoFavor(page)).toHaveText('$552.00');
+
   // 3. Ficha del primer pago: deshacerlo con motivo (su sobrante sigue sin usarse) reabre los dos pedidos.
   await irA(page, rutaPrimerPago!);
   await expect(page.getByRole('heading', { name: 'Pago de $400.00', exact: true })).toBeVisible();
@@ -103,7 +111,7 @@ test('pago agrupado: reparto sugerido, aviso de duplicado y deshacer el pago', a
     await expect(estadoDelPedido(page, 'Abierto')).toBeVisible();
   }
   await irA(page, ficha);
-  await expect(montoSaldoFavor(page)).toHaveText('$400.00');
+  await expect(montoSaldoFavor(page)).toHaveText('$450.00');
 });
 
 test('cancelar un pedido con abono: devolver en efectivo deja el saldo a favor en cero', async ({

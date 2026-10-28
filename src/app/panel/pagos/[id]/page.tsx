@@ -12,6 +12,7 @@ import { Fecha } from '@/features/ui/Fecha';
 import { EncabezadoAcciones } from '@/features/ui/MenuAcciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { obtenerPago } from '@/server/pagos/lecturas';
+import { MSG_APLICACION_PREVIA } from '@/server/pagos/mensajes';
 import { ETIQUETA_METODO_REGISTRADO } from '../../pedidos/etiquetas';
 import { FormAgregarComprobante, FormDeshacerPago } from './FormsPago';
 
@@ -26,6 +27,8 @@ export default async function FichaPago({ params }: { params: Promise<{ id: stri
   const p = await conDbLectura((db) => obtenerPago(db, id.data));
   if (!p) notFound();
   const vigente = !p.anuladoAt;
+  // Una aplicación anulada (su pedido se canceló) impide deshacer el pago entero.
+  const hayAnuladas = p.aplicaciones.some((a) => a.anuladaAt);
   const pagador = p.clienteId
     ? { nombre: p.clienteNombre, tipo: 'cliente', href: `/panel/clientes/${p.clienteId}` }
     : { nombre: p.vendedorNombre, tipo: 'vendedor', href: `/panel/vendedores/${p.vendedorId}` };
@@ -38,7 +41,7 @@ export default async function FichaPago({ params }: { params: Promise<{ id: stri
             id: 'deshacer',
             etiqueta: 'Deshacer pago',
             peligro: true,
-            oculta: !vigente,
+            oculta: !vigente || hayAnuladas,
             contenido: (
               <FormDeshacerPago pagoId={p.id} montoTexto={mxn(p.monto)} vigente={vigente} pedidos={folios} />
             ),
@@ -51,6 +54,7 @@ export default async function FichaPago({ params }: { params: Promise<{ id: stri
         </div>
       </EncabezadoAcciones>
 
+      {vigente && hayAnuladas && <p className="aviso-atencion max-w-3xl">{MSG_APLICACION_PREVIA}</p>}
       {!vigente && (
         <p className="aviso-atencion max-w-3xl">
           Pago deshecho el {p.anuladoAt ? <Fecha fecha={p.anuladoAt} /> : '—'}
@@ -93,7 +97,7 @@ export default async function FichaPago({ params }: { params: Promise<{ id: stri
                 {p.aplicaciones.map((a) => (
                   <li
                     key={a.id}
-                    className={`flex flex-wrap items-baseline gap-x-3 py-1 text-dato ${vigente ? '' : 'text-tinta-suave'}`}
+                    className={`flex flex-wrap items-baseline gap-x-3 py-1 text-dato ${vigente && !a.anuladaAt ? '' : 'text-tinta-suave'}`}
                   >
                     <Link
                       href={`/panel/pedidos/${a.folio}`}
@@ -103,11 +107,13 @@ export default async function FichaPago({ params }: { params: Promise<{ id: stri
                     </Link>
                     <span className="min-w-0 flex-1">{a.clienteNombre}</span>
                     <span
-                      className={`text-monto font-semibold tabular-nums ${vigente ? '' : 'line-through'}`}
+                      className={`text-monto font-semibold tabular-nums ${vigente && !a.anuladaAt ? '' : 'line-through'}`}
                     >
                       {mxn(a.monto)}
                     </span>
-                    {!vigente && <span className="text-meta">Anulado</span>}
+                    {(!vigente || a.anuladaAt) && (
+                      <span className="text-meta">{a.anuladaAt && vigente ? 'anulada' : 'Anulado'}</span>
+                    )}
                   </li>
                 ))}
               </ul>

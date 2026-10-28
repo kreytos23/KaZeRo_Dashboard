@@ -162,7 +162,13 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
             <h2 id="pago-agrupado" className="text-lg font-semibold">
               Registrar pago agrupado
             </h2>
-            <FormPagoAgrupado vendedorId={v.id} nombre={v.nombre} pedidos={abiertos} hoy={hoyMX()} />
+            <FormPagoAgrupado
+              vendedorId={v.id}
+              nombre={v.nombre}
+              pedidos={abiertos}
+              hoy={hoyMX()}
+              saldo={saldoFavor}
+            />
           </section>
           <section aria-labelledby="saldo-favor" className="order-4 flex max-w-2xl flex-col gap-3">
             <h2 id="saldo-favor" className="text-lg font-semibold">

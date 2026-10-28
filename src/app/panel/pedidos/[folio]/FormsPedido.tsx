@@ -196,7 +196,7 @@ export function FormCancelarPedido(p: Props) {
               {efectivo && (
                 <AreaTexto
                   etiqueta="Nota de la devolución en efectivo"
-                  name="notaReembolso"
+                  name="nota"
                   rows={2}
                   maxLength={200}
                   required

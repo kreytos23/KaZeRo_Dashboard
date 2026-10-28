@@ -187,7 +187,7 @@ export async function accionCancelarPedido(_: EstadoAccion, fd: FormData): Promi
         'Marca la casilla para confirmar que entiendes que no se puede deshacer.',
       );
     // P-6: «devolver en efectivo ahora» exige la nota del retiro (el servicio la valida); sin la casilla, como siempre.
-    const reembolso = texto(fd, 'devolverEfectivo') === 'on' ? { nota: texto(fd, 'notaReembolso') } : null;
+    const reembolso = texto(fd, 'devolverEfectivo') === 'on' ? { nota: texto(fd, 'nota') } : null;
     const r = await conDb((db) =>
       cancelarPedido(db, {
         key: uuidDe(fd, 'key'),

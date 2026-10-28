@@ -45,6 +45,7 @@ export async function obtenerPago(db: Ejecutor, pagoId: string) {
       .select({
         id: aplicacionPago.id,
         monto: aplicacionPago.monto,
+        anuladaAt: aplicacionPago.anuladaAt,
         pedidoId: pedido.id,
         folio: pedido.folio,
         clienteNombre: cliente.nombre,
