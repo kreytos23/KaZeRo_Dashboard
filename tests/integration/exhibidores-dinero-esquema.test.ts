@@ -115,7 +115,17 @@ describe('clienta «Venta de mostrador» (0021)', () => {
     expect(await codigo(() => q(sql`UPDATE cliente SET es_mostrador = true WHERE id = ${b.clienteId}`))).toBe(
       '42501',
     );
-    expect(await codigo(() => q(sql`UPDATE cliente SET notas = 'x' WHERE id = ${b.clienteId}`))).toBe('ok');
+    // Editar otra columna sigue permitido (kz_auditar exige el contexto de auditoría en la misma transacción).
+    expect(
+      await codigo(() =>
+        app((db) =>
+          db.transaction(async (tx) => {
+            await tx.execute(sql`SELECT set_config('kazero.admin_id', ${adminId}, true)`);
+            await tx.execute(sql`UPDATE cliente SET notas = 'x' WHERE id = ${b.clienteId}`);
+          }),
+        ),
+      ),
+    ).toBe('ok');
   });
 });
 
