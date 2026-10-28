@@ -37,10 +37,11 @@ export interface DatosPagoPedido {
   referencia?: string | null;
   /** Plan 4b (P-3): captura ya subida al almacén (la acción la sube antes). */
   comprobante?: Comprobante | null;
-  /** Plan 4b (P-4): si hay un pago parecido se avisa siempre; `true` confirma que es otro pago y lo guarda. */
+  /**
+   * Plan 4b (P-4): `registrarPagoDePedido` avisa siempre de un pago parecido; `true` confirma que es otro pago y lo
+   * guarda. `registrarPagoEnTx` (servicios internos) no avisa.
+   */
   confirmarDuplicado?: boolean;
-  /** Solo servicios internos (cobro de una venta de exhibidor, migración): no verifica duplicados. */
-  omitirAvisoDuplicado?: boolean;
 }
 export interface PagoRegistrado {
   pagoId: string;
@@ -115,7 +116,11 @@ export async function registrarPagoDePedido(db: Ejecutor, d: DatosPagoPedido): P
           operacion: 'registrarPagoDePedido',
           payload: payloadIdempotente(v),
         },
-        () => registrarPagoEnTx(tx, d, d.key),
+        async () => {
+          const r = await registrarPagoEnTx(tx, d, d.key);
+          await exigirSinDuplicados(tx, r.pagoId, Boolean(v.confirmarDuplicado)); // P-4: revierte si avisa
+          return r;
+        },
       ),
     ),
   );
@@ -171,18 +176,6 @@ export async function registrarPagoEnTx(
     );
     if (v.monto > disponible) throw noAlcanza(disponible, v.monto);
   }
-  // P-4: avisa siempre, salvo confirmación o servicio interno; el saldo a favor es dinero interno (sin banco).
-  if (!d.omitirAvisoDuplicado && v.metodo !== 'saldo_favor')
-    await exigirSinDuplicados(
-      tx,
-      {
-        referencia: v.referencia,
-        montoCentavos: v.monto,
-        fecha,
-        pagador: v.pagador === 'cliente' ? { clienteId: p.clienteId } : { vendedorId: p.vendedorId },
-      },
-      Boolean(v.confirmarDuplicado),
-    );
   // Si el pago liquida, exhibidores → piezas ANTES de tocar `pago` (D-10).
   if (v.monto === saldo) await bloquearPiezasDelPedido(tx, p.id);
   const monto = centavosANumeric(v.monto);

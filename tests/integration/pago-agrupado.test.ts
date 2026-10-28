@@ -4,12 +4,13 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
 import { vPedido } from '@/db/schema';
 import { rutaComprobante, rutaImagen } from '@/domain/imagenes';
+import { formatoFolio } from '@/domain/pedidos';
 import { crearCliente } from '@/server/clientes/servicio';
 import { barrerImagenesHuerfanas } from '@/server/imagenes/barrido';
 import { registrarPagoAgrupado, type DatosPagoAgrupado } from '@/server/pagos/agrupado';
 import { agregarComprobante } from '@/server/pagos/comprobante';
 import { posiblesDuplicados } from '@/server/pagos/duplicados';
-import { registrarPagoDePedido, type DatosPagoPedido } from '@/server/pagos/servicio';
+import { registrarPagoDePedido, registrarPagoEnTx, type DatosPagoPedido } from '@/server/pagos/servicio';
 import { subirComprobante } from '@/server/pagos/subida';
 import { crearPedido } from '@/server/pedidos/servicio';
 import { procesarImagen } from '@/server/imagenes/procesar';
@@ -423,7 +424,7 @@ describe('P-4: aviso de duplicado', () => {
     const porMonto = await agrupado(nuevo).catch((e: unknown) => e);
     expect(porMonto).toMatchObject({ codigo: 'posible_duplicado' });
     expect((porMonto as { detalle: unknown[] }).detalle).toHaveLength(1);
-    expect((porMonto as Error).message).toContain(`pedido #${a.folio}`);
+    expect((porMonto as Error).message).toContain(`pedido ${formatoFolio(a.folio)}`);
 
     await expect(
       agrupado({
@@ -455,7 +456,19 @@ describe('P-4: aviso de duplicado', () => {
     });
     expect(await cuenta('pago')).toBe(1);
     await pagarPedido(a.id, 5000, { fecha: '2026-02-01', confirmarDuplicado: true });
-    await pagarPedido(a.id, 5000, { fecha: '2026-02-01', omitirAvisoDuplicado: true });
+    // Servicio interno (cobro de una venta de exhibidor): registrarPagoEnTx no avisa.
+    await app((db) =>
+      db.transaction((tx) =>
+        registrarPagoEnTx(tx, {
+          adminId,
+          pedidoId: a.id,
+          montoCentavos: 5000,
+          metodo: 'transferencia',
+          pagador: 'cliente',
+          fecha: '2026-02-01',
+        }),
+      ),
+    );
     expect(await cuenta('pago')).toBe(3);
   });
 

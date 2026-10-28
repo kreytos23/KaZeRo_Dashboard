@@ -59,7 +59,7 @@ const pagar = (pedidoId: string, montoCentavos: number, extra: Partial<DatosPago
       montoCentavos,
       metodo: 'transferencia',
       pagador: 'cliente',
-      omitirAvisoDuplicado: true,
+      confirmarDuplicado: true,
       ...extra,
     }),
   );

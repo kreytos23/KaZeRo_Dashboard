@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { aplicacionPago, pago, pedido, pedidoItem, saldoFavorMov } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
+import { formatoFolio } from '@/domain/pedidos';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
 import { conIdempotencia } from '@/server/idempotencia';
@@ -114,13 +115,13 @@ export async function registrarPagoAgrupado(
             if (p.estado === 'liquidado')
               throw new ErrorNegocio(
                 'pedido_liquidado',
-                `El pedido #${p.folio} ya está liquidado.`,
+                `El pedido ${formatoFolio(p.folio)} ya está liquidado.`,
                 'aplicaciones',
               );
             if (p.estado === 'cancelado')
               throw new ErrorNegocio(
                 'pedido_cancelado',
-                `El pedido #${p.folio} está cancelado.`,
+                `El pedido ${formatoFolio(p.folio)} está cancelado.`,
                 'aplicaciones',
               );
             if (fecha < p.fecha)
@@ -133,7 +134,7 @@ export async function registrarPagoAgrupado(
             if (a.montoCentavos > saldo)
               throw new ErrorNegocio(
                 'pago_excede',
-                `Lo aplicado al pedido #${p.folio} (${formatoMXN(a.montoCentavos)}) supera su saldo (${formatoMXN(saldo)}).`,
+                `Lo aplicado al pedido ${formatoFolio(p.folio)} (${formatoMXN(a.montoCentavos)}) supera su saldo (${formatoMXN(saldo)}).`,
                 'aplicaciones',
               );
             filas.push({ id: p.id, folio: p.folio, saldo: saldo - a.montoCentavos });
@@ -143,18 +144,6 @@ export async function registrarPagoAgrupado(
             const disponible = numericACentavos(await saldoFavorDe(tx, { vendedorId: v.vendedorId }));
             if (v.monto > disponible) throw noAlcanza(disponible, v.monto);
           }
-          // P-4: el saldo a favor es dinero interno (sin banco): no hay duplicado que avisar.
-          if (v.metodo !== 'saldo_favor')
-            await exigirSinDuplicados(
-              tx,
-              {
-                referencia: v.referencia,
-                montoCentavos: v.monto,
-                fecha,
-                pagador: { vendedorId: v.vendedorId },
-              },
-              v.confirmarDuplicado,
-            );
           // Los que se liquidan: los exhibidores de TODAS sus piezas y luego todas las piezas, ANTES de `pago`
           // (D-10, orden global; liquidarSiSaldoCero los vuelve a pedir ya tomados).
           const aLiquidar = filas.filter((f) => f.saldo === 0).map((f) => f.id);
@@ -182,6 +171,7 @@ export async function registrarPagoAgrupado(
               comprobanteSha256: v.comprobante?.sha256 ?? null,
             })
             .returning({ id: pago.id });
+          await exigirSinDuplicados(tx, pg!.id, v.confirmarDuplicado); // P-4: revierte si avisa
           // R-35: la fecha de cobro de cada aplicación es la fecha del pago.
           const aps = ids.length
             ? await tx
