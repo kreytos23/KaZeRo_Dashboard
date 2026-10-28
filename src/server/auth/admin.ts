@@ -9,7 +9,7 @@ import { nuevoSecretoTotp, uriTotp } from './totp';
 /** Acepta la conexión o una transacción. Quien llame con kazero_app debe haber re-autenticado al admin que da el alta. */
 export async function crearAdmin(
   db: Ejecutor,
-  datos: { email: string; password: string },
+  datos: { email: string; password: string; nombre?: string | null },
   llaveTotp: string,
 ) {
   const error = validarFortaleza(datos.password);
@@ -21,11 +21,11 @@ export async function crearAdmin(
   const passwordHash = await hashPassword(datos.password);
   // Atómico: un admin sin códigos de recuperación dejaría a producción abortando para siempre.
   const id = await db.transaction(async (tx) => {
-    // INSERT crudo con solo las 3 columnas concedidas a kazero_app: Drizzle listaría también `rol` (DEFAULT)
+    // INSERT crudo con solo las columnas concedidas a kazero_app: Drizzle listaría también `rol` (DEFAULT)
     // y la app no tiene privilegio para elegirlo.
     const r = await tx.execute<{ id: string }>(
-      sql`INSERT INTO admin (email, password_hash, totp_secret_cifrado)
-          VALUES (${email}, ${passwordHash}, ${cifrar(secretoTotp, llaveTotp)}) RETURNING id`,
+      sql`INSERT INTO admin (email, nombre, password_hash, totp_secret_cifrado)
+          VALUES (${email}, ${datos.nombre ?? null}, ${passwordHash}, ${cifrar(secretoTotp, llaveTotp)}) RETURNING id`,
     );
     const nuevoId = r.rows[0]!.id;
     await tx

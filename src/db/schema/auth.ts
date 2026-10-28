@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  check,
   index,
   integer,
   jsonb,
@@ -33,6 +34,8 @@ export const admin = pgTable(
   {
     id: uuid('id').primaryKey().defaultRandom(),
     email: text('email').notNull(),
+    // Cómo se le saluda en el inicio del panel; opcional.
+    nombre: text('nombre'),
     passwordHash: text('password_hash').notNull(),
     totpSecretCifrado: text('totp_secret_cifrado').notNull(),
     // Último paso TOTP aceptado: impide reutilizar el mismo código dentro de su ventana.
@@ -43,7 +46,10 @@ export const admin = pgTable(
     createdAt: ts('created_at').notNull().defaultNow(),
     updatedAt: ts('updated_at').notNull().defaultNow(),
   },
-  (t) => [uniqueIndex('admin_email_uq').on(sql`lower(${t.email})`)],
+  (t) => [
+    uniqueIndex('admin_email_uq').on(sql`lower(${t.email})`),
+    check('admin_nombre_largo', sql`${t.nombre} IS NULL OR char_length(${t.nombre}) BETWEEN 1 AND 60`),
+  ],
 );
 
 export const codigoRecuperacion = pgTable(

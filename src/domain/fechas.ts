@@ -19,6 +19,18 @@ export function hoyMX(ahora = new Date()): string {
   return DIA_MX.format(ahora);
 }
 
+const HORA_MX = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/Mexico_City',
+  hour: 'numeric',
+  hourCycle: 'h23',
+});
+
+/** Saludo del inicio según la hora en México: 00:00-11:59, 12:00-18:59 y 19:00-23:59. */
+export function saludoSegunHora(ahora: Date): 'Buenos días' | 'Buenas tardes' | 'Buenas noches' {
+  const h = Number(HORA_MX.format(ahora));
+  return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
+}
+
 /** Días de calendario de `a` a `b` (fechas de negocio 'AAAA-MM-DD'; negativo si `b` es anterior). */
 export function diasEntre(a: string, b: string): number {
   const utc = (iso: string) =>
