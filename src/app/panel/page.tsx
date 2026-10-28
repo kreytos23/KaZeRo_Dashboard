@@ -8,11 +8,13 @@ import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { FECHA_LARGA } from '@/features/ui/formato';
 import { Saldo } from '@/features/ui/Saldo';
 import { calcularMesAbierto, comisionesPendientes, reporteComisiones } from '@/server/comisiones/lecturas';
+import { requerirSesion } from '@/server/auth/sesion-actual';
 import { reporteDeudores } from '@/server/reportes/deudores';
 
 export const metadata = { title: 'Panel' };
 
 export default async function Panel() {
+  await requerirSesion();
   const hoy = hoyMX();
   const { deudas, pendientes, curso, abierto } = await conDbLectura(async (db) => {
     const [deudas, pendientes, abierto] = await Promise.all([
@@ -69,7 +71,7 @@ export default async function Panel() {
             <h2 className="text-monto font-semibold">Por cobrar</h2>
             <p className="text-destacado font-bold tabular-nums">{formatoMXN(deudas.totalCentavos)}</p>
             <p className="text-dato text-tinta-suave">
-              {deudas.numPedidos} pedidos · {conAtraso} con más de 30 días
+              {deudas.numPedidos} {deudas.numPedidos === 1 ? 'pedido' : 'pedidos'} · {conAtraso} con más de 30 días
             </p>
             <ul className="flex flex-col gap-1">
               {deudas.grupos.map((g) => (
@@ -102,7 +104,7 @@ export default async function Panel() {
                   </span>
                   <span className="flex items-center gap-2">
                     <Saldo estado="abierto" saldo={centavosANumeric(p.saldoCentavos)} />
-                    <span className="text-dato text-tinta-suave">{p.dias} días</span>
+                    <span className="text-dato text-tinta-suave">{p.dias} {p.dias === 1 ? 'día' : 'días'}</span>
                   </span>
                 </li>
               ))}
