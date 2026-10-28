@@ -9,10 +9,10 @@ import { conIdempotencia } from '@/server/idempotencia';
 import {
   bloquearCliente,
   bloquearExhibidoresDe,
-  bloquearPedido,
+  bloquearPedidos,
   bloquearPiezasPorId,
   liquidarSiSaldoCero,
-  pagadoCentavos,
+  pagadoPorPedido,
 } from '@/server/pedidos/comun';
 import { validarFecha } from '@/server/pedidos/servicio';
 import { noAlcanza, saldoFavorDe } from '@/server/saldo-favor/servicio';
@@ -107,9 +107,12 @@ export async function registrarPagoAgrupado(
             ? await tx.select({ clienteId: pedido.clienteId }).from(pedido).where(inArray(pedido.id, ids))
             : [];
           for (const c of [...new Set(refs.map((r) => r.clienteId))].sort()) await bloquearCliente(tx, c);
+          const bloqueados = new Map((await bloquearPedidos(tx, ids)).map((p) => [p.id, p]));
+          const pagado = await pagadoPorPedido(tx, ids);
           const filas: { id: string; folio: number; saldo: number }[] = [];
           for (const a of v.aplicaciones) {
-            const p = await bloquearPedido(tx, a.pedidoId);
+            const p = bloqueados.get(a.pedidoId);
+            if (!p) throw new ErrorNegocio('no_encontrado', 'El pedido no existe.');
             if (p.vendedorId !== v.vendedorId)
               throw new ErrorNegocio('pedido_ajeno', 'El pedido es de otra vendedora.', 'aplicaciones');
             if (p.estado === 'liquidado')
@@ -130,7 +133,7 @@ export async function registrarPagoAgrupado(
                 'La fecha del pago no puede ser anterior a la del pedido.',
                 'fecha',
               );
-            const saldo = numericACentavos(p.total) - (await pagadoCentavos(tx, p.id));
+            const saldo = numericACentavos(p.total) - pagado.get(p.id)!;
             if (a.montoCentavos > saldo)
               throw new ErrorNegocio(
                 'pago_excede',
@@ -208,8 +211,9 @@ export async function registrarPagoAgrupado(
               adminId: d.adminId,
               fecha,
             });
+          // Solo los que quedan en 0 pueden liquidarse; los demás siguen con saldo.
           const liquidados: number[] = [];
-          for (const f of filas)
+          for (const f of filas.filter((x) => x.saldo === 0))
             if ((await liquidarSiSaldoCero(tx, f.id, d.adminId)) === 'liquidado') liquidados.push(f.folio);
           return { pagoId: pg!.id, sobranteCentavos: sobrante, liquidados };
         },

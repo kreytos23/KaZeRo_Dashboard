@@ -1,4 +1,5 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import type { Ejecutor } from '@/db/pool';
 import { admin, aplicacionPago, cliente, pago, pedido, vendedor, vPedido } from '@/db/schema';
 import { numericACentavos } from '@/domain/dinero';
@@ -11,33 +12,35 @@ export async function claveDeComprobante(db: Ejecutor, pagoId: string): Promise<
 
 /** Ficha de un pago: datos, quién lo registró y lo deshizo, y sus aplicaciones con el folio del pedido. */
 export async function obtenerPago(db: Ejecutor, pagoId: string) {
-  const [p] = await db
-    .select({
-      id: pago.id,
-      fecha: pago.fecha,
-      monto: pago.monto,
-      metodo: pago.metodo,
-      nota: pago.nota,
-      referencia: pago.referencia,
-      comprobanteClave: pago.comprobanteClave,
-      createdAt: pago.createdAt,
-      anuladoAt: pago.anuladoAt,
-      anulacionMotivo: pago.anulacionMotivo,
-      anuladoPor: pago.anuladoPor,
-      registradoPor: admin.email,
-      exhibidorId: pago.exhibidorId,
-      clienteId: pago.pagadorClienteId,
-      clienteNombre: cliente.nombre,
-      vendedorId: pago.pagadorVendedorId,
-      vendedorNombre: vendedor.nombre,
-    })
-    .from(pago)
-    .innerJoin(admin, eq(admin.id, pago.adminId))
-    .leftJoin(cliente, eq(cliente.id, pago.pagadorClienteId))
-    .leftJoin(vendedor, eq(vendedor.id, pago.pagadorVendedorId))
-    .where(eq(pago.id, pagoId));
-  if (!p) return null;
-  const [aplicaciones, deshizo] = await Promise.all([
+  const anulador = alias(admin, 'anulador');
+  const [[p], aplicaciones] = await Promise.all([
+    db
+      .select({
+        id: pago.id,
+        fecha: pago.fecha,
+        monto: pago.monto,
+        metodo: pago.metodo,
+        nota: pago.nota,
+        referencia: pago.referencia,
+        comprobanteClave: pago.comprobanteClave,
+        createdAt: pago.createdAt,
+        anuladoAt: pago.anuladoAt,
+        anulacionMotivo: pago.anulacionMotivo,
+        anuladoPor: pago.anuladoPor,
+        anuladoPorEmail: anulador.email,
+        registradoPor: admin.email,
+        exhibidorId: pago.exhibidorId,
+        clienteId: pago.pagadorClienteId,
+        clienteNombre: cliente.nombre,
+        vendedorId: pago.pagadorVendedorId,
+        vendedorNombre: vendedor.nombre,
+      })
+      .from(pago)
+      .innerJoin(admin, eq(admin.id, pago.adminId))
+      .leftJoin(cliente, eq(cliente.id, pago.pagadorClienteId))
+      .leftJoin(vendedor, eq(vendedor.id, pago.pagadorVendedorId))
+      .leftJoin(anulador, eq(anulador.id, pago.anuladoPor))
+      .where(eq(pago.id, pagoId)),
     db
       .select({
         id: aplicacionPago.id,
@@ -51,14 +54,11 @@ export async function obtenerPago(db: Ejecutor, pagoId: string) {
       .innerJoin(cliente, eq(cliente.id, pedido.clienteId))
       .where(eq(aplicacionPago.pagoId, pagoId))
       .orderBy(asc(pedido.folio)),
-    p.anuladoPor
-      ? db.select({ email: admin.email }).from(admin).where(eq(admin.id, p.anuladoPor))
-      : Promise.resolve([]),
   ]);
+  if (!p) return null;
   const aplicado = aplicaciones.reduce((s, a) => s + numericACentavos(a.monto), 0);
   return {
     ...p,
-    anuladoPorEmail: deshizo[0]?.email ?? null,
     aplicaciones,
     /** Lo que no se aplicó a ningún pedido (pago agrupado): fue a saldo a favor de la vendedora. */
     sobranteCentavos: Math.max(0, numericACentavos(p.monto) - aplicado),

@@ -11,10 +11,9 @@ import { conIdempotencia } from '@/server/idempotencia';
 import {
   bloquearCliente,
   bloquearExhibidores,
-  bloquearPedido,
+  bloquearPedidos,
   bloquearPiezasPorId,
-  pagadoCentavos,
-  type PedidoBloqueado,
+  pagadoPorPedido,
 } from '@/server/pedidos/comun';
 import { saldoFavorDe } from '@/server/saldo-favor/servicio';
 import {
@@ -72,9 +71,7 @@ export async function anularPago(db: Ejecutor, d: DatosAnulacion): Promise<{ rea
             const clientes = new Set(refs.map((r) => r.clienteId));
             if (previo.clienteId) clientes.add(previo.clienteId);
             for (const c of [...clientes].sort()) await bloquearCliente(tx, c);
-            const pedidos: PedidoBloqueado[] = [];
-            for (const id of [...new Set(refs.map((r) => r.pedidoId))].sort())
-              pedidos.push(await bloquearPedido(tx, id));
+            const pedidos = await bloquearPedidos(tx, [...new Set(refs.map((r) => r.pedidoId))]);
             if (previo.exhibidorId) await bloquearExhibidores(tx, [previo.exhibidorId]);
             // Una pieza vendida no tiene exhibidor (D-13): no hay más exhibidores que bloquear antes de las piezas.
             const liquidados = pedidos.filter((p) => p.estado === 'liquidado');
@@ -178,8 +175,12 @@ export async function anularPago(db: Ejecutor, d: DatosAnulacion): Promise<{ rea
 
             // R-16 al revés: el liquidado que queda con saldo se reabre y sus piezas vuelven a estar apartadas.
             const reabiertos: number[] = [];
+            const pagado = await pagadoPorPedido(
+              tx,
+              liquidados.map((p) => p.id),
+            );
             for (const p of liquidados) {
-              if (numericACentavos(p.total) <= (await pagadoCentavos(tx, p.id))) continue;
+              if (numericACentavos(p.total) <= pagado.get(p.id)!) continue;
               const ids = new Set(lineas.filter((l) => l.pedidoId === p.id).map((l) => l.piezaId));
               const suyas = piezas.filter((x) => ids.has(x.id));
               const noVendidas = suyas.filter((x) => x.estado !== 'vendida');
