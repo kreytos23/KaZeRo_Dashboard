@@ -7,6 +7,7 @@ import { hoyMX } from '@/domain/fechas';
 import { crearCliente } from '@/server/clientes/servicio';
 import { reporteComisiones } from '@/server/comisiones/lecturas';
 import {
+  clienteMostradorId,
   registrarAjusteExhibidor,
   registrarEntregaExhibidor,
   registrarVentaExhibidor,
@@ -19,7 +20,7 @@ import {
   regresarPiezas,
 } from '@/server/exhibidores/servicio';
 import { registrarPagoDePedido } from '@/server/pagos/servicio';
-import { cancelarPedido } from '@/server/pedidos/servicio';
+import { cancelarPedido, crearPedido } from '@/server/pedidos/servicio';
 import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { reiniciarConAdmin, urlApp } from './utilidades';
@@ -259,6 +260,24 @@ describe('venta del exhibidor', () => {
     expect(e).toMatchObject({ codigo: 'metodo_invalido' });
   });
 
+  it('una nota a «Venta de mostrador» fuera del exhibidor se rechaza', async () => {
+    await pieza('MS01');
+    const mostradorId = await app((db) => clienteMostradorId(db));
+    const e = await falla(
+      app((db) =>
+        crearPedido(db, {
+          key: randomUUID(),
+          adminId,
+          clienteId: mostradorId,
+          vendedorId: perlaId,
+          codigos: ['MS01'],
+          cuentaTarjeta: false,
+          descuentoManualCentavos: 0,
+        }),
+      ),
+    );
+    expect(e).toMatchObject({ codigo: 'mostrador_fuera_de_exhibidor', campo: 'cliente' });
+  });
   it('idempotente: la misma key no duplica nota ni cobro', async () => {
     const key = randomUUID();
     const a = await venta({ key });

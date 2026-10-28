@@ -1,6 +1,15 @@
 import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { aplicacionPago, pago, pedido, pedidoItem, pieza, saldoFavorMov, vendedor } from '@/db/schema';
+import {
+  aplicacionPago,
+  cliente,
+  pago,
+  pedido,
+  pedidoItem,
+  pieza,
+  saldoFavorMov,
+  vendedor,
+} from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
 import { descuentoLealtad, siguientePosicion, type Posicion } from '@/domain/lealtad';
@@ -125,8 +134,23 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
   const v = validarPedido(d);
   return conErroresDeNegocio(() =>
     db.transaction((tx) =>
-      conIdempotencia(tx, { key: d.key, adminId: d.adminId, operacion: 'crearPedido', payload: v }, () =>
-        crearPedidoEnTx(tx, d),
+      conIdempotencia(
+        tx,
+        { key: d.key, adminId: d.adminId, operacion: 'crearPedido', payload: v },
+        async () => {
+          // «Venta de mostrador» solo nace de una venta del exhibidor (Plan 4a, registrarVentaExhibidor).
+          const [c] = await tx
+            .select({ esMostrador: cliente.esMostrador })
+            .from(cliente)
+            .where(eq(cliente.id, v.clienteId));
+          if (c?.esMostrador)
+            throw new ErrorNegocio(
+              'mostrador_fuera_de_exhibidor',
+              'Las ventas de mostrador se registran desde el exhibidor.',
+              'cliente',
+            );
+          return crearPedidoEnTx(tx, d);
+        },
       ),
     ),
   );
