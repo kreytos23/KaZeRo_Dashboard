@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diasEntre, hoyMX, parsearFechaISO } from '@/domain/fechas';
+import { diasEntre, hoyMX, parsearFechaISO, saludoSegunHora } from '@/domain/fechas';
 
 describe('fechas de negocio', () => {
   it('acepta fechas reales', () => {
@@ -23,4 +23,17 @@ describe('diasEntre', () => {
     expect(diasEntre('2026-10-26', '2026-11-12')).toBe(17);
     expect(diasEntre('2026-03-07', '2026-03-09')).toBe(2);
   });
+});
+
+describe('saludoSegunHora (hora de México, UTC-6 todo el año)', () => {
+  it.each([
+    ['2026-10-09T06:00:00Z', 'Buenos días'], // 00:00 en CDMX
+    ['2026-10-09T17:59:00Z', 'Buenos días'], // 11:59
+    ['2026-10-09T18:00:00Z', 'Buenas tardes'], // 12:00
+    ['2026-10-10T00:59:00Z', 'Buenas tardes'], // 18:59
+    ['2026-10-10T01:00:00Z', 'Buenas noches'], // 19:00
+    ['2026-10-10T05:59:00Z', 'Buenas noches'], // 23:59
+    // 03:00 UTC es aún la noche anterior en CDMX (21:00), no la madrugada.
+    ['2026-10-09T03:00:00Z', 'Buenas noches'],
+  ])('%s → %s', (iso, esperado) => expect(saludoSegunHora(new Date(iso))).toBe(esperado));
 });

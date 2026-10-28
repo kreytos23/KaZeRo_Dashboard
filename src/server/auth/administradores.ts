@@ -8,7 +8,7 @@ import { cifrar } from './cifrado';
 import { reautenticarAdmin, registrarAcceso } from './servicio';
 import { hashCodigoRecuperacion, nuevosCodigosRecuperacion } from './tokens';
 import { nuevoSecretoTotp, uriTotp } from './totp';
-import { validarAltaAdmin } from './validacion';
+import { validarAltaAdmin, validarNombre } from './validacion';
 
 type Red = { ip: string | null; userAgent: string | null };
 /** Los secretos, la URI y los códigos se devuelven una sola vez: no se registran ni se guardan en claro. */
@@ -53,10 +53,28 @@ async function comoResultado(fn: () => Promise<ResultadoEnrolamiento>): Promise<
 /** Sin el admin "migración": no es una persona ni puede entrar (Plan 7a). */
 export function listarAdmins(db: Ejecutor) {
   return db
-    .select({ id: vAdmin.id, email: vAdmin.email, createdAt: vAdmin.createdAt })
+    .select({ id: vAdmin.id, email: vAdmin.email, nombre: vAdmin.nombre, createdAt: vAdmin.createdAt })
     .from(vAdmin)
     .where(ne(sql`lower(${vAdmin.email})`, EMAIL_ADMIN_MIGRACION))
     .orderBy(asc(vAdmin.createdAt));
+}
+
+/** Nombre con el que se saluda al administrador; null si no tiene. */
+export async function nombreDeAdmin(db: Ejecutor, adminId: string) {
+  const [a] = await db.select({ nombre: vAdmin.nombre }).from(vAdmin).where(eq(vAdmin.id, adminId)).limit(1);
+  return a?.nombre ?? null;
+}
+
+/** Cambia (o quita, con vacío) el nombre de un administrador. No es sensible: no pide contraseña. */
+export async function guardarNombreAdmin(db: Ejecutor, adminId: string, crudo: string) {
+  const { nombre, error } = validarNombre(crudo);
+  if (error) throw new ErrorNegocio('validacion', error, 'nombre');
+  const r = await db
+    .update(admin)
+    .set({ nombre })
+    .where(and(eq(admin.id, adminId), ne(sql`lower(${admin.email})`, EMAIL_ADMIN_MIGRACION)))
+    .returning({ id: admin.id });
+  if (r.length === 0) throw new ErrorNegocio('no_encontrado', 'Administrador no encontrado.');
 }
 
 export async function agregarAdmin(
@@ -66,6 +84,7 @@ export async function agregarAdmin(
     sesionActualId: string;
     passwordActual: string;
     email: string;
+    nombre?: string;
     password: string;
     confirmacion: string;
   } & Red,
@@ -75,6 +94,8 @@ export async function agregarAdmin(
   const email = e.email.trim().toLowerCase();
   const invalido = validarAltaAdmin({ email, password: e.password, confirmacion: e.confirmacion });
   if (invalido) return { ok: false, error: invalido };
+  const { nombre, error: errorNombre } = validarNombre(e.nombre ?? '');
+  if (errorNombre) return { ok: false, error: errorNombre };
   return comoResultado(() =>
     db.transaction(async (tx): Promise<ResultadoEnrolamiento> => {
       const r = await reautenticarAdmin(tx, e.adminActualId, e.passwordActual, e, ahora);
@@ -86,7 +107,7 @@ export async function agregarAdmin(
         .where(sql`lower(${admin.email}) = ${email}`)
         .limit(1);
       if (existe) return { ok: false, error: 'Ya existe un administrador con ese correo.' };
-      const nuevo = await crearAdmin(tx, { email, password: e.password }, llaveTotp);
+      const nuevo = await crearAdmin(tx, { email, nombre, password: e.password }, llaveTotp);
       await registrarAcceso(tx, r.email, 'admin_creado', e, ahora);
       return {
         ok: true,

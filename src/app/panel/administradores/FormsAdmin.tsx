@@ -2,9 +2,9 @@
 
 import { startTransition, useActionState, useState } from 'react';
 import { Campo } from '@/features/ui/Campo';
-import { BotonEnvio } from '@/features/ui/FormAccion';
+import { BotonEnvio, FormAccion } from '@/features/ui/FormAccion';
 import { useHidratado } from '@/features/ui/hidratado';
-import { accionAgregarAdmin, accionRegenerarTotp } from './acciones';
+import { accionAgregarAdmin, accionGuardarNombre, accionRegenerarTotp } from './acciones';
 import type { EstadoEnrolamiento } from './tipos';
 
 type Accion = (prev: EstadoEnrolamiento, fd: FormData) => Promise<EstadoEnrolamiento>;
@@ -119,6 +119,7 @@ function Alta({ onOcultar, emailActual }: { onOcultar: () => void; emailActual: 
         required
         maxLength={200}
       />
+      <Campo etiqueta="Nombre (opcional)" name="nombre" autoComplete="off" maxLength={60} />
       <Campo
         etiqueta="Contraseña nueva"
         name="password"
@@ -199,4 +200,18 @@ export function FormAgregarAdmin({ emailActual }: { emailActual: string }) {
 export function FormRegenerarTotp({ emailActual }: { emailActual: string }) {
   const [n, setN] = useState(0);
   return <Regenerar key={n} emailActual={emailActual} onOcultar={() => setN((x) => x + 1)} />;
+}
+
+/** Nombre con el que se saluda a ese administrador en el inicio; vacío lo quita. */
+export function FormNombreAdmin({ adminId, nombre }: { adminId: string; nombre: string | null }) {
+  return (
+    <FormAccion
+      accion={accionGuardarNombre}
+      textoBoton="Guardar nombre"
+      className="flex max-w-md flex-wrap items-end gap-3"
+    >
+      <input type="hidden" name="adminId" value={adminId} />
+      <Campo etiqueta="Nombre" name="nombre" defaultValue={nombre ?? ''} autoComplete="off" maxLength={60} />
+    </FormAccion>
+  );
 }

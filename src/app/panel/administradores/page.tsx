@@ -1,7 +1,7 @@
 import { conDbLectura } from '@/db/client';
 import { listarAdmins } from '@/server/auth/administradores';
 import { requerirSesion } from '@/server/auth/sesion-actual';
-import { FormAgregarAdmin, FormRegenerarTotp } from './FormsAdmin';
+import { FormAgregarAdmin, FormNombreAdmin, FormRegenerarTotp } from './FormsAdmin';
 
 const FECHA = new Intl.DateTimeFormat('es-MX', {
   dateStyle: 'medium',
@@ -18,10 +18,13 @@ export default async function PaginaAdministradores() {
   return (
     <section className="flex max-w-3xl flex-col gap-8">
       <h1 className="text-2xl font-semibold">Administradores</h1>
-      <ul className="flex flex-col gap-1 text-dato">
+      <ul className="flex flex-col gap-4 text-dato">
         {admins.map((a) => (
-          <li key={a.id}>
-            {a.email} · desde {FECHA.format(a.createdAt)}
+          <li key={a.id} className="flex flex-col gap-2">
+            <span>
+              {a.email} · desde {FECHA.format(a.createdAt)}
+            </span>
+            <FormNombreAdmin adminId={a.id} nombre={a.nombre} />
           </li>
         ))}
       </ul>

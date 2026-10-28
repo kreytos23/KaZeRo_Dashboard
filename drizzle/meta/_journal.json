@@ -141,6 +141,20 @@
       "when": 1793090090024,
       "tag": "0019_comisiones_reglas",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793176868019,
+      "tag": "0020_tough_black_panther",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793176900000,
+      "tag": "0021_admin_nombre",
+      "breakpoints": true
     }
   ]
 }
