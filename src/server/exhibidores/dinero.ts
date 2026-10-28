@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { cliente, entregaExhibidor } from '@/db/schema';
-import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
+import { centavosANumeric, centavosANumericConSigno, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
 import { conIdempotencia } from '@/server/idempotencia';
 import { porEntregarCentavos } from '@/server/exhibidores/lecturas-dinero';
@@ -172,7 +172,7 @@ async function registrarMovimiento(
           await tx.insert(entregaExhibidor).values({
             exhibidorId: o.exhibidorId,
             tipo: o.tipo,
-            monto: centavosANumeric(o.montoCentavos),
+            monto: centavosANumericConSigno(o.montoCentavos),
             fecha,
             metodo: o.metodo,
             nota: o.nota,

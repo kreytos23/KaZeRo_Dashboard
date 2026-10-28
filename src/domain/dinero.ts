@@ -9,10 +9,15 @@ export function pesosACentavos(texto: string): number | null {
   return Number(entero) * 100 + Number(decimales.padEnd(2, '0'));
 }
 
+/** Montos de negocio: nunca negativos (las validaciones de piezas, pagos y pedidos se apoyan en este RangeError). */
 export function centavosANumeric(c: number): string {
-  if (!Number.isSafeInteger(c)) throw new RangeError('Monto en centavos inválido.');
-  const a = Math.abs(c);
-  return `${c < 0 ? '-' : ''}${Math.trunc(a / 100)}.${String(a % 100).padStart(2, '0')}`;
+  if (!Number.isSafeInteger(c) || c < 0) throw new RangeError('Monto en centavos inválido.');
+  return `${Math.trunc(c / 100)}.${String(c % 100).padStart(2, '0')}`;
+}
+
+/** Solo para movimientos que llevan signo (ajustes del exhibidor). */
+export function centavosANumericConSigno(c: number): string {
+  return c < 0 ? `-${centavosANumeric(-c)}` : centavosANumeric(c);
 }
 
 export function numericACentavos(n: string): number {

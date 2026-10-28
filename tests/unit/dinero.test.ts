@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   centavosANumeric,
+  centavosANumericConSigno,
   formatoMXN,
   numericACentavos,
   pesosACentavos,
@@ -29,9 +30,10 @@ describe('dinero en centavos', () => {
     expect(numericACentavos('7')).toBe(700);
   });
   it('admite negativos (ajustes del exhibidor)', () => {
-    expect(centavosANumeric(-1250)).toBe('-12.50');
-    expect(centavosANumeric(-5)).toBe('-0.05');
-    expect(centavosANumeric(0)).toBe('0.00');
+    expect(centavosANumericConSigno(-1250)).toBe('-12.50');
+    expect(centavosANumericConSigno(-5)).toBe('-0.05');
+    expect(centavosANumericConSigno(0)).toBe('0.00');
+    expect(() => centavosANumeric(-1)).toThrow(RangeError); // los montos de negocio siguen sin negativos
     expect(numericACentavos('-12.50')).toBe(-1250);
     expect(numericACentavos('-0.00')).toBe(0);
     expect(numericACentavos('0.00')).toBe(0);
