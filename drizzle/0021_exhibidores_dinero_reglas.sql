@@ -158,6 +158,14 @@ CREATE OR REPLACE VIEW v_exhibidor WITH (security_invoker = true) AS
     FROM entrega_exhibidor GROUP BY exhibidor_id
   ) en ON en.exhibidor_id = e.id;
 --> statement-breakpoint
+-- 7b. v_cliente de 0003 con es_mostrador al final: las lecturas excluyen o marcan a «Venta de mostrador» sin subconsultas.
+CREATE OR REPLACE VIEW v_cliente WITH (security_invoker = true) AS
+  SELECT c.id, c.nombre, c.referencia, c.telefono, c.cumpleanos, c.red_social, c.usuario_red,
+         c.vendedor_habitual_id, v.nombre AS vendedor_habitual_nombre, c.notas, c.version,
+         c.es_mostrador
+  FROM cliente c
+  LEFT JOIN vendedor v ON v.id = c.vendedor_habitual_id;
+--> statement-breakpoint
 -- 8. Privilegios: entregas y ajustes solo se insertan. cliente pasa de UPDATE de tabla (0003) a UPDATE por columna
 --    sin id, created_at ni es_mostrador (el REVOKE de tabla quita también los de columna: va primero).
 GRANT SELECT, INSERT ON entrega_exhibidor TO kazero_app;

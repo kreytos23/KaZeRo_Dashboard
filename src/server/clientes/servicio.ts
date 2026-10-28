@@ -122,7 +122,7 @@ export function listarClientes(db: Ejecutor, o: { q?: string; limite?: number } 
       .select()
       .from(vCliente)
       // «Venta de mostrador» no es una clienta de verdad: no se lista (sus notas se ven desde el exhibidor).
-      .where(and(sql`${vCliente.id} NOT IN (SELECT id FROM cliente WHERE es_mostrador)`, filtro))
+      .where(and(eq(vCliente.esMostrador, false), filtro))
       .orderBy(asc(vCliente.nombre))
       .limit(Math.min(o.limite ?? 50, 200))
   );

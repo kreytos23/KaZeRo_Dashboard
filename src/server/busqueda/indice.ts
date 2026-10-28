@@ -1,4 +1,4 @@
-import { asc, desc, sql } from 'drizzle-orm';
+import { asc, desc, eq } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { vCliente, vPedido, vPieza, vVendedor } from '@/db/schema';
 import { etiquetaUbicacion } from '@/domain/ubicacion';
@@ -27,7 +27,7 @@ export async function construirIndice(db: Ejecutor): Promise<IndiceBusqueda> {
       .select({ id: vCliente.id, nombre: vCliente.nombre, referencia: vCliente.referencia })
       .from(vCliente)
       // «Venta de mostrador» es interna (Plan 4a): no se busca ni se elige como clienta.
-      .where(sql`${vCliente.id} NOT IN (SELECT id FROM cliente WHERE es_mostrador)`)
+      .where(eq(vCliente.esMostrador, false))
       .orderBy(asc(vCliente.nombre)),
     db.select({ id: vVendedor.id, nombre: vVendedor.nombre }).from(vVendedor).orderBy(asc(vVendedor.nombre)),
     db
