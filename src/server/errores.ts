@@ -9,7 +9,10 @@ import {
   mensajeEntregaExcede,
 } from '@/server/exhibidores/mensajes';
 import {
+  MSG_APLICACION_PREVIA,
   MSG_COMPROBANTE_REPETIDO,
+  MSG_EXHIBIDOR_NEGATIVO,
+  MSG_MOTIVO_ANULACION,
   MSG_OTRA_VENDEDORA,
   MSG_PAGO_ANULADO,
   MSG_REFERENCIA_LARGA,
@@ -81,6 +84,7 @@ const CAMPOS: Record<string, string> = {
   // Plan 4b: referencia y comprobante.
   pago_referencia_largo: 'referencia',
   pago_comprobante_sha256_uq: 'comprobante',
+  pago_anulacion_coherente: 'motivo',
 };
 
 /** CHECK de coherencia interna de pedidos y pagos: la app nunca debería violarlos (son la última barrera). */
@@ -203,6 +207,11 @@ const MENSAJES: Record<string, string> = {
   saldo_favor_sobrante_sin_pago: PEDIDO_INCONSISTENTE,
   saldo_favor_sobrante_incoherente: PEDIDO_INCONSISTENTE,
   saldo_favor_pago_origen: PEDIDO_INCONSISTENTE,
+  pago_anulacion_coherente: MSG_MOTIVO_ANULACION,
+  pago_anulacion_aplicacion_previa: MSG_APLICACION_PREVIA,
+  pago_anulacion_exhibidor_negativo: MSG_EXHIBIDOR_NEGATIVO,
+  pago_anulado_incompleto: PEDIDO_INCONSISTENTE,
+  saldo_favor_anulacion_incoherente: PEDIDO_INCONSISTENTE,
   pedido_mostrador_sin_tarjeta: 'Las notas de venta de mostrador no cuentan en tarjeta.',
 };
 

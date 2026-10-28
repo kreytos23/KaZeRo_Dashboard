@@ -58,7 +58,12 @@ beforeEach(async () => {
 describe('cancelarPedido', () => {
   it('R-17: las piezas vuelven a disponible, el pedido queda cancelado con motivo y saldo 0', async () => {
     const p = await crear([await alta('CA01'), await alta('CA02')]);
-    expect(await cancelar(p.id)).toEqual({ liberadas: 2, alExhibidor: 0, saldoFavor: '0.00' });
+    expect(await cancelar(p.id)).toEqual({
+      liberadas: 2,
+      alExhibidor: 0,
+      saldoFavor: '0.00',
+      reembolsado: '0.00',
+    });
     expect(await ficha(p.id)).toMatchObject({
       estado: 'cancelado',
       cancelacionMotivo: 'Ya no la quiere',

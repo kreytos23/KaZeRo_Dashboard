@@ -25,6 +25,7 @@ import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/er
 import { MSG_FECHA_FUTURA } from '@/server/exhibidores/mensajes';
 import { conIdempotencia } from '@/server/idempotencia';
 import { exigirCustodiaDe } from '@/server/piezas/custodia';
+import { retirarEnTx, validarNotaRetiro } from '@/server/saldo-favor/servicio';
 import {
   apartarPiezas,
   bloquearCliente,
@@ -251,17 +252,27 @@ export interface PedidoCancelado {
   liberadas: number;
   alExhibidor: number;
   saldoFavor: string;
+  /** P-6: lo devuelto en efectivo al cancelar (entonces `saldoFavor` es 0). */
+  reembolsado: string;
 }
 
 /**
  * R-17: cancela un pedido abierto. Orden de bloqueo (D-10): cliente → pedido → exhibidores → piezas (helper
  * compartido) → pagos. Las piezas vuelven al exhibidor si sigue abierto o a disponible (D-12); lo abonado pasa a
  * saldo a favor de quien pagó y las aplicaciones se anulan (no se borran). El índice parcial de la tarjeta excluye
- * cancelados: la posición queda libre (R-24).
+ * cancelados: la posición queda libre (R-24). P-6: con `reembolso`, ese saldo se retira en efectivo en la misma
+ * transacción (un retiro por titular, con la nota); lo cobrado por un exhibidor no cambia su por entregar.
  */
 export async function cancelarPedido(
   db: Ejecutor,
-  d: { key: string; adminId: string; pedidoId: string; version: number; motivo: string },
+  d: {
+    key: string;
+    adminId: string;
+    pedidoId: string;
+    version: number;
+    motivo: string;
+    reembolso?: { nota: string } | null;
+  },
 ): Promise<PedidoCancelado> {
   const motivo = d.motivo.trim();
   if (!motivo || motivo.length > 200)
@@ -270,7 +281,9 @@ export async function cancelarPedido(
       'Escribe el motivo de la cancelación (hasta 200 caracteres).',
       'motivo',
     );
-  const payload = { pedidoId: d.pedidoId, version: d.version, motivo };
+  // Sin reembolso, el payload (y su hash de idempotencia) es el de siempre.
+  const reembolso = d.reembolso ? validarNotaRetiro(d.reembolso.nota) : undefined;
+  const payload = { pedidoId: d.pedidoId, version: d.version, motivo, reembolso };
   return conErroresDeNegocio(() =>
     db.transaction((tx) =>
       conIdempotencia(
@@ -335,6 +348,29 @@ export async function cancelarPedido(
             );
             saldoFavor = aplicaciones.reduce((s, a) => s + numericACentavos(a.monto), 0);
           }
+          let reembolsado = 0;
+          if (reembolso) {
+            const porTitular = new Map<
+              string,
+              { clienteId: string | null; vendedorId: string | null; c: number }
+            >();
+            for (const a of aplicaciones) {
+              const k = a.clienteId ?? `v:${a.vendedorId}`;
+              const t = porTitular.get(k) ?? { clienteId: a.clienteId, vendedorId: a.vendedorId, c: 0 };
+              t.c += numericACentavos(a.monto);
+              porTitular.set(k, t);
+            }
+            for (const t of porTitular.values())
+              await retirarEnTx(tx, {
+                ...t,
+                montoCentavos: t.c,
+                nota: reembolso,
+                adminId: d.adminId,
+                fecha: hoyMX(),
+              });
+            reembolsado = saldoFavor;
+            saldoFavor = 0;
+          }
           const filas = await tx
             .update(pedido)
             .set({
@@ -350,6 +386,7 @@ export async function cancelarPedido(
             liberadas: piezas.length,
             alExhibidor: r.alExhibidor,
             saldoFavor: centavosANumeric(saldoFavor),
+            reembolsado: centavosANumeric(reembolsado),
           };
         },
       ),

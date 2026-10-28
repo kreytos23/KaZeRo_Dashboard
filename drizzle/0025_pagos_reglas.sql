@@ -318,3 +318,115 @@ CREATE OR REPLACE VIEW v_saldo_favor_mov WITH (security_invoker = true) AS
 -- 8. Privilegios: de un pago solo se agregan el comprobante y la anulación (también permite su FOR UPDATE). Sin
 --    DELETE, como siempre.
 GRANT UPDATE (comprobante_clave, comprobante_sha256, anulado_at, anulacion_motivo, anulado_por) ON pago TO kazero_app;
+--> statement-breakpoint
+-- 9. (P-5) kz_validar_transicion_pieza VERSIÓN 6 = el cuerpo de la v5 (0017) SIN CAMBIOS + un agregado (v6, marcado):
+--    vendida → apartada solo al deshacer el pago que liquidó su pedido: el último movimiento de la pieza es la venta
+--    del pedido P, su línea en P sigue vigente (una devuelta no vuelve: la devolución la dejó en defecto y la línea no
+--    vigente) y P, aún liquidado, ya no está pagado (el servicio anula las aplicaciones antes). Sin exhibidor ni
+--    custodia, como estaba vendida. El trigger pieza_transicion (0017) la llama por nombre: CREATE OR REPLACE conserva
+--    su oid.
+CREATE OR REPLACE FUNCTION public.kz_validar_transicion_pieza() RETURNS trigger
+  LANGUAGE plpgsql
+  AS $$
+DECLARE
+  ultimo record;
+  ex_abierto boolean;
+  ultimo_venta record;
+BEGIN
+  IF NOT kz_transicion_pieza_permitida(OLD.estado, NEW.estado) THEN
+    -- Única excepción: deshacer el último cambio manual a regalo/defecto/guardada. Lo decide el historial
+    -- (solo inserción y coherente con la pieza, ver kz_validar_movimiento_pieza), no una bandera de sesión.
+    -- Solo llegan aquí regalo→disponible y {regalo,defecto,guardada}→en_exhibidor: defecto→disponible y
+    -- guardada→disponible ya son cambios manuales normales.
+    IF OLD.estado::text IN ('regalo', 'defecto', 'guardada') AND NEW.estado::text IN ('disponible', 'en_exhibidor') THEN
+      SELECT mp.tipo::text AS tipo, mp.de_estado::text AS de, mp.a_estado::text AS a, mp.exhibidor_id
+        INTO ultimo
+        FROM public.movimiento_pieza mp
+        WHERE mp.pieza_id = OLD.id
+        ORDER BY mp.orden DESC
+        LIMIT 1;
+      IF FOUND AND ultimo.tipo = 'cambio_estado' AND ultimo.a = OLD.estado::text THEN
+        IF ultimo.de = 'disponible' THEN
+          -- Venía de disponible: solo vuelve a disponible.
+          IF NEW.estado::text = 'disponible' THEN
+            RETURN NEW;
+          END IF;
+        ELSIF ultimo.de = 'en_exhibidor' AND ultimo.exhibidor_id IS NOT NULL THEN
+          -- FOR SHARE: el exhibidor no se cierra mientras esta corrección decide. El servicio ya lo bloqueó
+          -- antes que a la pieza (orden exhibidor → pieza), así que aquí no se espera.
+          SELECT e.estado::text = 'abierto' INTO ex_abierto
+            FROM public.exhibidor e
+            WHERE e.id = ultimo.exhibidor_id
+            FOR SHARE;
+          -- Abierto: vuelve a ESE exhibidor. Cerrado: queda disponible (la app avisa).
+          IF ex_abierto AND NEW.estado::text = 'en_exhibidor' AND NEW.exhibidor_id = ultimo.exhibidor_id THEN
+            RETURN NEW;
+          END IF;
+          IF NOT ex_abierto AND NEW.estado::text = 'disponible' THEN
+            RETURN NEW;
+          END IF;
+        END IF;
+      END IF;
+    END IF;
+    -- (v5, D-17) vendida → defecto solo por una devolución: el último movimiento es la venta del pedido P y la
+    -- línea de esta pieza en P tiene su devolución registrada. Tras el movimiento 'devolucion' ya no se cumple,
+    -- así que no hay una segunda sin una venta nueva. Una pieza vendida no tiene exhibidor ni custodia (CHECK),
+    -- y defecto tampoco: no hay más reglas que revisar.
+    IF OLD.estado::text = 'vendida' AND NEW.estado::text = 'defecto' THEN
+      SELECT mp.tipo::text AS tipo, mp.pedido_id INTO ultimo_venta
+        FROM public.movimiento_pieza mp WHERE mp.pieza_id = OLD.id ORDER BY mp.orden DESC LIMIT 1;
+      IF FOUND AND ultimo_venta.tipo = 'venta' AND EXISTS (
+           SELECT 1 FROM public.devolucion d JOIN public.pedido_item i ON i.id = d.pedido_item_id
+           WHERE i.pieza_id = OLD.id AND i.pedido_id = ultimo_venta.pedido_id) THEN
+        RETURN NEW;
+      END IF;
+    END IF;
+    -- (v6, P-5)
+    IF OLD.estado::text = 'vendida' AND NEW.estado::text = 'apartada'
+       AND NEW.exhibidor_id IS NULL AND NEW.vendedor_custodia_id IS NULL THEN
+      SELECT mp.tipo::text AS tipo, mp.pedido_id INTO ultimo_venta
+        FROM public.movimiento_pieza mp WHERE mp.pieza_id = OLD.id ORDER BY mp.orden DESC LIMIT 1;
+      IF FOUND AND ultimo_venta.tipo = 'venta' AND EXISTS (
+           SELECT 1 FROM public.pedido p JOIN public.pedido_item i ON i.pedido_id = p.id
+           WHERE p.id = ultimo_venta.pedido_id AND i.pieza_id = OLD.id AND i.vigente
+             AND p.estado::text = 'liquidado'
+             AND p.total > (SELECT coalesce(sum(a.monto), 0) FROM public.aplicacion_pago a
+                            WHERE a.pedido_id = p.id AND a.anulada_at IS NULL)) THEN
+        RETURN NEW;
+      END IF;
+    END IF;
+    RAISE EXCEPTION 'Transición de pieza no permitida: % → %', OLD.estado, NEW.estado
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pieza_transicion';
+  END IF;
+  -- (v4, D-11) Sustituye la regla v3 "en_exhibidor -> en_exhibidor con otro exhibidor", que dejaba el hueco
+  -- vía apartada: nunca de un exhibidor a otro, en ningún estado.
+  IF OLD.exhibidor_id IS NOT NULL AND NEW.exhibidor_id IS NOT NULL AND NEW.exhibidor_id <> OLD.exhibidor_id THEN
+    RAISE EXCEPTION 'La pieza debe regresar antes de cambiar de exhibidor'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pieza_cambio_exhibidor';
+  END IF;
+  -- Solo una pieza que entra a un exhibidor gana exhibidor. Se nombra 'apartada' (el único otro estado que
+  -- puede tener exhibidor): en los demás, el CHECK pieza_exhibidor_solo_si_aplica ya rechaza con su propio
+  -- mensaje, que la prueba del Plan 2 conserva.
+  IF OLD.exhibidor_id IS NULL AND NEW.exhibidor_id IS NOT NULL AND NEW.estado::text = 'apartada' THEN
+    RAISE EXCEPTION 'Solo una pieza que entra a un exhibidor puede ganar exhibidor'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pieza_cambio_exhibidor';
+  END IF;
+  -- (v5, D-9) Custodia de vendedora: NULL → valor solo al entregar (disponible → disponible); valor → NULL al
+  -- regresar, vender o cambiar a mano; nunca de una vendedora a otra, ni ganarla o perderla estando apartada.
+  IF OLD.vendedor_custodia_id IS NOT NULL AND NEW.vendedor_custodia_id IS NOT NULL
+     AND NEW.vendedor_custodia_id <> OLD.vendedor_custodia_id THEN
+    RAISE EXCEPTION 'La pieza debe regresar a Kazero antes de entregarse a otra vendedora'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pieza_cambio_custodia';
+  END IF;
+  IF OLD.vendedor_custodia_id IS NULL AND NEW.vendedor_custodia_id IS NOT NULL
+     AND NOT (OLD.estado::text = 'disponible' AND NEW.estado::text = 'disponible') THEN
+    RAISE EXCEPTION 'Solo una pieza disponible en Kazero se entrega a una vendedora'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pieza_cambio_custodia';
+  END IF;
+  IF OLD.vendedor_custodia_id IS NOT NULL AND NEW.vendedor_custodia_id IS NULL AND NEW.estado::text = 'apartada' THEN
+    RAISE EXCEPTION 'Una pieza apartada conserva su vendedora'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pieza_cambio_custodia';
+  END IF;
+  RETURN NEW;
+END
+$$;

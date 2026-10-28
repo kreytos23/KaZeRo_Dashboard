@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, exists, gt, inArray, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, gt, inArray, isNull, or, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import {
   aplicacionPago,
@@ -60,7 +60,8 @@ export async function historialDineroExhibidor(
       .leftJoin(cliente, eq(cliente.id, pago.pagadorClienteId))
       .innerJoin(aplicacionPago, eq(aplicacionPago.pagoId, pago.id))
       .innerJoin(vPedido, eq(vPedido.id, aplicacionPago.pedidoId))
-      .where(eq(pago.exhibidorId, exhibidorId))
+      // Plan 4b (P-5): un pago deshecho no es dinero que el exhibidor tenga (igual que kz_por_entregar).
+      .where(and(eq(pago.exhibidorId, exhibidorId), isNull(pago.anuladoAt)))
       .orderBy(desc(pago.fecha), desc(pago.createdAt))
       .limit(LIMITE_HISTORIAL),
     db

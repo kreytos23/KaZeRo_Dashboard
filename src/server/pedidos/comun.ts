@@ -65,7 +65,7 @@ export async function bloquearPiezasPorCodigo(
 }
 
 /** Exhibidores por id ascendente con NO KEY UPDATE (no choca con el KEY SHARE de las FK). Devuelve los abiertos. */
-async function bloquearExhibidores(tx: Ejecutor, ids: string[]): Promise<Set<string>> {
+export async function bloquearExhibidores(tx: Ejecutor, ids: string[]): Promise<Set<string>> {
   if (!ids.length) return new Set();
   const ex = await tx
     .select({ id: exhibidor.id, estado: exhibidor.estado })
