@@ -1,8 +1,9 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { conDb } from '@/db/client';
-import { formatoMXN, pesosACentavos } from '@/domain/dinero';
+import { formatoMXN, numericACentavos, pesosACentavos } from '@/domain/dinero';
 import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
 import { partirCodigos } from '@/features/exhibidores/codigos';
 import type { EstadoAccion } from '@/features/ui/estado';
@@ -181,17 +182,23 @@ export async function accionCancelarPedido(_: EstadoAccion, fd: FormData): Promi
         'confirmacion',
         'Marca la casilla para confirmar que entiendes que no se puede deshacer.',
       );
-    await conDb((db) =>
+    // P-6: «devolver en efectivo ahora» exige la nota del retiro (el servicio la valida); sin la casilla, como siempre.
+    const reembolso = texto(fd, 'devolverEfectivo') === 'on' ? { nota: texto(fd, 'notaReembolso') } : null;
+    const r = await conDb((db) =>
       cancelarPedido(db, {
         key: uuidDe(fd, 'key'),
         adminId,
         pedidoId: uuidDe(fd, 'pedidoId'),
         version: versionDe(fd),
         motivo: texto(fd, 'motivo').slice(0, 400),
+        reembolso: reembolso && { nota: reembolso.nota.slice(0, 400) },
       }),
     );
     revalidarPedido(folio);
-    return 'Pedido cancelado.';
+    revalidatePath('/panel/vendedores/[id]', 'page');
+    return numericACentavos(r.reembolsado) > 0
+      ? `Pedido cancelado. Entrega ${formatoMXN(numericACentavos(r.reembolsado))} en efectivo.`
+      : 'Pedido cancelado.';
   });
 }
 

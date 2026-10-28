@@ -100,3 +100,8 @@ export function rutaComprobante(clave: string): string {
   if (!esUuid(clave)) throw new RangeError('Ruta de imagen inválida');
   return `comprobantes/${clave}/${clave}-grande.webp`;
 }
+
+/** URL servida por la app para el comprobante de un pago; `v` = clave, igual que en las fotos de pieza. */
+export function urlComprobante(pagoId: string, clave: string): string {
+  return `/api/pagos/${pagoId}/comprobante?v=${clave}`;
+}

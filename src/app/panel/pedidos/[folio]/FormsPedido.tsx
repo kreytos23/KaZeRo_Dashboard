@@ -2,9 +2,13 @@
 
 import { Fragment, useState } from 'react';
 import { centavosANumeric, numericACentavos } from '@/domain/dinero';
+import { AvisoDuplicado } from '@/features/pagos/AvisoDuplicado';
+import { CampoCaptura } from '@/features/pagos/CampoCaptura';
+import { avisoSinCaptura } from '@/features/pagos/formato';
 import { CampoKey } from '@/features/pedidos/CampoKey';
 import { AreaTexto, Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
+import { MSG_CANCELAR_CON_DEVOLUCIONES } from '@/server/pagos/mensajes';
 import { accionCancelarPedido, accionRegistrarPago } from '../acciones';
 import { ETIQUETA_METODO } from '../etiquetas';
 
@@ -26,6 +30,8 @@ interface Props {
   /** Plan 3.1: saldo a favor de la clienta (numeric) y su texto en pesos; '0.00' si no tiene. */
   saldoFavor: string;
   saldoFavorTexto: string;
+  /** Hay piezas devueltas (su crédito ya está en el saldo a favor): el pedido no se puede cancelar. */
+  conDevoluciones: boolean;
   /** Plan 4a: exhibidor abierto de la vendedora del que salió alguna pieza; null si no aplica. */
   exhibidor: { id: string; nombre: string } | null;
 }
@@ -39,6 +45,7 @@ function CamposPago(p: Props) {
   const [metodo, setMetodo] = useState('transferencia');
   const [monto, setMonto] = useState(p.saldo);
   const [cobroExhibidor, setCobroExhibidor] = useState(false);
+  const [hayCaptura, setHayCaptura] = useState(false);
   const conSaldoFavor = metodo === 'saldo_favor';
   // El exhibidor cobra en mano: nunca con saldo a favor, y quien paga es siempre la clienta.
   const conExhibidor = cobroExhibidor && !conSaldoFavor && p.exhibidor !== null;
@@ -102,6 +109,17 @@ function CamposPago(p: Props) {
         />
       )}
       <Campo etiqueta="Nota" name="nota" maxLength={200} autoComplete="off" />
+      {/* Un pago con saldo a favor es dinero interno: sin referencia ni captura. */}
+      {!conSaldoFavor && (
+        <>
+          <Campo etiqueta="Referencia (opcional)" name="referencia" maxLength={60} autoComplete="off" />
+          <CampoCaptura onCambio={setHayCaptura} />
+          {avisoSinCaptura(metodo, hayCaptura) && (
+            <p className="text-meta text-tinta-suave">{avisoSinCaptura(metodo, hayCaptura)}</p>
+          )}
+        </>
+      )}
+      <AvisoDuplicado />
     </>
   );
 }
@@ -141,9 +159,16 @@ export function FormRegistrarPago(p: Props) {
  */
 export function FormCancelarPedido(p: Props) {
   const marca = `${p.version}-${p.saldo}`;
+  const [efectivo, setEfectivo] = useState(false);
+  const bloqueado = p.conDevoluciones;
   return (
-    <FormAccion accion={accionCancelarPedido} textoBoton="Cancelar pedido" sinControles={!p.abierto}>
-      {p.abierto && (
+    <FormAccion
+      accion={accionCancelarPedido}
+      textoBoton="Cancelar pedido"
+      sinControles={!p.abierto || bloqueado}
+    >
+      {p.abierto && bloqueado && <p className="aviso-atencion">{MSG_CANCELAR_CON_DEVOLUCIONES}</p>}
+      {p.abierto && !bloqueado && (
         <Fragment key={marca}>
           <input type="hidden" name="pedidoId" value={p.pedidoId} />
           <input type="hidden" name="folio" value={p.folio} />
@@ -151,10 +176,34 @@ export function FormCancelarPedido(p: Props) {
           <CampoKey />
           <p className="aviso-atencion">
             Se {p.piezas === 1 ? 'liberará 1 pieza' : `liberarán ${p.piezas} piezas`}
-            {p.hayPagado ? ` y ${p.pagadoTexto} quedará como saldo a favor` : ''}. Esta acción no se puede
-            deshacer.
+            {p.hayPagado
+              ? efectivo
+                ? ` y se devolverán ${p.pagadoTexto} en efectivo`
+                : ` y ${p.pagadoTexto} quedará como saldo a favor`
+              : ''}
+            . Esta acción no se puede deshacer.
           </p>
           <AreaTexto etiqueta="Motivo de la cancelación" name="motivo" rows={2} maxLength={200} required />
+          {p.hayPagado && (
+            <>
+              <CampoCasilla
+                name="devolverEfectivo"
+                checked={efectivo}
+                onChange={(e) => setEfectivo(e.target.checked)}
+              >
+                Devolver en efectivo ahora (si no, queda como saldo a favor)
+              </CampoCasilla>
+              {efectivo && (
+                <AreaTexto
+                  etiqueta="Nota de la devolución en efectivo"
+                  name="notaReembolso"
+                  rows={2}
+                  maxLength={200}
+                  required
+                />
+              )}
+            </>
+          )}
           <CampoCasilla name="confirmo" required>
             Entiendo que cancelar no se puede deshacer
           </CampoCasilla>

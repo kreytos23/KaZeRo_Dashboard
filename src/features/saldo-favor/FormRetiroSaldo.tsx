@@ -4,10 +4,14 @@ import { Fragment } from 'react';
 import { CampoKey } from '@/features/pedidos/CampoKey';
 import { AreaTexto, Campo, CampoCasilla } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
-import { accionRetirarSaldoFavor } from '../acciones';
+import type { EstadoAccion } from '@/features/ui/estado';
 
 interface Props {
-  clienteId: string;
+  /** Server Action del retiro: la de la clienta o la de la vendedora (misma forma de formulario). */
+  accion: (prev: EstadoAccion, fd: FormData) => Promise<EstadoAccion>;
+  /** Nombre del campo oculto con el titular: `clienteId` o `vendedorId`. */
+  campoTitular: 'clienteId' | 'vendedorId';
+  titularId: string;
   /** numeric del saldo actual (prellena el monto). */
   saldo: string;
   saldoTexto: string;
@@ -15,17 +19,17 @@ interface Props {
 }
 
 /**
- * Devolver en efectivo el saldo a favor. El FormAccion sigue montado cuando el saldo llega a cero (solo cambian sus
+ * Devolver en efectivo el saldo a favor (de una clienta o de una vendedora). El FormAccion sigue montado cuando el saldo llega a cero (solo cambian sus
  * hijos): así el aviso «Retiro registrado.» no desaparece con el formulario.
  */
-export function FormsSaldoFavor({ clienteId, saldo, saldoTexto, hayInicial }: Props) {
+export function FormRetiroSaldo({ accion, campoTitular, titularId, saldo, saldoTexto, hayInicial }: Props) {
   const hay = hayInicial;
   return (
-    <FormAccion accion={accionRetirarSaldoFavor} textoBoton="Devolver en efectivo" sinControles={!hay}>
+    <FormAccion accion={accion} textoBoton="Devolver en efectivo" sinControles={!hay}>
       {hay && (
         // La llave cambia con el saldo: refresca el monto prellenado y regenera la llave de idempotencia.
         <Fragment key={saldo}>
-          <input type="hidden" name="clienteId" value={clienteId} />
+          <input type="hidden" name={campoTitular} value={titularId} />
           <CampoKey />
           <p className="text-meta text-tinta-suave">
             Disponible para devolver: {saldoTexto}. Puedes devolver solo una parte.

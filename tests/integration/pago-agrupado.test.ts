@@ -15,7 +15,11 @@ import { crearPedido } from '@/server/pedidos/servicio';
 import { procesarImagen } from '@/server/imagenes/procesar';
 import { cambiarImagenPieza, clavesDeImagenReferenciadas } from '@/server/piezas/imagen';
 import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
-import { saldoFavorDeVendedor } from '@/server/saldo-favor/servicio';
+import {
+  movimientosSaldoFavor,
+  retirarSaldoFavorDeVendedor,
+  saldoFavorDeVendedor,
+} from '@/server/saldo-favor/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { crearAlmacenMemoria } from '../apoyo/almacen-memoria';
 import { jpegDePrueba } from '../apoyo/imagenes';
@@ -199,6 +203,27 @@ describe('P-1: pago agrupado de una vendedora', () => {
 });
 
 describe('P-2: sobrante y saldo a favor de la vendedora', () => {
+  it('la vendedora retira su saldo en efectivo: queda en su libro, no pasa del saldo y es idempotente', async () => {
+    await agrupado({ montoCentavos: 20000, aplicaciones: [] });
+    const key = randomUUID();
+    const retirar = (montoCentavos: number, k: string = randomUUID()) =>
+      app((db) =>
+        retirarSaldoFavorDeVendedor(db, {
+          key: k,
+          adminId,
+          vendedorId: ctx.vendedorId,
+          montoCentavos,
+          nota: 'Entregado en efectivo',
+        }),
+      );
+    expect(await retirar(5000, key)).toEqual({ saldo: '150.00' });
+    expect(await retirar(5000, key)).toEqual({ saldo: '150.00' }); // la misma llave no retira dos veces
+    expect(await saldoVendedora()).toBe('150.00');
+    await expect(retirar(15001)).rejects.toMatchObject({ codigo: 'saldo_insuficiente' });
+    const libro = await app((db) => movimientosSaldoFavor(db, { vendedorId: ctx.vendedorId }));
+    expect(libro.map((m) => m.tipo).sort()).toEqual(['retiro', 'sobrante']);
+  });
+
   it('lo que sobra queda como saldo suyo y se usa después como método «saldo a favor»', async () => {
     const a = await pedidoCon('SO01', 10000);
     const r = await agrupado({

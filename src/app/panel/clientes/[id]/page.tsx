@@ -8,7 +8,8 @@ import { formatoFolio } from '@/domain/pedidos';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { AreaTexto, Campo, Selector } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
-import { montoConSigno, textoMovimientoSaldo } from '@/features/saldo-favor/texto';
+import { FormRetiroSaldo } from '@/features/saldo-favor/FormRetiroSaldo';
+import { HistorialSaldo } from '@/features/saldo-favor/HistorialSaldo';
 import { TarjetaLealtad } from '@/features/pedidos/TarjetaLealtad';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPedido } from '@/features/ui/estado-visual';
@@ -22,8 +23,7 @@ import { resumenCliente } from '@/server/pedidos/lecturas';
 import { movimientosSaldoFavor } from '@/server/saldo-favor/servicio';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { fechaCorta } from '../../pedidos/etiquetas';
-import { accionEditarCliente } from '../acciones';
-import { FormsSaldoFavor } from './FormsSaldoFavor';
+import { accionEditarCliente, accionRetirarSaldoFavor } from '../acciones';
 
 const mxn = (n: string) => formatoMXN(numericACentavos(n));
 
@@ -111,37 +111,15 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
               Saldo a favor
             </h2>
             <p className="tarjeta p-4 text-3xl font-semibold tabular-nums">{mxn(resumen.saldoFavor)}</p>
-            <FormsSaldoFavor
-              clienteId={c.id}
+            <FormRetiroSaldo
+              accion={accionRetirarSaldoFavor}
+              campoTitular="clienteId"
+              titularId={c.id}
               saldo={resumen.saldoFavor}
               saldoTexto={mxn(resumen.saldoFavor)}
               hayInicial={numericACentavos(resumen.saldoFavor) > 0}
             />
-            {libro.length === 0 ? (
-              <p className="text-meta text-tinta-suave">Sin movimientos de saldo a favor.</p>
-            ) : (
-              <ul
-                aria-label="Historial de saldo a favor"
-                className="tarjeta flex flex-col divide-y divide-borde px-4"
-              >
-                {libro.map((m) => (
-                  <li key={m.id} className="flex flex-wrap items-baseline gap-x-3 py-3 text-dato">
-                    <span className="min-w-0 flex-1">
-                      {textoMovimientoSaldo(m)}
-                      <span className="block text-tinta-suave">
-                        {fechaCorta(m.fecha)}
-                        {m.adminEmail ? ` · ${m.adminEmail}` : ''}
-                      </span>
-                    </span>
-                    <span
-                      className={`text-monto font-semibold tabular-nums ${m.monto.startsWith('-') ? '' : 'text-exito'}`}
-                    >
-                      {montoConSigno(m.monto)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <HistorialSaldo libro={libro} />
           </section>
         </div>
         <div className="ficha-col">

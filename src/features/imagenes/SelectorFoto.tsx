@@ -15,12 +15,15 @@ const BOTON =
 export function SelectorFoto({
   etiqueta,
   onCambio,
+  campoError = 'imagen',
 }: {
   etiqueta: string;
   onCambio: (f: File | null) => void;
+  /** Nombre del campo del servidor cuyo error se muestra aquí (la foto de pieza usa `imagen`; el comprobante, `comprobante`). */
+  campoError?: string;
 }) {
   const id = useId();
-  const errorServidor = useContext(ErroresCampo).imagen;
+  const errorServidor = useContext(ErroresCampo)[campoError];
   const [vista, setVista] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -1,6 +1,6 @@
 import { desc, eq, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { cliente, saldoFavorMov, vSaldoFavor, vSaldoFavorMov } from '@/db/schema';
+import { cliente, saldoFavorMov, vendedor, vSaldoFavor, vSaldoFavorMov } from '@/db/schema';
 import { centavosANumeric, centavosANumericConSigno, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
@@ -36,12 +36,16 @@ export async function saldoFavorDeVendedor(db: Ejecutor, vendedorId: string): Pr
  */
 export function movimientosSaldoFavor(
   db: Ejecutor,
-  d: { clienteId: string; limite?: number },
+  d: { clienteId: string; limite?: number } | { vendedorId: string; limite?: number },
 ): Promise<MovSaldoFavor[]> {
   const q = db
     .select()
     .from(vSaldoFavorMov)
-    .where(eq(vSaldoFavorMov.clienteId, d.clienteId))
+    .where(
+      'clienteId' in d
+        ? eq(vSaldoFavorMov.clienteId, d.clienteId)
+        : eq(vSaldoFavorMov.vendedorId, d.vendedorId),
+    )
     .orderBy(
       desc(vSaldoFavorMov.createdAt),
       sql`CASE WHEN ${vSaldoFavorMov.tipo}::text IN ('retiro', 'uso') THEN 0 ELSE 1 END`,
@@ -154,6 +158,60 @@ export async function retirarSaldoFavor(db: Ejecutor, d: DatosRetiro): Promise<{
       ),
     ),
   );
+}
+
+/**
+ * P-2: la vendedora retira en efectivo su saldo a favor (el sobrante de sus pagos). Igual que el de la clienta, con
+ * la fila de la vendedora bloqueada y el candado consultivo del libro que toma el trigger al insertar.
+ */
+export async function retirarSaldoFavorDeVendedor(
+  db: Ejecutor,
+  d: Omit<DatosRetiro, 'clienteId'> & { vendedorId: string },
+): Promise<{ saldo: string }> {
+  if (!Number.isSafeInteger(d.montoCentavos) || d.montoCentavos <= 0)
+    throw new ErrorNegocio('monto_invalido', 'El monto debe ser mayor que cero.', 'monto');
+  const nota = validarNotaRetiro(d.nota);
+  if (d.fecha?.trim()) validarFecha(d.fecha);
+  const payload = {
+    vendedorId: d.vendedorId,
+    monto: d.montoCentavos,
+    nota,
+    fecha: d.fecha?.trim() || null,
+  };
+  try {
+    return await conErroresDeNegocio(() =>
+      db.transaction((tx) =>
+        conIdempotencia(
+          tx,
+          { key: d.key, adminId: d.adminId, operacion: 'retirarSaldoFavorDeVendedor', payload },
+          async (): Promise<{ saldo: string }> => {
+            await fijarContextoAuditoria(tx, { adminId: d.adminId, motivo: null });
+            const fecha = validarFecha(payload.fecha ?? undefined);
+            const [v] = await tx
+              .select({ id: vendedor.id })
+              .from(vendedor)
+              .where(eq(vendedor.id, d.vendedorId))
+              .for('no key update');
+            if (!v) throw new ErrorNegocio('no_encontrado', 'La vendedora no existe.');
+            const queda = await retirarEnTx(tx, {
+              clienteId: null,
+              vendedorId: d.vendedorId,
+              montoCentavos: d.montoCentavos,
+              nota,
+              adminId: d.adminId,
+              fecha,
+            });
+            return { saldo: centavosANumeric(queda) };
+          },
+        ),
+      ),
+    );
+  } catch (e) {
+    // Carrera que el bloqueo ya evita: si la BD igual rechaza, se dice con el saldo real.
+    if (e instanceof ErrorNegocio && e.codigo === 'saldo_favor_insuficiente')
+      throw noAlcanza(numericACentavos(await saldoFavorDeVendedor(db, d.vendedorId)), d.montoCentavos);
+    throw e;
+  }
 }
 
 /**

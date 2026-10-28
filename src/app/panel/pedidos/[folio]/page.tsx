@@ -79,6 +79,7 @@ export default async function FichaPedido({
     saldoTexto: mxn(p.saldo),
     pagadoTexto: mxn(p.pagado),
     hayPagado: pagadoCentavos > 0,
+    conDevoluciones: numericACentavos(p.devuelto) > 0,
     piezas: p.piezas,
     hoy: hoyMX(),
     saldoFavor,
@@ -271,12 +272,16 @@ export default async function FichaPedido({
                 {p.pagos.map((g) => (
                   <li
                     key={g.id}
-                    className={`flex flex-wrap items-baseline gap-x-3 py-3 text-dato ${g.anuladaAt ? 'text-tinta-suave' : ''}`}
+                    className={`flex flex-wrap items-baseline gap-x-3 py-1 text-dato ${g.anuladaAt ? 'text-tinta-suave' : ''}`}
                   >
-                    <span className={g.anuladaAt ? 'line-through' : undefined}>
+                    <Link
+                      href={`/panel/pagos/${g.pagoId}`}
+                      className={`enlace inline-flex min-h-11 items-center ${g.anuladaAt ? 'line-through' : ''}`}
+                    >
                       {fechaCorta(g.fecha)} · {ETIQUETA_METODO_REGISTRADO[g.metodo]} · {g.pagadorNombre} (
-                      {g.pagadorTipo}){g.nota ? ` · ${g.nota}` : ''}
-                    </span>
+                      {g.pagadorTipo}){g.referencia ? ` · Ref. ${g.referencia}` : ''}
+                      {g.nota ? ` · ${g.nota}` : ''}
+                    </Link>
                     <span
                       className={`ml-auto text-monto font-semibold tabular-nums ${g.anuladaAt ? 'line-through' : ''}`}
                     >
