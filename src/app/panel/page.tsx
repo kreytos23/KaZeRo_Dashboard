@@ -7,10 +7,12 @@ import { textoCierre, textoReporteDeudores } from '@/domain/recordatorios';
 import { Anillo } from '@/features/pedidos/iconos-lealtad';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { FECHA_LARGA } from '@/features/ui/formato';
+import { PorEntregar } from '@/features/exhibidores/PorEntregar';
 import { Saldo } from '@/features/ui/Saldo';
 import { calcularMesAbierto, comisionesPendientes, reporteComisiones } from '@/server/comisiones/lecturas';
 import { nombreDeAdmin } from '@/server/auth/administradores';
 import { requerirSesion } from '@/server/auth/sesion-actual';
+import { exhibidoresPorEntregar } from '@/server/exhibidores/lecturas-dinero';
 import { reporteDeudores } from '@/server/reportes/deudores';
 
 export const metadata = { title: 'Panel' };
@@ -19,15 +21,16 @@ export default async function Panel() {
   const { adminId } = await requerirSesion();
   const ahora = new Date();
   const hoy = hoyMX(ahora);
-  const { nombre, deudas, pendientes, curso, abierto } = await conDbLectura(async (db) => {
-    const [nombre, deudas, pendientes, abierto] = await Promise.all([
+  const { nombre, deudas, pendientes, curso, abierto, porEntregar } = await conDbLectura(async (db) => {
+    const [nombre, deudas, pendientes, abierto, porEntregar] = await Promise.all([
       nombreDeAdmin(db, adminId),
       reporteDeudores(db, { hoy }),
       comisionesPendientes(db),
       calcularMesAbierto(db, hoy),
+      exhibidoresPorEntregar(db),
     ]);
     const curso = await reporteComisiones(db, abierto, { hoy, abierto });
-    return { nombre, deudas, pendientes, curso, abierto };
+    return { nombre, deudas, pendientes, curso, abierto, porEntregar };
   });
   const cierre = textoCierre(abierto, hoy);
   const atrasados = deudas.grupos
@@ -125,6 +128,33 @@ export default async function Panel() {
             </Link>
           </section>
         </div>
+      )}
+
+      {porEntregar.length > 0 && (
+        <section aria-labelledby="exhibidores-por-entregar" className="flex flex-col gap-3">
+          <h2 id="exhibidores-por-entregar" className="text-monto font-semibold">
+            Exhibidores con dinero por entregar
+          </h2>
+          <ul className="tarjeta flex flex-col divide-y divide-borde px-5">
+            {porEntregar.map((x) => (
+              <li
+                key={x.id}
+                className="relative flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-3"
+              >
+                <span className="text-dato">
+                  <Link
+                    href={`/panel/exhibidores/${x.id}`}
+                    className="font-semibold underline after:absolute after:inset-0 after:content-['']"
+                  >
+                    {x.nombre}
+                  </Link>{' '}
+                  <span className="text-tinta-suave">{x.vendedorNombre}</span>
+                </span>
+                <PorEntregar centavos={x.porEntregarCentavos} />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <section className="flex flex-col gap-3">

@@ -1,4 +1,13 @@
 import { pgCode, pgConstraint } from '@/db/errors';
+import {
+  MSG_COBRO_SIN_SALDO_FAVOR,
+  MSG_EXHIBIDOR_CERRADO,
+  MSG_FECHA_FUTURA,
+  MSG_MOTIVO_AJUSTE,
+  MSG_NOTA_LARGA,
+  mensajeCierreConDinero,
+  mensajeEntregaExcede,
+} from '@/server/exhibidores/mensajes';
 
 export class ErrorNegocio extends Error {
   override name = 'ErrorNegocio';
@@ -56,6 +65,11 @@ const CAMPOS: Record<string, string> = {
   devolucion_motivo_largo: 'motivo',
   saldo_favor_retiro_completo: 'nota',
   saldo_favor_nota_largo: 'nota',
+  // Plan 4a: dinero del exhibidor.
+  entrega_exhibidor_excede: 'monto',
+  entrega_exhibidor_fecha: 'fecha',
+  entrega_exhibidor_nota: 'nota',
+  entrega_exhibidor_ajuste_motivo: 'motivo',
 };
 
 /** CHECK de coherencia interna de pedidos y pagos: la app nunca debería violarlos (son la última barrera). */
@@ -157,6 +171,18 @@ const MENSAJES: Record<string, string> = {
   saldo_favor_uso_faltante: PEDIDO_INCONSISTENTE,
   pago_saldo_sin_aplicacion: PEDIDO_INCONSISTENTE,
   devolucion_sin_saldo: PEDIDO_INCONSISTENTE,
+  // Plan 4a (0022/0023): el servicio valida antes; estos son la última barrera.
+  entrega_exhibidor_excede: mensajeEntregaExcede(),
+  entrega_exhibidor_cerrado: MSG_EXHIBIDOR_CERRADO,
+  entrega_exhibidor_fecha: MSG_FECHA_FUTURA,
+  entrega_exhibidor_nota: MSG_NOTA_LARGA,
+  entrega_exhibidor_ajuste_motivo: MSG_MOTIVO_AJUSTE,
+  entrega_exhibidor_monto: 'El monto no es válido.',
+  entrega_exhibidor_metodo: PEDIDO_INCONSISTENTE,
+  exhibidor_cierre_con_dinero: mensajeCierreConDinero(),
+  pago_exhibidor_coherente: 'El exhibidor que cobró debe estar abierto y ser de la vendedora del pedido.',
+  pago_exhibidor_sin_saldo: MSG_COBRO_SIN_SALDO_FAVOR,
+  pedido_mostrador_sin_tarjeta: 'Las notas de venta de mostrador no cuentan en tarjeta.',
 };
 
 function mensajesPg(err: unknown): string[] {

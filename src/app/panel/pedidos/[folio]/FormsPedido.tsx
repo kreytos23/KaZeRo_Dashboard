@@ -26,6 +26,8 @@ interface Props {
   /** Plan 3.1: saldo a favor de la clienta (numeric) y su texto en pesos; '0.00' si no tiene. */
   saldoFavor: string;
   saldoFavorTexto: string;
+  /** Plan 4a: exhibidor abierto de la vendedora del que salió alguna pieza; null si no aplica. */
+  exhibidor: { id: string; nombre: string } | null;
 }
 
 /**
@@ -36,7 +38,10 @@ function CamposPago(p: Props) {
   const favor = numericACentavos(p.saldoFavor);
   const [metodo, setMetodo] = useState('transferencia');
   const [monto, setMonto] = useState(p.saldo);
+  const [cobroExhibidor, setCobroExhibidor] = useState(false);
   const conSaldoFavor = metodo === 'saldo_favor';
+  // El exhibidor cobra en mano: nunca con saldo a favor, y quien paga es siempre la clienta.
+  const conExhibidor = cobroExhibidor && !conSaldoFavor && p.exhibidor !== null;
   const elegirMetodo = (m: string) => {
     setMetodo(m);
     setMonto(m === 'saldo_favor' ? centavosANumeric(Math.min(favor, numericACentavos(p.saldo))) : p.saldo);
@@ -67,12 +72,22 @@ function CamposPago(p: Props) {
         autoComplete="off"
       />
       <Campo etiqueta="Fecha" name="fecha" type="date" defaultValue={p.hoy} max={p.hoy} required />
-      {conSaldoFavor ? (
+      {p.exhibidor && !conSaldoFavor && (
+        <CampoCasilla
+          name="cobroExhibidor"
+          checked={cobroExhibidor}
+          onChange={(e) => setCobroExhibidor(e.target.checked)}
+        >
+          Lo cobró el exhibidor {p.exhibidor.nombre}
+        </CampoCasilla>
+      )}
+      {conExhibidor && <input type="hidden" name="exhibidorId" value={p.exhibidor!.id} />}
+      {conSaldoFavor || conExhibidor ? (
         <>
           {/* El saldo a favor es de la clienta: el pagador no se elige. */}
           <input type="hidden" name="pagador" value="cliente" />
           <p className="text-dato text-tinta-suave">
-            Paga: {p.clienteNombre} (cliente), con su saldo a favor.
+            Paga: {p.clienteNombre} (cliente){conSaldoFavor ? ', con su saldo a favor' : ''}.
           </p>
         </>
       ) : (

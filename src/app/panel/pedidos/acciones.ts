@@ -2,11 +2,10 @@
 
 import { redirect } from 'next/navigation';
 import { conDb } from '@/db/client';
-import { pesosACentavos } from '@/domain/dinero';
 import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
 import { partirCodigos } from '@/features/exhibidores/codigos';
 import type { EstadoAccion } from '@/features/ui/estado';
-import { ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
+import { centavosDe, ejecutarAccion, texto, uuidDe, uuidOpcionalDe, versionDe } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { crearCliente } from '@/server/clientes/servicio';
 import { ErrorNegocio } from '@/server/errores';
@@ -14,15 +13,6 @@ import { registrarPagoDePedido, type MetodoPago } from '@/server/pagos/servicio'
 import { devolverPiezaDefectuosa } from '@/server/pedidos/devolucion';
 import { cancelarPedido, crearPedido, editarPedido } from '@/server/pedidos/servicio';
 import { revalidarPedido } from './revalidar';
-
-function centavosDe(fd: FormData, campo: string): number {
-  const t = texto(fd, campo).trim();
-  if (!t) return 0;
-  const c = pesosACentavos(t);
-  if (c === null)
-    throw new ErrorNegocio('monto_invalido', 'Escribe un monto válido, por ejemplo 149 o 149.50.', campo);
-  return c;
-}
 
 function folioDe(fd: FormData): number {
   const f = parsearFolio(texto(fd, 'folio'));
@@ -51,7 +41,7 @@ export async function accionCrearPedido(_: EstadoAccion, fd: FormData): Promise<
         fecha: texto(fd, 'fecha').slice(0, 20),
         codigos: codigos.map((c) => c.slice(0, 40)),
         cuentaTarjeta: fd.get('cuentaTarjeta') === 'on',
-        descuentoManualCentavos: centavosDe(fd, 'descuentoManual'),
+        descuentoManualCentavos: centavosDe(fd, 'descuentoManual', { vacioEsCero: true }),
         descuentoManualMotivo: texto(fd, 'descuentoMotivo').slice(0, 400),
         notas: texto(fd, 'notas').slice(0, 1000),
       }),
@@ -86,10 +76,11 @@ export async function accionRegistrarPago(_: EstadoAccion, fd: FormData): Promis
         adminId,
         pedidoId: uuidDe(fd, 'pedidoId'),
         fecha: texto(fd, 'fecha').slice(0, 20),
-        montoCentavos: centavosDe(fd, 'monto'),
+        montoCentavos: centavosDe(fd, 'monto', { vacioEsCero: true }),
         metodo: texto(fd, 'metodo') as MetodoPago, // el servicio valida contra METODOS_PAGO
         pagador,
         nota: texto(fd, 'nota').slice(0, 400),
+        exhibidorId: uuidOpcionalDe(fd, 'exhibidorId'),
       }),
     );
     revalidarPedido(folio);
@@ -133,7 +124,7 @@ export async function accionEditarPedido(_: EstadoAccion, fd: FormData): Promise
         version: versionDe(fd),
         vendedorId: uuidDe(fd, 'vendedorId'),
         fecha: texto(fd, 'fecha').slice(0, 20),
-        descuentoManualCentavos: centavosDe(fd, 'descuentoManual'),
+        descuentoManualCentavos: centavosDe(fd, 'descuentoManual', { vacioEsCero: true }),
         descuentoManualMotivo: texto(fd, 'descuentoMotivo').slice(0, 400),
         notas: texto(fd, 'notas').slice(0, 1000),
         agregar: partirCodigos(texto(fd, 'agregar')),

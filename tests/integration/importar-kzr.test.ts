@@ -48,7 +48,7 @@ async function contar() {
     db.execute(
       sql`SELECT (SELECT count(*) FROM pedido)::int AS pedidos, (SELECT count(*) FROM pedido_item)::int AS items,
         (SELECT count(*) FROM movimiento_pieza WHERE tipo = 'apartado')::int AS movs, (SELECT count(*) FROM origen_excel)::int AS origen,
-        (SELECT count(*) FROM cliente)::int AS clientes,
+        (SELECT count(*) FROM cliente WHERE NOT es_mostrador)::int AS clientes,
         (SELECT count(*) FROM pieza WHERE estado = 'apartada')::int AS apartadas,
         (SELECT count(*) FROM admin WHERE lower(email) = ${EMAIL_ADMIN_MIGRACION})::int AS admin_mig`,
     ),
@@ -396,5 +396,19 @@ describe('importar notas KZR', () => {
     expect((await owner((db) => db.execute(sql`SELECT cliente_id FROM pedido`))).rows).toEqual([
       { cliente_id: dora },
     ]);
+  });
+
+  it('nunca liga una clienta del Excel a la de mostrador: con el mismo nombre crea otra', async () => {
+    const filas = [fila(2, { cliente: 'Venta de mostrador' })];
+    const plan = await simular(urlOwner(), filas, HOY);
+    expect(plan.clientesPorCrear).toHaveLength(1);
+    const r = await aplicar(filas, plan.hash);
+    expect(r.insertados).toMatchObject({ clientes: 1, pedidos: 1 });
+    const ped = (
+      await owner((db) =>
+        db.execute(sql`SELECT c.es_mostrador FROM pedido p JOIN cliente c ON c.id = p.cliente_id`),
+      )
+    ).rows;
+    expect(ped).toEqual([{ es_mostrador: false }]);
   });
 });

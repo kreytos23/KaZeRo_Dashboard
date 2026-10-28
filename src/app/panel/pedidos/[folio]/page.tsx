@@ -16,6 +16,7 @@ import { Saldo } from '@/features/ui/Saldo';
 import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
+import { exhibidorCobradorDelPedido } from '@/server/exhibidores/lecturas-dinero';
 import { obtenerPedidoPorFolio } from '@/server/pedidos/lecturas';
 import { saldoFavorDeCliente } from '@/server/saldo-favor/servicio';
 import { ETIQUETA_METODO_REGISTRADO, fechaCorta } from '../etiquetas';
@@ -45,14 +46,15 @@ export default async function FichaPedido({
   const resultado = await conDbLectura(async (db) => {
     const p = await obtenerPedidoPorFolio(db, folio);
     if (!p) return null;
-    const [historial, saldoFavor] = await Promise.all([
+    const [historial, saldoFavor, exhibidor] = await Promise.all([
       historialDeCambios(db, 'pedido', p.id),
       saldoFavorDeCliente(db, p.clienteId),
+      p.estado === 'abierto' ? exhibidorCobradorDelPedido(db, p.id, p.vendedorId) : null,
     ]);
-    return { p, historial, saldoFavor };
+    return { p, historial, saldoFavor, exhibidor };
   });
   if (!resultado) notFound();
-  const { p, historial, saldoFavor } = resultado;
+  const { p, historial, saldoFavor, exhibidor } = resultado;
   const vigentes = p.items.filter((i) => i.vigente);
   // Una línea devuelta (Plan 3.1) deja de ser vigente pero sigue en el subtotal: no es una pieza «quitada».
   const devueltas = p.items.filter((i) => !i.vigente && i.devolucionId);
@@ -81,6 +83,7 @@ export default async function FichaPedido({
     hoy: hoyMX(),
     saldoFavor,
     saldoFavorTexto: mxn(saldoFavor),
+    exhibidor,
   };
   return (
     <section className="flex flex-col gap-6">

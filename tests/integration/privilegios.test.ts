@@ -70,7 +70,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
           SELECT table_name || '.' || column_name AS p FROM information_schema.column_privileges
           WHERE grantee = 'kazero_app' AND table_schema = 'public' AND privilege_type = 'UPDATE'
             AND table_name IN ('auditoria', 'auditoria_campo', 'movimiento_pieza', 'pieza', 'pedido', 'pedido_item', 'aplicacion_pago',
-              'corte_comision', 'comision_linea', 'pago_comision')`),
+              'corte_comision', 'comision_linea', 'pago_comision', 'cliente', 'entrega_exhibidor')`),
       ]),
     );
     const orden = (f: { rows: { p: string }[] }) => f.rows.map((x) => x.p).sort();
@@ -134,8 +134,22 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       'vendedor_custodia_id', // Plan 3.1: entregar/regresar a vendedora
       'version',
     ];
+    // Plan 4a: cliente se edita salvo id, created_at y es_mostrador (la clienta de mostrador la fija la BD).
+    const clienteCols = [
+      'nombre',
+      'referencia',
+      'telefono',
+      'cumpleanos',
+      'red_social',
+      'usuario_red',
+      'vendedor_habitual_id',
+      'notas',
+      'version',
+      'updated_at',
+    ];
     expect(orden(updates)).toEqual(
       [
+        ...clienteCols.map((c) => `cliente.${c}`),
         ...piezaCols.map((c) => `pieza.${c}`),
         ...pedidoCols.map((c) => `pedido.${c}`),
         ...['vigente', 'quitado_at', 'updated_at'].map((c) => `pedido_item.${c}`),
@@ -161,11 +175,12 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       ...t('auditoria', 'SELECT'), // Plan 2.1: la escribe solo kz_auditar (SECURITY DEFINER)
       ...t('auditoria_campo', 'SELECT'),
       ...t('categoria', 'INSERT', 'SELECT', 'UPDATE'),
-      ...t('cliente', 'INSERT', 'SELECT', 'UPDATE'),
+      ...t('cliente', 'INSERT', 'SELECT'), // Plan 4a: UPDATE por columna (nunca es_mostrador)
       ...t('codigo_recuperacion', 'INSERT', 'SELECT'),
       ...t('comision_linea', 'INSERT', 'SELECT'), // Plan 5a: cortes, líneas y pagos no se borran
       ...t('corte_comision', 'INSERT', 'SELECT'),
       ...t('devolucion', 'INSERT', 'SELECT'), // Plan 3.1: no se edita ni se borra
+      ...t('entrega_exhibidor', 'INSERT', 'SELECT'), // Plan 4a: entregas y ajustes no se editan ni se borran
       ...t('exhibidor', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('idempotencia', 'DELETE', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('material', 'INSERT', 'SELECT', 'UPDATE'),

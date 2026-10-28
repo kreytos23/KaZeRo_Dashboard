@@ -92,7 +92,8 @@ export async function cargarSnapshot(tx: Ejecutor, filas: readonly FilaExcel[]):
   const nombres = [...new Set(filas.flatMap((f) => (f.cliente ? [nombreCliente(f.cliente)] : [])))];
   const claves = [...folios.map(claveNota), ...nombres.map(claveCliente)];
   const [clientes, vendedores, piezas, pedidosPorFolio, origenes, tarjetas, max, seq] = await Promise.all([
-    tx.select({ id: cliente.id, nombre: cliente.nombre }).from(cliente),
+    // La clienta de mostrador nunca se empareja con una clienta del Excel.
+    tx.select({ id: cliente.id, nombre: cliente.nombre }).from(cliente).where(eq(cliente.esMostrador, false)),
     tx.select({ id: vendedor.id, nombre: vendedor.nombre, activo: vendedor.activo }).from(vendedor),
     codigos.length
       ? tx

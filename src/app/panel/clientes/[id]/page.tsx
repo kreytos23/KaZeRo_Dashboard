@@ -61,9 +61,12 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
               <h2 id="pedidos-cliente" className="text-lg font-semibold">
                 Pedidos
               </h2>
-              <Link href={`/panel/pedidos/nuevo?cliente=${c.id}`} className="boton-primario">
-                Nuevo pedido
-              </Link>
+              {/* Las ventas de mostrador nacen en el exhibidor (E-1). */}
+              {!c.esMostrador && (
+                <Link href={`/panel/pedidos/nuevo?cliente=${c.id}`} className="boton-primario">
+                  Nuevo pedido
+                </Link>
+              )}
             </div>
             <p>
               <Link
@@ -142,9 +145,12 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
           </section>
         </div>
         <div className="ficha-col">
-          <div className="order-2">
-            <TarjetaLealtad tarjeta={resumen.tarjeta} />
-          </div>
+          {/* Las notas de «Venta de mostrador» no cuentan en tarjeta: su ficha no la muestra. */}
+          {!c.esMostrador && (
+            <div className="order-2">
+              <TarjetaLealtad tarjeta={resumen.tarjeta} />
+            </div>
+          )}
           <div className="order-4 flex max-w-2xl flex-col gap-3">
             <FormAccion accion={accionEditarCliente} textoBoton="Guardar cambios">
               {/* key por versión en los campos (no en el formulario): refresca los defaultValue sin perder el estado de la acción. */}

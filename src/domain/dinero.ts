@@ -9,17 +9,23 @@ export function pesosACentavos(texto: string): number | null {
   return Number(entero) * 100 + Number(decimales.padEnd(2, '0'));
 }
 
+/** Montos de negocio: nunca negativos (las validaciones de piezas, pagos y pedidos se apoyan en este RangeError). */
 export function centavosANumeric(c: number): string {
   if (!Number.isSafeInteger(c) || c < 0) throw new RangeError('Monto en centavos inválido.');
   return `${Math.trunc(c / 100)}.${String(c % 100).padStart(2, '0')}`;
 }
 
+/** Solo para movimientos que llevan signo (ajustes del exhibidor). */
+export function centavosANumericConSigno(c: number): string {
+  return c < 0 ? `-${centavosANumeric(-c)}` : centavosANumeric(c);
+}
+
 export function numericACentavos(n: string): number {
-  const m = /^(\d+)(?:\.(\d{1,2}))?$/.exec(n);
+  const m = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(n);
   if (!m) throw new RangeError('Valor numeric inválido.');
-  const c = Number(m[1]) * 100 + Number((m[2] ?? '').padEnd(2, '0'));
+  const c = Number(m[2]) * 100 + Number((m[3] ?? '').padEnd(2, '0'));
   if (!Number.isSafeInteger(c)) throw new RangeError('Valor numeric fuera de rango.');
-  return c;
+  return m[1] && c ? -c : c;
 }
 
 const FORMATO = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });

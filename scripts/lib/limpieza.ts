@@ -21,6 +21,7 @@ export const TABLAS_NEGOCIO = [
   'pedido_item',
   'movimiento_pieza',
   'pedido',
+  'entrega_exhibidor',
   'pieza',
   'exhibidor',
   'cliente',
@@ -30,6 +31,14 @@ export const TABLAS_NEGOCIO = [
   'proveedor',
   'idempotencia',
 ] as const;
+
+/**
+ * Plan 4a: la clienta «Venta de mostrador» la crea la migración 0023; quien vacía `cliente` la vuelve a sembrar
+ * con esta misma sentencia (idempotente).
+ */
+export const SQL_SEMBRAR_MOSTRADOR = `INSERT INTO cliente (nombre, es_mostrador, notas)
+  SELECT 'Venta de mostrador', true, 'Clienta genérica para ventas de exhibidor sin clienta conocida.'
+  WHERE NOT EXISTS (SELECT 1 FROM cliente WHERE es_mostrador)`;
 
 export interface ArgsLimpieza {
   confirmoProduccion: boolean;
@@ -87,7 +96,7 @@ export interface ResultadoLimpieza {
 }
 
 /**
- * Una transacción: bloquea, cuenta, vacía y reinicia los contadores. TRUNCATE ... RESTART IDENTITY solo toca las
+ * Una transacción: bloquea, cuenta, vacía, reinicia los contadores y resiembra la clienta de mostrador. TRUNCATE ... RESTART IDENTITY solo toca las
  * secuencias de las tablas de la lista (sin CASCADE); después se reinician explícitamente las que pertenecen a esas
  * tablas, por si alguna no estuviera ligada como identidad. Las de admin/sesion/acceso_log/codigo_recuperacion no se tocan.
  */
@@ -112,6 +121,7 @@ export async function limpiarDatosPrueba(urlOwner: string): Promise<ResultadoLim
       );
       const secuencias = (seqs.rows as { nombre: string }[]).map((x) => x.nombre);
       for (const nombre of secuencias) await tx.execute(sql.raw(`ALTER SEQUENCE public."${nombre}" RESTART`));
+      await tx.execute(sql.raw(SQL_SEMBRAR_MOSTRADOR));
       return { borradas: r.rows[0] as Record<string, number>, secuencias };
     }),
   );

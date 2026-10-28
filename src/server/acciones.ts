@@ -1,6 +1,7 @@
 import 'server-only';
 import { unstable_rethrow } from 'next/navigation';
 import { pgCode } from '@/db/errors';
+import { pesosACentavos } from '@/domain/dinero';
 import { MAX_BYTES_SUBIDA } from '@/domain/imagenes';
 import type { EstadoAccion } from '@/features/ui/estado';
 import { ErrorNegocio } from './errores';
@@ -25,6 +26,27 @@ export async function ejecutarAccion(fn: () => Promise<string | void>): Promise<
 export function texto(fd: FormData, campo: string): string {
   const v = fd.get(campo);
   return typeof v === 'string' ? v : '';
+}
+
+/**
+ * Monto en pesos de un campo del formulario, en centavos. Vacío cuenta como 0 solo con `vacioEsCero`;
+ * `etiqueta` antepone el nombre del campo al mensaje (formularios con varios montos).
+ */
+export function centavosDe(
+  fd: FormData,
+  campo: string,
+  o: { vacioEsCero?: boolean; etiqueta?: string } = {},
+): number {
+  const t = texto(fd, campo).trim();
+  if (!t && o.vacioEsCero) return 0;
+  const c = pesosACentavos(t);
+  if (c === null)
+    throw new ErrorNegocio(
+      'monto_invalido',
+      `${o.etiqueta ? `${o.etiqueta}: escribe` : 'Escribe'} un monto válido, por ejemplo 149 o 149.50.`,
+      campo,
+    );
+  return c;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

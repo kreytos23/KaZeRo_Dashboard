@@ -22,10 +22,12 @@ import {
 } from '@/domain/pedidos';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
+import { MSG_FECHA_FUTURA } from '@/server/exhibidores/mensajes';
 import { conIdempotencia } from '@/server/idempotencia';
 import { exigirCustodiaDe } from '@/server/piezas/custodia';
 import {
   apartarPiezas,
+  bloquearCliente,
   bloquearPedido,
   bloquearPiezasDelPedido,
   bloquearPiezasParaApartar,
@@ -75,7 +77,7 @@ export function validarFecha(t: string | undefined, campo = 'fecha'): string {
   if (!t?.trim()) return hoyMX();
   const f = parsearFechaISO(t);
   if (!f) throw new ErrorNegocio('fecha_invalida', 'La fecha no es válida.', campo);
-  if (f > hoyMX()) throw new ErrorNegocio('fecha_invalida', 'La fecha no puede ser futura.', campo);
+  if (f > hoyMX()) throw new ErrorNegocio('fecha_invalida', MSG_FECHA_FUTURA, campo);
   return f;
 }
 
@@ -101,7 +103,7 @@ export function validarNotas(notas: string | undefined): string {
   return n;
 }
 
-function validarPedido(d: DatosPedido) {
+function validarPedido(d: Omit<DatosPedido, 'key'>) {
   const descuento = validarDescuentoManual(d.descuentoManualCentavos, d.descuentoManualMotivo);
   // Una fecha omitida se resuelve dentro de la transacción: el payload de idempotencia guarda lo que se pidió.
   if (d.fecha?.trim()) validarFecha(d.fecha);
@@ -135,102 +137,114 @@ export async function crearPedido(db: Ejecutor, d: DatosPedido): Promise<PedidoC
       conIdempotencia(
         tx,
         { key: d.key, adminId: d.adminId, operacion: 'crearPedido', payload: v },
-        async (): Promise<PedidoCreado> => {
-          // Contexto de auditoría (Plan 2.1) antes de cualquier escritura: si el pedido se liquida al crearse,
-          // kz_auditar registra el cambio de estado.
-          await fijarContextoAuditoria(tx, { adminId: d.adminId, motivo: null });
-          const fecha = validarFecha(v.fecha ?? undefined);
-          // 1) Cliente: serializa la asignación de posición (R-23).
+        async () => {
+          // «Venta de mostrador» solo nace de una venta del exhibidor (Plan 4a, registrarVentaExhibidor).
           const [c] = await tx
-            .select({ id: cliente.id })
+            .select({ esMostrador: cliente.esMostrador })
             .from(cliente)
-            .where(eq(cliente.id, v.clienteId))
-            .for('no key update');
-          if (!c) throw new ErrorNegocio('no_encontrado', 'El cliente no existe.', 'clienteId');
-          await exigirVendedorActivo(tx, v.vendedorId);
-          // 2) Exhibidores → piezas (R-04, R-05): todo o nada.
-          const { piezas, faltantes } = await bloquearPiezasParaApartar(tx, v.codigos);
-          await exigirDisponibles(tx, {
-            codigos: v.codigos,
-            piezas,
-            faltantes,
-            prefijo: 'No se creó el pedido.',
-          });
-          // P2 (reunión 2026-10-23): la pieza en poder de una vendedora solo se vende en su nota.
-          await exigirCustodiaDe(tx, piezas, v.vendedorId);
-          // 3) Tarjeta (R-23, R-24, R-26, R-28). El bloqueo del cliente (paso 1) serializa la asignación.
-          let posicion: Posicion | null = null;
-          let pctBps = 0;
-          if (v.cuentaTarjeta) {
-            const ocupadas = await tx
-              .select({ ciclo: pedido.cicloTarjeta, posicion: pedido.posicionTarjeta })
-              .from(pedido)
-              .where(
-                and(
-                  eq(pedido.clienteId, v.clienteId),
-                  eq(pedido.cuentaTarjeta, true),
-                  ne(pedido.estado, 'cancelado'),
-                ),
-              );
-            posicion = siguientePosicion(ocupadas.map((o) => ({ ciclo: o.ciclo!, posicion: o.posicion! })));
-            pctBps = descuentoLealtad({ cuentaTarjeta: true, posicion: posicion.posicion }).pctBps;
-          }
-          // 4) Totales (R-11, R-12, D-6, D-7).
-          const t = calcularTotales(
-            piezas.map((p) => numericACentavos(p.precio)),
-            pctBps,
-            v.descuentoManual,
-          );
-          if (t.manualExcede)
+            .where(eq(cliente.id, v.clienteId));
+          if (c?.esMostrador)
             throw new ErrorNegocio(
-              'descuento_excede',
-              `El descuento manual supera el total después de lealtad (${formatoMXN(t.subtotal - t.descuentoLealtad)}).`,
-              'descuentoManual',
+              'mostrador_fuera_de_exhibidor',
+              'Las ventas de mostrador se registran desde el exhibidor.',
+              'cliente',
             );
-          const total = centavosANumeric(t.total);
-          const [p] = await tx
-            .insert(pedido)
-            .values({
-              clienteId: v.clienteId,
-              vendedorId: v.vendedorId,
-              fecha,
-              cuentaTarjeta: v.cuentaTarjeta,
-              cicloTarjeta: posicion?.ciclo ?? null,
-              posicionTarjeta: posicion?.posicion ?? null,
-              descuentoLealtadPct: pctBpsANumeric(pctBps),
-              sinLealtadMotivo: null,
-              descuentoManualMonto: centavosANumeric(v.descuentoManual),
-              descuentoManualMotivo: v.descuentoMotivo,
-              total,
-              notas: v.notas,
-              adminId: d.adminId, // D-21: quién lo creó
-            })
-            .returning({ id: pedido.id, folio: pedido.folio });
-          const pedidoId = p!.id;
-          await tx.insert(pedidoItem).values(
-            piezas.map((pz, i) => ({
-              pedidoId,
-              piezaId: pz.id,
-              precioLista: pz.precio,
-              precioFinal: centavosANumeric(t.preciosFinales[i]!),
-            })),
-          );
-          await apartarPiezas(tx, { pedidoId, piezas, adminId: d.adminId });
-          // D-8 / R-15: con total 0 el saldo ya es 0 y se liquida en esta misma transacción.
-          const estado = (await liquidarSiSaldoCero(tx, pedidoId, d.adminId)) as 'abierto' | 'liquidado';
-          return {
-            id: pedidoId,
-            folio: p!.folio,
-            estado,
-            total,
-            // Objeto plano: el resultado se guarda en idempotencia.resultado (JSON) y un reintento recibe lo mismo.
-            posicion: posicion ? { ciclo: posicion.ciclo, posicion: posicion.posicion } : null,
-            pctBps,
-          };
+          return crearPedidoEnTx(tx, d);
         },
       ),
     ),
   );
+}
+
+/** Cuerpo de `crearPedido` dentro de una transacción ya abierta (y, en su caso, bajo idempotencia del llamador). */
+export async function crearPedidoEnTx(tx: Ejecutor, d: Omit<DatosPedido, 'key'>): Promise<PedidoCreado> {
+  const v = validarPedido(d);
+  // Contexto de auditoría (Plan 2.1) antes de cualquier escritura: si el pedido se liquida al crearse,
+  // kz_auditar registra el cambio de estado.
+  await fijarContextoAuditoria(tx, { adminId: d.adminId, motivo: null });
+  const fecha = validarFecha(v.fecha ?? undefined);
+  // 1) Cliente: serializa la asignación de posición (R-23).
+  await bloquearCliente(tx, v.clienteId);
+  await exigirVendedorActivo(tx, v.vendedorId);
+  // 2) Exhibidores → piezas (R-04, R-05): todo o nada.
+  const { piezas, faltantes } = await bloquearPiezasParaApartar(tx, v.codigos);
+  await exigirDisponibles(tx, {
+    codigos: v.codigos,
+    piezas,
+    faltantes,
+    prefijo: 'No se creó el pedido.',
+  });
+  // P2 (reunión 2026-10-23): la pieza en poder de una vendedora solo se vende en su nota.
+  await exigirCustodiaDe(tx, piezas, v.vendedorId);
+  // 3) Tarjeta (R-23, R-24, R-26, R-28). El bloqueo del cliente (paso 1) serializa la asignación.
+  let posicion: Posicion | null = null;
+  let pctBps = 0;
+  if (v.cuentaTarjeta) {
+    const ocupadas = await tx
+      .select({ ciclo: pedido.cicloTarjeta, posicion: pedido.posicionTarjeta })
+      .from(pedido)
+      .where(
+        and(
+          eq(pedido.clienteId, v.clienteId),
+          eq(pedido.cuentaTarjeta, true),
+          ne(pedido.estado, 'cancelado'),
+        ),
+      );
+    posicion = siguientePosicion(ocupadas.map((o) => ({ ciclo: o.ciclo!, posicion: o.posicion! })));
+    pctBps = descuentoLealtad({ cuentaTarjeta: true, posicion: posicion.posicion }).pctBps;
+  }
+  // 4) Totales (R-11, R-12, D-6, D-7).
+  const t = calcularTotales(
+    piezas.map((p) => numericACentavos(p.precio)),
+    pctBps,
+    v.descuentoManual,
+  );
+  if (t.manualExcede)
+    throw new ErrorNegocio(
+      'descuento_excede',
+      `El descuento manual supera el total después de lealtad (${formatoMXN(t.subtotal - t.descuentoLealtad)}).`,
+      'descuentoManual',
+    );
+  const total = centavosANumeric(t.total);
+  const [p] = await tx
+    .insert(pedido)
+    .values({
+      clienteId: v.clienteId,
+      vendedorId: v.vendedorId,
+      fecha,
+      cuentaTarjeta: v.cuentaTarjeta,
+      cicloTarjeta: posicion?.ciclo ?? null,
+      posicionTarjeta: posicion?.posicion ?? null,
+      descuentoLealtadPct: pctBpsANumeric(pctBps),
+      sinLealtadMotivo: null,
+      descuentoManualMonto: centavosANumeric(v.descuentoManual),
+      descuentoManualMotivo: v.descuentoMotivo,
+      total,
+      notas: v.notas,
+      adminId: d.adminId, // D-21: quién lo creó
+    })
+    .returning({ id: pedido.id, folio: pedido.folio });
+  const pedidoId = p!.id;
+  await tx.insert(pedidoItem).values(
+    piezas.map((pz, i) => ({
+      pedidoId,
+      piezaId: pz.id,
+      precioLista: pz.precio,
+      precioFinal: centavosANumeric(t.preciosFinales[i]!),
+    })),
+  );
+  await apartarPiezas(tx, { pedidoId, piezas, adminId: d.adminId });
+  // D-8 / R-15: con total 0 el saldo ya es 0 y se liquida en esta misma transacción.
+  const estado = (await liquidarSiSaldoCero(tx, pedidoId, d.adminId)) as 'abierto' | 'liquidado';
+  return {
+    id: pedidoId,
+    folio: p!.folio,
+    estado,
+    total,
+    // Objeto plano: el resultado se guarda en idempotencia.resultado (JSON) y un reintento recibe lo mismo.
+    posicion: posicion ? { ciclo: posicion.ciclo, posicion: posicion.posicion } : null,
+    pctBps,
+  };
 }
 
 export interface PedidoCancelado {

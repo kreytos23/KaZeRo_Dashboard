@@ -155,6 +155,20 @@
       "when": 1793176900000,
       "tag": "0021_admin_nombre",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793178508934,
+      "tag": "0022_square_sleepwalker",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793178526742,
+      "tag": "0023_exhibidores_dinero_reglas",
+      "breakpoints": true
     }
   ]
 }

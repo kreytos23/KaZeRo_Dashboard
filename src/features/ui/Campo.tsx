@@ -115,6 +115,7 @@ export function AreaTexto({
   required,
   placeholder,
   maxLength,
+  onChange,
 }: {
   etiqueta: string;
   name: string;
@@ -123,6 +124,7 @@ export function AreaTexto({
   required?: boolean;
   placeholder?: string;
   maxLength?: number;
+  onChange?: (valor: string) => void;
 }) {
   const id = useId();
   const { error, aria } = useErrorDe(name, id);
@@ -139,6 +141,7 @@ export function AreaTexto({
         required={required}
         placeholder={placeholder}
         maxLength={maxLength}
+        onChange={onChange && ((e) => onChange(e.target.value))}
         className="campo py-2 font-mono"
         {...aria}
       />

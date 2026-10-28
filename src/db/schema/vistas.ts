@@ -47,6 +47,8 @@ export const vCliente = pgView('v_cliente', {
   vendedorHabitualNombre: text('vendedor_habitual_nombre'),
   notas: text('notas').notNull(),
   version: integer('version').notNull(),
+  // Plan 4a (0023), al final: la clienta especial «Venta de mostrador».
+  esMostrador: boolean('es_mostrador').notNull(),
 }).existing();
 
 export const vPieza = pgView('v_pieza', {
@@ -106,6 +108,11 @@ export const vExhibidor = pgView('v_exhibidor', {
   piezasActuales: integer('piezas_actuales').notNull(),
   // Plan 3 (0013): apartadas en un pedido que conservan este exhibidor.
   piezasApartadas: integer('piezas_apartadas').notNull(),
+  // Plan 4a (0023), al final: dinero del exhibidor (E-5).
+  cobrado: numeric('cobrado').notNull(),
+  entregado: numeric('entregado').notNull(),
+  ajustes: numeric('ajustes').notNull(),
+  porEntregar: numeric('por_entregar').notNull(),
 }).existing();
 
 // Creada en 0007_admins_grants.sql: solo columnas no sensibles de admin.
