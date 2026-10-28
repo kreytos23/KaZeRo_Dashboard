@@ -50,6 +50,12 @@ function validar(d: Omit<DatosPagoPedido, 'key'>) {
       'El saldo a favor es de la clienta: elige «cliente».',
       'pagador',
     );
+  if (d.exhibidorId && d.pagador !== 'cliente')
+    throw new ErrorNegocio(
+      'pagador_invalido',
+      'Un cobro del exhibidor lo paga la clienta: elige «cliente».',
+      'pagador',
+    );
   if (d.exhibidorId && d.metodo === 'saldo_favor')
     throw new ErrorNegocio(
       'metodo_invalido',

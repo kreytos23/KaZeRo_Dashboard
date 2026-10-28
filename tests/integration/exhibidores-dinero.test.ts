@@ -151,7 +151,7 @@ describe('venta del exhibidor', () => {
 
   it('rechaza un cobro mayor al total y no deja nada (ni nota ni pieza vendida)', async () => {
     const e = await falla(venta({ cobradoCentavos: PRECIO + 1 }));
-    expect(e).toMatchObject({ codigo: 'pago_excede' });
+    expect(e).toMatchObject({ codigo: 'pago_excede', campo: 'cobrado' });
     expect(await app((db) => db.select().from(pedido))).toHaveLength(0);
     expect((await app((db) => obtenerPiezaPorCodigo(db, 'EX01')))!.estado).toBe('en_exhibidor');
   });
@@ -195,6 +195,50 @@ describe('venta del exhibidor', () => {
     const ver = (await app((db) => obtenerExhibidor(db, vacio)))!.version;
     await app((db) => cerrarExhibidor(db, { exhibidorId: vacio, version: ver }));
     expect(await falla(venta({ exhibidorId: vacio }))).toMatchObject({ codigo: 'exhibidor_cerrado' });
+  });
+
+  it('un abono cobrado por un exhibidor cerrado se rechaza', async () => {
+    const v = await venta({ cobradoCentavos: 0 });
+    const vacio = await app((db) =>
+      crearExhibidor(db, { vendedorId: perlaId, nombre: 'Cerrado', fechaEnvio: '2026-10-03' }),
+    );
+    const ver = (await app((db) => obtenerExhibidor(db, vacio)))!.version;
+    await app((db) => cerrarExhibidor(db, { exhibidorId: vacio, version: ver }));
+    const e = await falla(
+      app((db) =>
+        registrarPagoDePedido(db, {
+          key: randomUUID(),
+          adminId,
+          pedidoId: v.pedidoId,
+          montoCentavos: 1000,
+          metodo: 'efectivo',
+          pagador: 'cliente',
+          exhibidorId: vacio,
+        }),
+      ),
+    );
+    expect(e).toMatchObject({ codigo: 'exhibidor_cerrado', campo: 'exhibidorId' });
+  });
+
+  it('un abono con exhibidor y pagador vendedor se rechaza; la venta valida el método aun sin cobro', async () => {
+    const v = await venta({ cobradoCentavos: 0 });
+    const e = await falla(
+      app((db) =>
+        registrarPagoDePedido(db, {
+          key: randomUUID(),
+          adminId,
+          pedidoId: v.pedidoId,
+          montoCentavos: 1000,
+          metodo: 'efectivo',
+          pagador: 'vendedor',
+          exhibidorId,
+        }),
+      ),
+    );
+    expect(e).toMatchObject({ codigo: 'pagador_invalido', campo: 'pagador' });
+    expect(await falla(venta({ cobradoCentavos: 0, metodo: 'saldo_favor' }))).toMatchObject({
+      codigo: 'metodo_invalido',
+    });
   });
 
   it('un abono con exhibidor y método saldo_favor se rechaza con mensaje claro', async () => {
@@ -256,6 +300,10 @@ describe('entregas, ajustes y cierre', () => {
     expect(await falla(ajuste(-9501))).toMatchObject({ codigo: 'excede' });
     expect(await falla(ajuste(0))).toMatchObject({ campo: 'monto' });
     expect(await falla(ajuste(100, '  '))).toMatchObject({ campo: 'motivo' });
+    expect(await falla(ajuste(100, null as unknown as string))).toMatchObject({
+      codigo: 'motivo_invalido',
+      campo: 'motivo',
+    });
   });
 
   it('entrega o ajuste sobre un exhibidor cerrado se rechaza con mensaje claro', async () => {

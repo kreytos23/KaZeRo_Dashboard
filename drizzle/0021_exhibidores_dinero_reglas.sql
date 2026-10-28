@@ -130,15 +130,15 @@ REVOKE ALL ON FUNCTION public.kz_exhibidor_cierre_sin_dinero() FROM PUBLIC;
 CREATE TRIGGER exhibidor_cierre_sin_dinero BEFORE UPDATE OF estado ON exhibidor
   FOR EACH ROW EXECUTE FUNCTION kz_exhibidor_cierre_sin_dinero();
 --> statement-breakpoint
--- 7. v_exhibidor de 0013 con el dinero al final. CREATE OR REPLACE conserva su GRANT SELECT a kazero_app.
+-- 7. v_exhibidor de 0013 con el dinero al final, siempre con 2 decimales ('0.00', no '0'). CREATE OR REPLACE conserva su GRANT SELECT a kazero_app.
 CREATE OR REPLACE VIEW v_exhibidor WITH (security_invoker = true) AS
   SELECT e.id, e.nombre, e.fecha_envio, e.estado, e.version, e.vendedor_id, v.nombre AS vendedor_nombre,
          coalesce(pz.n, 0)::int AS piezas_actuales,
          coalesce(pz.apartadas, 0)::int AS piezas_apartadas,
-         coalesce(co.cobrado, 0)::numeric AS cobrado,
-         coalesce(en.entregado, 0)::numeric AS entregado,
-         coalesce(en.ajustes, 0)::numeric AS ajustes,
-         public.kz_por_entregar(e.id) AS por_entregar
+         coalesce(co.cobrado, 0)::numeric(12,2) AS cobrado,
+         coalesce(en.entregado, 0)::numeric(12,2) AS entregado,
+         coalesce(en.ajustes, 0)::numeric(12,2) AS ajustes,
+         public.kz_por_entregar(e.id)::numeric(12,2) AS por_entregar
   FROM exhibidor e
   JOIN vendedor v ON v.id = e.vendedor_id
   LEFT JOIN (

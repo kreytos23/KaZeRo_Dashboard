@@ -170,7 +170,7 @@ describe('entrega_exhibidor (0020/0021)', () => {
   it('sin cobros, v_exhibidor da ceros', async () => {
     const r = await q(sql`SELECT cobrado::text, entregado::text, ajustes::text, por_entregar::text
       FROM v_exhibidor WHERE id = ${b.exhibidorId}`);
-    expect(r.rows[0]).toEqual({ cobrado: '0', entregado: '0', ajustes: '0', por_entregar: '0' });
+    expect(r.rows[0]).toEqual({ cobrado: '0.00', entregado: '0.00', ajustes: '0.00', por_entregar: '0.00' });
   });
 
   it('CHECK: ajuste con motivo; entrega > 0 con método; ajuste ≠ 0 sin método; fecha no futura', async () => {

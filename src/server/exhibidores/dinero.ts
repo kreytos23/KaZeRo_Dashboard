@@ -6,7 +6,7 @@ import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
 import { conIdempotencia } from '@/server/idempotencia';
 import { validarCodigos, bloquearPiezasPorCodigo } from '@/server/pedidos/comun';
 import { crearPedidoEnTx, validarFecha } from '@/server/pedidos/servicio';
-import { registrarPagoEnTx, type MetodoPago } from '@/server/pagos/servicio';
+import { METODOS_PAGO, registrarPagoEnTx, type MetodoPago } from '@/server/pagos/servicio';
 
 // Plan 4a: la venta del exhibidor en un paso (E-1, E-3, E-4) y el dinero que el exhibidor entrega (E-5, E-6).
 // Orden de bloqueo (D-10): cliente → exhibidor → piezas → … (pedido y pago son nuevos en la venta).
@@ -65,6 +65,9 @@ export async function registrarVentaExhibidor(
     const codigos = validarCodigos(d.codigos);
     if (!Number.isSafeInteger(d.cobradoCentavos) || d.cobradoCentavos < 0)
       throw new ErrorNegocio('monto_invalido', 'Lo cobrado no puede ser negativo.', 'cobrado');
+    // El método se valida aunque no haya cobro: el cobro del exhibidor nunca es con saldo a favor.
+    if (!METODOS_PAGO.includes(d.metodo) || d.metodo === 'saldo_favor')
+      throw new ErrorNegocio('metodo_invalido', 'Elige un método de cobro válido.', 'metodo');
     const fecha = d.fecha?.trim() || undefined;
     if (fecha) validarFecha(fecha);
     const payload = {
@@ -112,7 +115,13 @@ export async function registrarVentaExhibidor(
             descuentoManualCentavos: 0,
           });
           let estado = p.estado;
-          if (d.cobradoCentavos > 0)
+          if (d.cobradoCentavos > 0) {
+            if (d.cobradoCentavos > numericACentavos(p.total))
+              throw new ErrorNegocio(
+                'pago_excede',
+                `Lo cobrado (${formatoMXN(d.cobradoCentavos)}) supera el total de la nota (${formatoMXN(numericACentavos(p.total))}).`,
+                'cobrado',
+              );
             estado = (
               await registrarPagoEnTx(tx, {
                 adminId: d.adminId,
@@ -124,6 +133,7 @@ export async function registrarVentaExhibidor(
                 exhibidorId: d.exhibidorId,
               })
             ).estado;
+          }
           return { pedidoId: p.id, folio: p.folio, estado };
         },
       ),
@@ -242,7 +252,7 @@ export async function registrarAjusteExhibidor(
   return conErroresDeNegocio(async () => {
     if (!Number.isSafeInteger(d.montoCentavos) || d.montoCentavos === 0)
       throw new ErrorNegocio('monto_invalido', 'El ajuste no puede ser cero.', 'monto');
-    const motivo = d.motivo.trim();
+    const motivo = (d.motivo ?? '').trim();
     if (!motivo || motivo.length > 200)
       throw new ErrorNegocio(
         'motivo_invalido',
