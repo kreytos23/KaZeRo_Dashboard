@@ -6,6 +6,7 @@ import { formatoFolio } from '@/domain/pedidos';
 import { textoCierre, textoReporteDeudores } from '@/domain/recordatorios';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { FECHA_LARGA } from '@/features/ui/formato';
+import { PorEntregar } from '@/features/exhibidores/PorEntregar';
 import { Saldo } from '@/features/ui/Saldo';
 import { calcularMesAbierto, comisionesPendientes, reporteComisiones } from '@/server/comisiones/lecturas';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -141,11 +142,7 @@ export default async function Panel() {
                   </Link>{' '}
                   <span className="text-tinta-suave">{x.vendedorNombre}</span>
                 </span>
-                <Saldo
-                  estado="abierto"
-                  saldo={centavosANumeric(x.porEntregarCentavos)}
-                  rotulo="Por entregar"
-                />
+                <PorEntregar centavos={x.porEntregarCentavos} />
               </li>
             ))}
           </ul>

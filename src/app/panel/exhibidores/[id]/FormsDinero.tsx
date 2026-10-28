@@ -5,6 +5,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { normalizarCodigo } from '@/domain/codigos';
 import { centavosANumeric, formatoMXN, numericACentavos, pesosACentavos } from '@/domain/dinero';
 import { calcularTotales } from '@/domain/pedidos';
+import { MAX_CARACTERES_CODIGOS } from '@/features/exhibidores/codigos';
 import { CampoKey } from '@/features/pedidos/CampoKey';
 import { urlConsultaPrevia } from '@/features/pedidos/consulta-previa';
 import { SelectorCliente, type ClienteElegido } from '@/features/pedidos/SelectorCliente';
@@ -26,12 +27,22 @@ function codigosDeTexto(t: string): string[] {
   return [
     ...new Set(
       t
-        .slice(0, 20_000)
+        .slice(0, MAX_CARACTERES_CODIGOS)
         .split(/[\s,]+/)
         .filter(Boolean)
         .map(normalizarCodigo),
     ),
   ];
+}
+
+/** Método y fecha, comunes a la venta, el abono y la entrega. */
+function CamposMetodoFecha({ hoy }: { hoy: string }) {
+  return (
+    <>
+      <Selector etiqueta="Método" name="metodo" required defaultValue="efectivo" opciones={METODOS} />
+      <Campo etiqueta="Fecha" name="fecha" type="date" defaultValue={hoy} max={hoy} required />
+    </>
+  );
 }
 
 /**
@@ -88,7 +99,7 @@ function CamposVenta({ hoy }: { hoy: string }) {
         name="codigos"
         rows={3}
         required
-        maxLength={20000}
+        maxLength={MAX_CARACTERES_CODIGOS}
         onChange={setCodigos}
         placeholder="Uno por línea o separados por espacio o coma"
       />
@@ -119,8 +130,7 @@ function CamposVenta({ hoy }: { hoy: string }) {
           La nota queda con saldo de {formatoMXN(total - cobradoCentavos)}.
         </p>
       )}
-      <Selector etiqueta="Método" name="metodo" required defaultValue="efectivo" opciones={METODOS} />
-      <Campo etiqueta="Fecha" name="fecha" type="date" defaultValue={hoy} max={hoy} required />
+      <CamposMetodoFecha hoy={hoy} />
     </>
   );
 }
@@ -177,8 +187,7 @@ function CamposAbono({ notas, hoy }: { notas: NotaAbierta[]; hoy: string }) {
         required
         autoComplete="off"
       />
-      <Selector etiqueta="Método" name="metodo" required defaultValue="efectivo" opciones={METODOS} />
-      <Campo etiqueta="Fecha" name="fecha" type="date" defaultValue={hoy} max={hoy} required />
+      <CamposMetodoFecha hoy={hoy} />
     </>
   );
 }
@@ -249,8 +258,7 @@ export function FormEntrega({
             required
             autoComplete="off"
           />
-          <Selector etiqueta="Método" name="metodo" required defaultValue="efectivo" opciones={METODOS} />
-          <Campo etiqueta="Fecha" name="fecha" type="date" defaultValue={hoy} max={hoy} required />
+          <CamposMetodoFecha hoy={hoy} />
           <Campo etiqueta="Nota" name="nota" maxLength={200} autoComplete="off" />
         </Fragment>
       </FormAccion>

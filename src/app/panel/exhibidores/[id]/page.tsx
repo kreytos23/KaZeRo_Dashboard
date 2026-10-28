@@ -9,6 +9,8 @@ import { formatoFolio } from '@/domain/pedidos';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
 import { AreaTexto, Campo, CampoCasilla } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
+import { MAX_CARACTERES_CODIGOS } from '@/features/exhibidores/codigos';
+import { PorEntregar } from '@/features/exhibidores/PorEntregar';
 import { montoMovimiento, rotuloMovimiento } from '@/features/exhibidores/dinero-ui';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoExhibidor, vistaEstadoPedido } from '@/features/ui/estado-visual';
@@ -18,11 +20,7 @@ import { Saldo } from '@/features/ui/Saldo';
 import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
-import {
-  historialDineroExhibidor,
-  resumenDineroExhibidor,
-  ventasDeExhibidor,
-} from '@/server/exhibidores/lecturas-dinero';
+import { historialDineroExhibidor, ventasDeExhibidor } from '@/server/exhibidores/lecturas-dinero';
 import { obtenerExhibidor } from '@/server/exhibidores/servicio';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
 import { fechaCorta } from '../../pedidos/etiquetas';
@@ -35,24 +33,23 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [e, vendedor, cambios, dinero, historial, ventas] = await conDbLectura(async (db) => {
-    const ex = await obtenerExhibidor(db, id.data);
-    if (!ex) return [null, null, [], null, [], []] as const;
-    const [v, c, d, h, vt] = await Promise.all([
-      obtenerVendedor(db, ex.vendedorId),
-      historialDeCambios(db, 'exhibidor', ex.id),
-      resumenDineroExhibidor(db, ex.id),
-      historialDineroExhibidor(db, ex.id),
-      ventasDeExhibidor(db, ex.id),
+  const [e, cambios, historial, ventas, vendedor] = await conDbLectura(async (db) => {
+    const [ex, ...resto] = await Promise.all([
+      obtenerExhibidor(db, id.data),
+      historialDeCambios(db, 'exhibidor', id.data),
+      historialDineroExhibidor(db, id.data),
+      ventasDeExhibidor(db, id.data),
     ]);
-    return [ex, v, c, d, h, vt] as const;
+    // Solo esto depende del exhibidor leído.
+    return [ex, ...resto, ex ? await obtenerVendedor(db, ex.vendedorId) : null] as const;
   });
-  if (!e || !dinero) notFound();
+  if (!e) notFound();
   const abierto = e.estado === 'abierto';
   const hoy = hoyMX();
-  const porEntregar = dinero.porEntregarCentavos;
+  const porEntregar = numericACentavos(e.porEntregar);
+  const ajustes = numericACentavos(e.ajustes);
   // Cambia con cada venta, cobro, entrega o ajuste: los formularios se reinician y estrenan llave de idempotencia.
-  const marca = `${porEntregar}-${historial.length}-${ventas.length}-${e.piezasActuales}`;
+  const marca = `${e.porEntregar}-${e.cobrado}-${e.entregado}-${e.ajustes}-${ventas.length}-${e.piezasActuales}`;
   const notasAbiertas = ventas
     .filter((v) => v.estado === 'abierto' && v.saldoCentavos > 0)
     .map((v) => ({
@@ -131,27 +128,19 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
               Por entregar
             </h2>
             {porEntregar > 0 ? (
-              <Saldo
-                estado="abierto"
-                saldo={centavosANumeric(porEntregar)}
-                tamano="destacado"
-                rotulo="Por entregar"
-                className="self-start"
-              />
+              <PorEntregar centavos={porEntregar} tamano="destacado" className="self-start" />
             ) : (
               <p className="text-destacado font-bold tabular-nums text-tinta-suave">{formatoMXN(0)}</p>
             )}
             <dl className="grid max-w-sm grid-cols-[1fr_auto] gap-x-6 gap-y-1 text-dato">
               <dt>Cobrado</dt>
-              <dd className="text-right tabular-nums">{formatoMXN(dinero.cobradoCentavos)}</dd>
+              <dd className="text-right tabular-nums">{formatoMXN(numericACentavos(e.cobrado))}</dd>
               <dt>Entregado</dt>
-              <dd className="text-right tabular-nums">{formatoMXN(dinero.entregadoCentavos)}</dd>
-              {dinero.ajustesCentavos !== 0 && (
+              <dd className="text-right tabular-nums">{formatoMXN(numericACentavos(e.entregado))}</dd>
+              {ajustes !== 0 && (
                 <>
                   <dt>Ajustes</dt>
-                  <dd className="text-right tabular-nums">
-                    {montoMovimiento('ajuste', dinero.ajustesCentavos)}
-                  </dd>
+                  <dd className="text-right tabular-nums">{montoMovimiento('ajuste', ajustes)}</dd>
                 </>
               )}
             </dl>
@@ -303,13 +292,19 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
                   name="codigos"
                   rows={4}
                   required
-                  maxLength={20000}
+                  maxLength={MAX_CARACTERES_CODIGOS}
                   placeholder="Uno por línea o separados por espacio o coma"
                 />
               </FormAccion>
               <FormAccion accion={accionRegresar} textoBoton="Regresar piezas" limpiarAlGuardar>
                 <input type="hidden" name="exhibidorId" value={e.id} />
-                <AreaTexto etiqueta="Códigos a regresar" name="codigos" rows={4} required maxLength={20000} />
+                <AreaTexto
+                  etiqueta="Códigos a regresar"
+                  name="codigos"
+                  rows={4}
+                  required
+                  maxLength={MAX_CARACTERES_CODIGOS}
+                />
               </FormAccion>
             </div>
           )}

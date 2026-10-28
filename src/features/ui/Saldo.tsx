@@ -11,15 +11,12 @@ export function Saldo({
   saldo,
   tamano = 'monto',
   className = '',
-  rotulo,
 }: {
   estado: EstadoPedido;
   /** numeric de la base (p. ej. '347.00'). */
   saldo: string;
   tamano?: 'monto' | 'destacado';
   className?: string;
-  /** Lectura para lector de pantalla cuando el monto no es «Por cobrar» (p. ej. «Por entregar»). */
-  rotulo?: string;
 }) {
   const centavos = numericACentavos(saldo);
   const v = vistaSaldo(estado, centavos);
@@ -34,7 +31,7 @@ export function Saldo({
       <span aria-hidden="true" className="font-black">
         !
       </span>
-      <span className="sr-only">{rotulo ?? v.rotulo}: </span>
+      <span className="sr-only">{v.rotulo}: </span>
       {monto}
     </span>
   );
