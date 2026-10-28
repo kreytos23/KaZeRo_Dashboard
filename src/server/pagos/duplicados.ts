@@ -39,7 +39,7 @@ export async function posiblesDuplicados(
       folio: sql<
         number | null
       >`(SELECT p.folio::int FROM aplicacion_pago a JOIN pedido p ON p.id = a.pedido_id
-        WHERE a.pago_id = ${pago.id} ORDER BY a.created_at, p.folio LIMIT 1)`,
+        WHERE a.pago_id = "pago"."id" ORDER BY a.created_at, p.folio LIMIT 1)`,
     })
     .from(pago)
     .where(
