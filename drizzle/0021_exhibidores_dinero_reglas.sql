@@ -96,7 +96,8 @@ BEGIN
       USING ERRCODE = 'check_violation', CONSTRAINT = 'entrega_exhibidor_cerrado';
   END IF;
   IF public.kz_por_entregar(NEW.exhibidor_id)
-     + CASE WHEN NEW.tipo::text = 'entrega' THEN -NEW.monto ELSE NEW.monto END < 0 THEN
+     -- Paréntesis obligatorios: el IF de plpgsql corta la condición en el primer THEN, aunque sea de un CASE.
+     + (CASE WHEN NEW.tipo::text = 'entrega' THEN -NEW.monto ELSE NEW.monto END) < 0 THEN
     RAISE EXCEPTION 'La entrega supera el dinero por entregar del exhibidor'
       USING ERRCODE = 'check_violation', CONSTRAINT = 'entrega_exhibidor_excede';
   END IF;
