@@ -16,7 +16,7 @@ import {
   pagadoCentavos,
   type PedidoBloqueado,
 } from '@/server/pedidos/comun';
-import { saldoFavorDeCliente, saldoFavorDeVendedor } from '@/server/saldo-favor/servicio';
+import { saldoFavorDe } from '@/server/saldo-favor/servicio';
 import {
   MSG_APLICACION_PREVIA,
   MSG_EXHIBIDOR_NEGATIVO,
@@ -132,9 +132,10 @@ export async function anularPago(db: Ejecutor, d: DatosAnulacion): Promise<{ rea
             const sobrante = sob ? numericACentavos(sob.monto) : 0;
             if (sobrante) {
               const saldo = numericACentavos(
-                pg!.clienteId
-                  ? await saldoFavorDeCliente(tx, pg!.clienteId)
-                  : await saldoFavorDeVendedor(tx, pg!.vendedorId!),
+                await saldoFavorDe(
+                  tx,
+                  pg!.clienteId ? { clienteId: pg!.clienteId } : { vendedorId: pg!.vendedorId! },
+                ),
               );
               if (saldo < sobrante)
                 throw new ErrorNegocio(

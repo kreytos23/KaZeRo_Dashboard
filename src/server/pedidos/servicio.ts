@@ -27,7 +27,7 @@ import { MSG_FECHA_FUTURA } from '@/server/exhibidores/mensajes';
 import { MSG_CANCELAR_CON_DEVOLUCIONES } from '@/server/pagos/mensajes';
 import { conIdempotencia } from '@/server/idempotencia';
 import { exigirCustodiaDe } from '@/server/piezas/custodia';
-import { retirarEnTx, validarNotaRetiro } from '@/server/saldo-favor/servicio';
+import { retirarEnTx, validarNotaRetiro, type Titular } from '@/server/saldo-favor/servicio';
 import {
   apartarPiezas,
   bloquearCliente,
@@ -361,19 +361,20 @@ export async function cancelarPedido(
           }
           let reembolsado = 0;
           if (reembolso) {
-            const porTitular = new Map<
-              string,
-              { clienteId: string | null; vendedorId: string | null; c: number }
-            >();
+            // Un retiro por titular, en el orden en que aparece (ids uuid: no chocan entre clientas y vendedoras).
+            const porTitular = new Map<string, { titular: Titular; c: number }>();
             for (const a of aplicaciones) {
-              const k = a.clienteId ?? `v:${a.vendedorId}`;
-              const t = porTitular.get(k) ?? { clienteId: a.clienteId, vendedorId: a.vendedorId, c: 0 };
+              const k = a.clienteId ?? a.vendedorId!;
+              const t = porTitular.get(k) ?? {
+                titular: a.clienteId ? { clienteId: a.clienteId } : { vendedorId: a.vendedorId! },
+                c: 0,
+              };
               t.c += numericACentavos(a.monto);
               porTitular.set(k, t);
             }
             for (const t of porTitular.values())
               await retirarEnTx(tx, {
-                ...t,
+                titular: t.titular,
                 montoCentavos: t.c,
                 nota: reembolso,
                 pedidoId: p.id,

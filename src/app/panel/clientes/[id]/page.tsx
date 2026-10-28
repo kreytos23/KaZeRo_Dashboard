@@ -23,7 +23,7 @@ import { resumenCliente } from '@/server/pedidos/lecturas';
 import { movimientosSaldoFavor } from '@/server/saldo-favor/servicio';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { fechaCorta } from '../../pedidos/etiquetas';
-import { accionEditarCliente, accionRetirarSaldoFavor } from '../acciones';
+import { accionEditarCliente } from '../acciones';
 
 const mxn = (n: string) => formatoMXN(numericACentavos(n));
 
@@ -111,14 +111,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
               Saldo a favor
             </h2>
             <p className="tarjeta p-4 text-3xl font-semibold tabular-nums">{mxn(resumen.saldoFavor)}</p>
-            <FormRetiroSaldo
-              accion={accionRetirarSaldoFavor}
-              campoTitular="clienteId"
-              titularId={c.id}
-              saldo={resumen.saldoFavor}
-              saldoTexto={mxn(resumen.saldoFavor)}
-              hayInicial={numericACentavos(resumen.saldoFavor) > 0}
-            />
+            <FormRetiroSaldo titular={{ clienteId: c.id }} saldo={resumen.saldoFavor} />
             <HistorialSaldo libro={libro} />
           </section>
         </div>

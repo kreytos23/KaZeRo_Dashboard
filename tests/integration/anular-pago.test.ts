@@ -15,7 +15,7 @@ import { registrarPagoDePedido, type DatosPagoPedido } from '@/server/pagos/serv
 import { devolverPiezaDefectuosa } from '@/server/pedidos/devolucion';
 import { cancelarPedido, crearPedido } from '@/server/pedidos/servicio';
 import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
-import { saldoFavorDeCliente, saldoFavorDeVendedor } from '@/server/saldo-favor/servicio';
+import { saldoFavorDe } from '@/server/saldo-favor/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { reiniciarConAdmin, urlApp } from './utilidades';
 
@@ -92,8 +92,8 @@ const cancelar = async (pedidoId: string, reembolso?: { nota: string }) => {
 const ficha = (id: string) =>
   app(async (db) => (await db.select().from(vPedido).where(eq(vPedido.id, id)))[0]!);
 const estadoPieza = async (codigo: string) => (await app((db) => obtenerPiezaPorCodigo(db, codigo)))!.estado;
-const saldoClienta = (id = clienteId) => app((db) => saldoFavorDeCliente(db, id));
-const saldoVendedora = () => app((db) => saldoFavorDeVendedor(db, vendedorId));
+const saldoClienta = (id = clienteId) => app((db) => saldoFavorDe(db, { clienteId: id }));
+const saldoVendedora = () => app((db) => saldoFavorDe(db, { vendedorId }));
 const filas = async <T = Record<string, unknown>>(q: ReturnType<typeof sql>) =>
   (await app((db) => db.execute(q))).rows as T[];
 const falla = (p: Promise<unknown>) =>

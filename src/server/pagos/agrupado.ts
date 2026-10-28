@@ -14,7 +14,7 @@ import {
   pagadoCentavos,
 } from '@/server/pedidos/comun';
 import { validarFecha } from '@/server/pedidos/servicio';
-import { noAlcanza, saldoFavorDeVendedor } from '@/server/saldo-favor/servicio';
+import { noAlcanza, saldoFavorDe } from '@/server/saldo-favor/servicio';
 import { validarComprobante, type Comprobante } from './comprobante';
 import { exigirSinDuplicados } from './duplicados';
 import { METODOS_PAGO, payloadIdempotente, validarReferencia, type MetodoPago } from './servicio';
@@ -140,7 +140,7 @@ export async function registrarPagoAgrupado(
           }
           // D-20: el saldo de la vendedora se lee con sus pedidos ya bloqueados; el libro lo vuelve a exigir.
           if (v.metodo === 'saldo_favor') {
-            const disponible = numericACentavos(await saldoFavorDeVendedor(tx, v.vendedorId));
+            const disponible = numericACentavos(await saldoFavorDe(tx, { vendedorId: v.vendedorId }));
             if (v.monto > disponible) throw noAlcanza(disponible, v.monto);
           }
           // P-4: el saldo a favor es dinero interno (sin banco): no hay duplicado que avisar.

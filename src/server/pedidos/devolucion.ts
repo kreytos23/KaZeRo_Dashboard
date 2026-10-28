@@ -9,7 +9,7 @@ import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
 import { conIdempotencia } from '@/server/idempotencia';
 import { bloquearPedido, bloquearPiezasPorId } from '@/server/pedidos/comun';
 import { validarFecha } from '@/server/pedidos/servicio';
-import { saldoFavorDeCliente } from '@/server/saldo-favor/servicio';
+import { saldoFavorDe } from '@/server/saldo-favor/servicio';
 
 export interface DatosDevolucion {
   key: string;
@@ -122,7 +122,7 @@ export async function devolverPiezaDefectuosa(db: Ejecutor, d: DatosDevolucion):
           });
           return {
             montoAFavor: centavosANumeric(monto),
-            saldoFavor: await saldoFavorDeCliente(tx, p.clienteId),
+            saldoFavor: await saldoFavorDe(tx, { clienteId: p.clienteId }),
           };
         },
       ),

@@ -9,7 +9,7 @@ import { registrarPagoDePedido } from '@/server/pagos/servicio';
 import { devolverPiezaDefectuosa } from '@/server/pedidos/devolucion';
 import { cancelarPedido, crearPedido } from '@/server/pedidos/servicio';
 import { altaPieza, cambiarEstado, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
-import { movimientosSaldoFavor, saldoFavorDeCliente } from '@/server/saldo-favor/servicio';
+import { movimientosSaldoFavor, saldoFavorDe } from '@/server/saldo-favor/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
@@ -82,7 +82,7 @@ const devolver = (
   );
 const ficha = (id: string) =>
   app(async (db) => (await db.select().from(vPedido).where(eq(vPedido.id, id)))[0]!);
-const saldo = () => app((db) => saldoFavorDeCliente(db, ctx.clienteId));
+const saldo = () => app((db) => saldoFavorDe(db, { clienteId: ctx.clienteId }));
 
 beforeEach(async () => {
   adminId = await reiniciarConAdmin();

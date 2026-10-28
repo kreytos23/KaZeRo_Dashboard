@@ -21,11 +21,11 @@ import { ErrorNegocio } from '@/server/errores';
 import { listarExhibidores } from '@/server/exhibidores/servicio';
 import { piezasDeVendedora } from '@/server/piezas/custodia';
 import { pedidosAbiertosDeVendedora } from '@/server/pagos/lecturas';
-import { saldoFavorDeVendedor } from '@/server/pedidos/lecturas';
+import { saldoFavorDe } from '@/server/saldo-favor/servicio';
 import { movimientosSaldoFavor } from '@/server/saldo-favor/servicio';
 import { resumenDeVendedora } from '@/server/vendedores/resumen';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
-import { accionEditarVendedor, accionRetirarSaldoVendedora } from '../acciones';
+import { accionEditarVendedor } from '../acciones';
 import { TIPOS } from '../tipos';
 import { ETIQUETA_ESTADO } from '../../inventario/etiquetas';
 import { FormsCustodia } from './FormsCustodia';
@@ -43,7 +43,7 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
       obtenerVendedor(db, id.data),
       listarExhibidores(db, { vendedorId: id.data }),
       historialDeCambios(db, 'vendedor', id.data),
-      saldoFavorDeVendedor(db, id.data),
+      saldoFavorDe(db, { vendedorId: id.data }),
       piezasDeVendedora(db, id.data),
       resumenDeVendedora(db, id.data),
       pedidosAbiertosDeVendedora(db, id.data),
@@ -172,14 +172,7 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
               {formatoMXN(numericACentavos(saldoFavor))}
             </p>
             <FormUsarSaldo saldo={saldoFavor} pedidos={abiertos} hoy={hoyMX()} />
-            <FormRetiroSaldo
-              accion={accionRetirarSaldoVendedora}
-              campoTitular="vendedorId"
-              titularId={v.id}
-              saldo={saldoFavor}
-              saldoTexto={formatoMXN(numericACentavos(saldoFavor))}
-              hayInicial={numericACentavos(saldoFavor) > 0}
-            />
+            <FormRetiroSaldo titular={{ vendedorId: v.id }} saldo={saldoFavor} />
             <HistorialSaldo libro={libro} />
           </section>
           <div className="order-5 flex max-w-2xl flex-col gap-3">

@@ -3,13 +3,12 @@
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { conDb } from '@/db/client';
-import { pesosACentavos, porcentajeANumeric } from '@/domain/dinero';
+import { porcentajeANumeric } from '@/domain/dinero';
 import { partirCodigos } from '@/features/exhibidores/codigos';
 import type { EstadoAccion } from '@/features/ui/estado';
 import { ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { ErrorNegocio } from '@/server/errores';
-import { retirarSaldoFavorDeVendedor } from '@/server/saldo-favor/servicio';
 import { entregarAVendedora, regresarAKazero } from '@/server/piezas/custodia';
 import { actualizarVendedor, crearVendedor } from '@/server/vendedores/servicio';
 
@@ -92,30 +91,5 @@ export async function accionRegresarAKazero(_: EstadoAccion, fd: FormData): Prom
     );
     revalidarCustodia(vendedorId);
     return piezas(regresadas, 'regresada');
-  });
-}
-
-/** P-2: la vendedora retira en efectivo su saldo a favor (sobrante de sus pagos). */
-export async function accionRetirarSaldoVendedora(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
-  const { adminId } = await requerirSesion();
-  return ejecutarAccion(async () => {
-    const vendedorId = uuidDe(fd, 'vendedorId');
-    // Dinero que sale de la caja: la casilla `required` no basta, un POST directo la saltaría.
-    if (texto(fd, 'confirmo') !== 'on')
-      throw new ErrorNegocio('confirmacion', 'Marca la casilla para confirmar que entregaste el efectivo.');
-    const monto = pesosACentavos(texto(fd, 'monto').trim());
-    if (monto === null || monto <= 0)
-      throw new ErrorNegocio('monto_invalido', 'Escribe un monto válido, por ejemplo 149 o 149.50.', 'monto');
-    await conDb((db) =>
-      retirarSaldoFavorDeVendedor(db, {
-        key: uuidDe(fd, 'key'),
-        adminId,
-        vendedorId,
-        montoCentavos: monto,
-        nota: texto(fd, 'nota').slice(0, 400),
-      }),
-    );
-    revalidatePath(`/panel/vendedores/${vendedorId}`);
-    return 'Retiro registrado.';
   });
 }

@@ -15,11 +15,7 @@ import { crearPedido } from '@/server/pedidos/servicio';
 import { procesarImagen } from '@/server/imagenes/procesar';
 import { cambiarImagenPieza, clavesDeImagenReferenciadas } from '@/server/piezas/imagen';
 import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
-import {
-  movimientosSaldoFavor,
-  retirarSaldoFavorDeVendedor,
-  saldoFavorDeVendedor,
-} from '@/server/saldo-favor/servicio';
+import { movimientosSaldoFavor, retirarSaldoFavor, saldoFavorDe } from '@/server/saldo-favor/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { crearAlmacenMemoria } from '../apoyo/almacen-memoria';
 import { jpegDePrueba } from '../apoyo/imagenes';
@@ -86,7 +82,7 @@ const ficha = (id: string) =>
   app(async (db) => (await db.select().from(vPedido).where(eq(vPedido.id, id)))[0]!);
 const cuenta = async (tabla: 'pago' | 'aplicacion_pago' | 'saldo_favor_mov') =>
   (await app((db) => db.execute(sql.raw(`SELECT count(*)::int AS n FROM ${tabla}`)))).rows[0]!['n'];
-const saldoVendedora = () => app((db) => saldoFavorDeVendedor(db, ctx.vendedorId));
+const saldoVendedora = () => app((db) => saldoFavorDe(db, { vendedorId: ctx.vendedorId }));
 
 beforeEach(async () => {
   adminId = await reiniciarConAdmin();
@@ -208,10 +204,10 @@ describe('P-2: sobrante y saldo a favor de la vendedora', () => {
     const key = randomUUID();
     const retirar = (montoCentavos: number, k: string = randomUUID()) =>
       app((db) =>
-        retirarSaldoFavorDeVendedor(db, {
+        retirarSaldoFavor(db, {
           key: k,
           adminId,
-          vendedorId: ctx.vendedorId,
+          titular: { vendedorId: ctx.vendedorId },
           montoCentavos,
           nota: 'Entregado en efectivo',
         }),

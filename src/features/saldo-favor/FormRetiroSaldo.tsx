@@ -1,38 +1,37 @@
 'use client';
 
 import { Fragment } from 'react';
+import { accionRetirarSaldo } from '@/app/panel/acciones';
 import { CampoKey } from '@/features/pedidos/CampoKey';
 import { AreaTexto, Campo, CampoCasilla } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
-import type { EstadoAccion } from '@/features/ui/estado';
+import { formatoMXN, numericACentavos } from '@/domain/dinero';
+import type { Titular } from '@/server/saldo-favor/servicio';
 
 interface Props {
-  /** Server Action del retiro: la de la clienta o la de la vendedora (misma forma de formulario). */
-  accion: (prev: EstadoAccion, fd: FormData) => Promise<EstadoAccion>;
-  /** Nombre del campo oculto con el titular: `clienteId` o `vendedorId`. */
-  campoTitular: 'clienteId' | 'vendedorId';
-  titularId: string;
+  /** La clienta o la vendedora dueña del saldo (va en un campo oculto con su nombre). */
+  titular: Titular;
   /** numeric del saldo actual (prellena el monto). */
   saldo: string;
-  saldoTexto: string;
-  hayInicial: boolean;
 }
 
 /**
  * Devolver en efectivo el saldo a favor (de una clienta o de una vendedora). El FormAccion sigue montado cuando el saldo llega a cero (solo cambian sus
  * hijos): así el aviso «Retiro registrado.» no desaparece con el formulario.
  */
-export function FormRetiroSaldo({ accion, campoTitular, titularId, saldo, saldoTexto, hayInicial }: Props) {
-  const hay = hayInicial;
+export function FormRetiroSaldo({ titular, saldo }: Props) {
+  const centavos = numericACentavos(saldo);
+  const hay = centavos > 0;
+  const [campo, id] = Object.entries(titular)[0]!;
   return (
-    <FormAccion accion={accion} textoBoton="Devolver en efectivo" sinControles={!hay}>
+    <FormAccion accion={accionRetirarSaldo} textoBoton="Devolver en efectivo" sinControles={!hay}>
       {hay && (
         // La llave cambia con el saldo: refresca el monto prellenado y regenera la llave de idempotencia.
         <Fragment key={saldo}>
-          <input type="hidden" name={campoTitular} value={titularId} />
+          <input type="hidden" name={campo} value={id} />
           <CampoKey />
           <p className="text-meta text-tinta-suave">
-            Disponible para devolver: {saldoTexto}. Puedes devolver solo una parte.
+            Disponible para devolver: {formatoMXN(centavos)}. Puedes devolver solo una parte.
           </p>
           <Campo
             etiqueta="Monto a devolver"

@@ -18,7 +18,7 @@ import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { exhibidorCobradorDelPedido } from '@/server/exhibidores/lecturas-dinero';
 import { obtenerPedidoPorFolio } from '@/server/pedidos/lecturas';
-import { saldoFavorDeCliente } from '@/server/saldo-favor/servicio';
+import { saldoFavorDe } from '@/server/saldo-favor/servicio';
 import { ETIQUETA_METODO_REGISTRADO, fechaCorta } from '../etiquetas';
 import { FormDevolver } from './FormDevolver';
 import { FormCancelarPedido, FormRegistrarPago } from './FormsPedido';
@@ -48,7 +48,7 @@ export default async function FichaPedido({
     if (!p) return null;
     const [historial, saldoFavor, exhibidor] = await Promise.all([
       historialDeCambios(db, 'pedido', p.id),
-      saldoFavorDeCliente(db, p.clienteId),
+      saldoFavorDe(db, { clienteId: p.clienteId }),
       p.estado === 'abierto' ? exhibidorCobradorDelPedido(db, p.id, p.vendedorId) : null,
     ]);
     return { p, historial, saldoFavor, exhibidor };

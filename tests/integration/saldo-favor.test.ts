@@ -7,7 +7,7 @@ import { crearCliente } from '@/server/clientes/servicio';
 import { registrarPagoDePedido, type DatosPagoPedido } from '@/server/pagos/servicio';
 import { cancelarPedido, crearPedido } from '@/server/pedidos/servicio';
 import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
-import { movimientosSaldoFavor, retirarSaldoFavor, saldoFavorDeCliente } from '@/server/saldo-favor/servicio';
+import { movimientosSaldoFavor, retirarSaldoFavor, saldoFavorDe } from '@/server/saldo-favor/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { reiniciarConAdmin, urlApp } from './utilidades';
 
@@ -53,8 +53,10 @@ const conSaldo = (pedidoId: string, montoCentavos: number, extra: Partial<DatosP
 const cancelar = (pedidoId: string) =>
   app((db) => cancelarPedido(db, { key: randomUUID(), adminId, pedidoId, version: 1, motivo: 'Prueba' }));
 const retirar = (montoCentavos: number, nota = 'Entregado en efectivo', key: string = randomUUID()) =>
-  app((db) => retirarSaldoFavor(db, { key, adminId, clienteId: ctx.clienteId, montoCentavos, nota }));
-const saldo = () => app((db) => saldoFavorDeCliente(db, ctx.clienteId));
+  app((db) =>
+    retirarSaldoFavor(db, { key, adminId, titular: { clienteId: ctx.clienteId }, montoCentavos, nota }),
+  );
+const saldo = () => app((db) => saldoFavorDe(db, { clienteId: ctx.clienteId }));
 const ficha = (id: string) =>
   app(async (db) => (await db.select().from(vPedido).where(eq(vPedido.id, id)))[0]!);
 const libro = async () =>

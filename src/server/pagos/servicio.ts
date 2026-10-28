@@ -14,7 +14,7 @@ import {
   pagadoCentavos,
 } from '@/server/pedidos/comun';
 import { validarFecha } from '@/server/pedidos/servicio';
-import { noAlcanza, saldoFavorDeCliente, saldoFavorDeVendedor } from '@/server/saldo-favor/servicio';
+import { noAlcanza, saldoFavorDe } from '@/server/saldo-favor/servicio';
 import { validarComprobante, type Comprobante } from './comprobante';
 import { exigirSinDuplicados } from './duplicados';
 import { MSG_REFERENCIA_LARGA } from './mensajes';
@@ -164,9 +164,10 @@ export async function registrarPagoEnTx(
   // P-2: con pagador vendedora paga con el saldo de la vendedora (su sobrante); la BD ata el uso a su titular.
   if (v.metodo === 'saldo_favor') {
     const disponible = numericACentavos(
-      v.pagador === 'cliente'
-        ? await saldoFavorDeCliente(tx, p.clienteId)
-        : await saldoFavorDeVendedor(tx, p.vendedorId),
+      await saldoFavorDe(
+        tx,
+        v.pagador === 'cliente' ? { clienteId: p.clienteId } : { vendedorId: p.vendedorId },
+      ),
     );
     if (v.monto > disponible) throw noAlcanza(disponible, v.monto);
   }
