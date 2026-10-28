@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   elegirOpcion,
   irA,
+  marcaDe,
   montoSaldoFavor,
   RUTA_ESTADO,
   sembrarCliente,
@@ -15,7 +16,7 @@ import {
 // Ajustes de la reunión del 2026-10-23 (Plan 3.1): tarjeta de 10, ubicación con vendedora, devolución y saldo a favor.
 test.use({ storageState: RUTA_ESTADO });
 
-const marca = (proyecto: string) => (proyecto === 'movil' ? 'M' : 'E');
+// Marca de proyecto y reintento (`marcaDe`): el reintento de CI no repite nombres ni códigos del intento anterior.
 const estadoCon = (page: Page, texto: string) => page.getByRole('status').filter({ hasText: texto });
 const resumen = (page: Page) => page.getByRole('region', { name: 'Resumen del pedido' });
 
@@ -37,7 +38,7 @@ const folioDeLaFicha = async (page: Page): Promise<number> => {
 test('tarjeta de 10: el quinto pedido abierto recibe 10 % aunque otra nota tenga saldo, y la ficha muestra 5 de 10', async ({
   page,
 }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const vendedorId = await sembrarVendedor(`Casa T${m}`);
   const cliente = await sembrarCliente(`Tarjeta ${m}`);
   await sembrarCompras(cliente, vendedorId, 3, `T${m}L`);
@@ -60,7 +61,7 @@ test('tarjeta de 10: el quinto pedido abierto recibe 10 % aunque otra nota tenga
 test('pieza con vendedora: se entrega desde su ficha, aparece filtrada en el inventario y se vende en su nota', async ({
   page,
 }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const nombre = `Rosa ${m}`;
   const vendedoraId = await sembrarVendedora(nombre);
   await sembrarCliente(`Cliente V ${m}`);
@@ -97,7 +98,7 @@ test('pieza con vendedora: se entrega desde su ficha, aparece filtrada en el inv
 test('devolver una pieza de un pedido liquidado da saldo a favor, que se usa en otro pedido y se retira en efectivo', async ({
   page,
 }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const vendedorId = await sembrarVendedor(`Casa D${m}`);
   const nombre = `Devuelve ${m}`;
   const cliente = await sembrarCliente(nombre);

@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page } from '@playwright/test';
+import { expect, type Locator, type Page, type TestInfo } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { register } from 'node:module';
@@ -45,6 +45,15 @@ export async function abrirMenuSiMovil(page: Page) {
     if ((await boton.getAttribute('aria-expanded')) !== 'true') await boton.click();
     await expect(boton).toHaveAttribute('aria-expanded', 'true', { timeout: 500 });
   }).toPass();
+}
+
+/**
+ * Marca de proyecto y reintento para nombres y códigos sembrados: `E`/`M` y una `R` por reintento (solo letras, así
+ * sirve también como parte de un prefijo de código). El reintento de CI encuentra en la base lo que creó el intento
+ * anterior; con la misma marca chocaría con «Ya existe…».
+ */
+export function marcaDe(info: Pick<TestInfo, 'project' | 'retry'>): string {
+  return `${info.project.name === 'movil' ? 'M' : 'E'}${'R'.repeat(info.retry)}`;
 }
 
 /**
