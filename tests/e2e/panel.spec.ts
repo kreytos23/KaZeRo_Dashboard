@@ -5,6 +5,7 @@ import {
   datosAdminRegen,
   elegirOpcion,
   irA,
+  marcaDe,
   RUTA_ESTADO,
   RUTA_ESTADO_REGEN,
   textosDeOpciones,
@@ -13,7 +14,7 @@ import {
 test.use({ storageState: RUTA_ESTADO });
 
 // Los dos proyectos (escritorio y móvil) comparten la BD: cada uno usa sus propios nombres y códigos.
-const marca = (proyecto: string) => (proyecto === 'movil' ? 'M' : 'E');
+// Marca de proyecto y reintento (`marcaDe`): el reintento de CI no repite nombres ni códigos del intento anterior.
 
 const estadoCon = (page: Page, texto: string) => page.getByRole('status').filter({ hasText: texto });
 
@@ -23,12 +24,13 @@ async function abrirBuscadorConAtajo(page: Page) {
   await expect(async () => {
     await page.keyboard.press('/');
     await expect(buscador).toBeFocused({ timeout: 500 });
-  }).toPass();
+    // Acotado: sin límite, un atajo que nunca enfoca agotaría los 30 s de la prueba sin decir dónde.
+  }).toPass({ timeout: 10_000 });
   return buscador;
 }
 
 test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const prefijo = `Z${m}`;
   const codigo = `${prefijo}01`;
 
@@ -98,7 +100,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
 });
 
 test('alta individual, ficha de pieza con destinos válidos y estados', async ({ page }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const codigo = `Y${m}01`;
   await irA(page, '/panel/inventario/nueva');
   await page.getByLabel('Prefijo').fill(`Y${m}`);
@@ -119,7 +121,7 @@ test('alta individual, ficha de pieza con destinos válidos y estados', async ({
 });
 
 test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async ({ page }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const codigo = `W${m}01`;
   await irA(page, '/panel/inventario/nueva');
   await page.getByLabel('Prefijo').fill(`W${m}`);
@@ -192,7 +194,7 @@ test('editar pieza con motivo por dinero, regalo, deshacer e historiales', async
 });
 
 test('cliente con alta rápida se encuentra sin acentos', async ({ page }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   await irA(page, '/panel/clientes');
   await page.getByLabel('Nombre', { exact: true }).fill(`Rocío Santibañez ${m}`);
   await page.getByLabel('Referencia').fill('5to norte');
@@ -224,7 +226,7 @@ test('cliente con alta rápida se encuentra sin acentos', async ({ page }, info)
 });
 
 test('editar un exhibidor abierto y renombrar un catálogo, ambos con historial', async ({ page }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
 
   await irA(page, '/panel/vendedores');
   await page.getByLabel('Nombre').fill(`Edith ${m}`);
@@ -281,7 +283,7 @@ test('editar un exhibidor abierto y renombrar un catálogo, ambos con historial'
 });
 
 test('agregar administrador muestra el QR y los códigos hasta ocultarlos', async ({ page }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const correo = `nuevo-${m.toLowerCase()}@kazero.test`;
   await irA(page, '/panel/administradores');
   const form = page

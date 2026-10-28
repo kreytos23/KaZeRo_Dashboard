@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hoyMX, parsearFechaISO } from '@/domain/fechas';
+import { diasEntre, hoyMX, parsearFechaISO } from '@/domain/fechas';
 
 describe('fechas de negocio', () => {
   it('acepta fechas reales', () => {
@@ -13,5 +13,14 @@ describe('fechas de negocio', () => {
   it('hoy se calcula en hora de la Ciudad de México', () => {
     // 2026-10-09 03:00 UTC sigue siendo el 8 de octubre en CDMX (UTC-6).
     expect(hoyMX(new Date('2026-10-09T03:00:00Z'))).toBe('2026-10-08');
+  });
+});
+
+describe('diasEntre', () => {
+  it('cuenta días de calendario, con signo y a través de meses', () => {
+    expect(diasEntre('2026-10-12', '2026-10-26')).toBe(14);
+    expect(diasEntre('2026-10-26', '2026-10-12')).toBe(-14);
+    expect(diasEntre('2026-10-26', '2026-11-12')).toBe(17);
+    expect(diasEntre('2026-03-07', '2026-03-09')).toBe(2);
   });
 });

@@ -181,12 +181,12 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
                     height={40}
                     loading="lazy"
                     decoding="async"
-                    className="size-10 shrink-0 rounded border border-borde bg-white object-cover"
+                    className="size-10 shrink-0 rounded border border-borde bg-superficie object-cover"
                   />
                 ) : (
                   <span
                     aria-hidden="true"
-                    className="size-10 shrink-0 rounded border border-borde bg-white"
+                    className="size-10 shrink-0 rounded border border-borde bg-superficie"
                   />
                 )}
                 <span className="min-w-0 flex-1 text-dato">

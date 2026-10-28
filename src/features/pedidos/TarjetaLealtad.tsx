@@ -1,9 +1,17 @@
 import Link from 'next/link';
 import { formatoFolio, formatoPct } from '@/domain/pedidos';
-import type { Tarjeta } from '@/domain/lealtad';
-import { etiquetaCasilla } from './texto-lealtad';
+import type { Casilla, Tarjeta } from '@/domain/lealtad';
+import { Anillo, Collar, Flor } from './iconos-lealtad';
+import { etiquetaCasilla, pieTarjeta } from './texto-lealtad';
 
-const SIMBOLO = { ocupada: '●', libre: '○' } as const;
+function Icono({ k }: { k: Casilla }) {
+  const color =
+    k.pctBps > 0 ? 'text-secundario' : k.estado === 'ocupada' ? 'text-primario' : 'text-borde-campo';
+  const clase = `size-8 ${color}`;
+  if (k.pctBps === 1000) return <Anillo className={clase} />;
+  if (k.pctBps === 2000) return <Collar className={clase} />;
+  return <Flor llena={k.estado === 'ocupada'} className={clase} />;
+}
 
 /** Tarjeta de lealtad (R-25, D-4). Server Component sin JS: una sola fila de 10 lugares, la tarjeta actual. */
 export function TarjetaLealtad({ tarjeta }: { tarjeta: Tarjeta }) {
@@ -17,40 +25,40 @@ export function TarjetaLealtad({ tarjeta }: { tarjeta: Tarjeta }) {
           <li
             key={k.posicion}
             aria-label={etiquetaCasilla(k)}
-            className="relative flex min-h-20 flex-col items-center justify-center rounded-lg border border-borde bg-white px-1 py-1 text-center"
+            className={`relative flex min-h-24 flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-1 text-center ${
+              k.estado === 'libre' ? 'border-dashed bg-crema' : 'bg-superficie'
+            } ${
+              k.pctBps > 0
+                ? 'border-secundario'
+                : k.estado === 'libre'
+                  ? 'border-borde-campo'
+                  : 'border-borde'
+            }`}
           >
-            <span aria-hidden="true" className="text-xl leading-none text-primario">
-              {SIMBOLO[k.estado]}
-            </span>
+            {k.conSaldo && (
+              <span
+                aria-hidden="true"
+                className="absolute -top-2 right-1 whitespace-nowrap rounded border border-aviso-borde bg-aviso-fondo px-1 text-[0.6875rem] leading-tight text-aviso"
+              >
+                con saldo
+              </span>
+            )}
+            <Icono k={k} />
             <span aria-hidden="true" className="text-meta text-tinta-suave">
-              {k.posicion}
+              {k.pctBps > 0 ? `${k.posicion} · ${formatoPct(k.pctBps)}` : k.posicion}
             </span>
-            {k.folio !== null ? (
+            {k.folio !== null && (
               <Link
                 href={`/panel/pedidos/${k.folio}`}
                 className="enlace text-meta font-semibold after:absolute after:inset-0 after:content-['']"
               >
                 {formatoFolio(k.folio)}
               </Link>
-            ) : (
-              k.pctBps > 0 && (
-                <span aria-hidden="true" className="text-meta font-medium">
-                  {formatoPct(k.pctBps)}
-                </span>
-              )
-            )}
-            {k.conSaldo && (
-              <span
-                aria-hidden="true"
-                title="con saldo"
-                className="absolute right-1 top-1 size-2 rounded-full bg-aviso"
-              />
             )}
           </li>
         ))}
       </ol>
-      <p className="text-meta text-tinta-suave">{tarjeta.ocupadas} de 10</p>
-      <p className="text-meta text-tinta-suave">● ocupado · ○ libre · punto ámbar: con saldo</p>
+      <p className="text-meta text-tinta-suave">{pieTarjeta(tarjeta)}</p>
     </section>
   );
 }

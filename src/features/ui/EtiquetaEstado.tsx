@@ -11,7 +11,7 @@ const CLASE_TONO: Record<Tono, string> = {
   error: 'border-error bg-error-fondo text-error',
   primario: 'border-primario bg-rubor-suave text-primario-fuerte',
   secundario: 'border-secundario bg-secundario-suave text-secundario-fuerte',
-  neutro: 'border-borde-campo bg-white text-tinta-suave',
+  neutro: 'border-borde-campo bg-superficie text-tinta-suave',
 };
 
 /** Formas distintas por significado (palomita, círculo vacío, cruz, rombo, cuadro, marcador). */

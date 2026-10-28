@@ -1,4 +1,4 @@
-import type { Casilla } from '@/domain/lealtad';
+import type { Casilla, Tarjeta } from '@/domain/lealtad';
 import { formatoFolio, formatoPct, numericAPctBps } from '@/domain/pedidos';
 import type { TarjetaPrevia } from './tipos';
 
@@ -38,4 +38,13 @@ export function etiquetaCasilla(c: Casilla): string {
   if (c.conSaldo) detalle.push('con saldo');
   if (c.pctBps > 0) detalle.push(`${formatoPct(c.pctBps)} de descuento`);
   return detalle.length ? `${partes[0]}: ${detalle.join(', ')}` : partes[0]!;
+}
+
+/** Pie de la tarjeta: «3 de 10 · faltan 2 para el 10 %». El siguiente premio es el primer lugar con descuento aún por llenar. */
+export function pieTarjeta(t: Tarjeta): string {
+  const total = t.casillas.length;
+  const premio = t.casillas.find((c) => c.pctBps > 0 && c.posicion > t.ocupadas);
+  if (!premio) return `${t.ocupadas} de ${total} · tarjeta completa`;
+  const faltan = premio.posicion - t.ocupadas;
+  return `${t.ocupadas} de ${total} · ${faltan === 1 ? 'falta 1' : `faltan ${faltan}`} para el ${formatoPct(premio.pctBps)}`;
 }

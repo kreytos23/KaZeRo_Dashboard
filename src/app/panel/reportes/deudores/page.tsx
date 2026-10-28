@@ -5,6 +5,7 @@ import { fechaCorta } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
+import { FECHA_LARGA } from '@/features/ui/formato';
 import { Saldo } from '@/features/ui/Saldo';
 import { uuidOpcional } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -13,8 +14,6 @@ import { listarVendedores } from '@/server/vendedores/servicio';
 import { FiltroVendedora } from './FiltroVendedora';
 
 export const metadata = { title: 'Deudores' };
-
-const FECHA_LARGA = new Intl.DateTimeFormat('es-MX', { dateStyle: 'full', timeZone: 'UTC' });
 
 export default async function Deudores({
   searchParams,

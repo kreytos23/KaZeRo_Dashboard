@@ -78,7 +78,7 @@ export function SelectorFoto({
           alt="Vista previa de la foto"
           width={160}
           height={160}
-          className="aspect-square w-40 rounded-lg border border-borde bg-white object-contain"
+          className="aspect-square w-40 rounded-lg border border-borde bg-superficie object-contain"
         />
       )}
       {mensaje && (

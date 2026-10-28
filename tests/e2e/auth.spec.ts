@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import { expect, test } from '@playwright/test';
-import { abrirMenuSiMovil, codigoTotpNoUsado, datosAdmin } from './utilidades';
+import { abrirMenuSiMovil, codigoTotpNoUsado, datosAdmin, esperarInicioPanel } from './utilidades';
 
 test('una ruta privada sin sesión manda a iniciar sesión', { tag: '@escritorio' }, async ({ page }) => {
   await page.goto('/panel');
@@ -59,7 +59,7 @@ test('login con contraseña y TOTP llega al panel; cerrar sesión lo protege de 
 
   await page.getByLabel('Código de 6 dígitos').fill(await codigoTotpNoUsado(d.secretoTotp));
   await page.getByRole('button', { name: 'Entrar' }).click();
-  await expect(page.getByRole('heading', { name: 'Panel Kazero' })).toBeVisible();
+  await esperarInicioPanel(page);
   const trasLogin = await nombresCookies();
   expect(trasLogin).toContain('__Host-kz_sesion');
   expect(trasLogin).not.toContain('__Host-kz_pre');

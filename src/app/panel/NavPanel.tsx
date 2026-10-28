@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { estaActiva } from './rutas';
 
 const NAVEGACION = [
   ['/panel/pedidos', 'Pedidos'],
@@ -23,7 +24,7 @@ export function NavPanel({ vertical = false, alElegir }: { vertical?: boolean; a
   return (
     <nav aria-label="Secciones" className={vertical ? 'flex flex-col gap-1' : '-mx-1 flex flex-wrap gap-1'}>
       {NAVEGACION.map(([href, texto]) => {
-        const activa = ruta === href || ruta.startsWith(`${href}/`);
+        const activa = estaActiva(ruta, href);
         return (
           <Link
             key={href}

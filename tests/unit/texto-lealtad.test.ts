@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { etiquetaCasilla, textoLealtadGuardada, textoLealtadPrevia } from '@/features/pedidos/texto-lealtad';
+import { armarTarjeta } from '@/domain/lealtad';
+import {
+  etiquetaCasilla,
+  pieTarjeta,
+  textoLealtadGuardada,
+  textoLealtadPrevia,
+} from '@/features/pedidos/texto-lealtad';
 import type { TarjetaPrevia } from '@/features/pedidos/tipos';
 
 const tarjeta = (extra: Partial<TarjetaPrevia> = {}): TarjetaPrevia => ({
@@ -73,4 +79,25 @@ describe('etiquetaCasilla (nombre accesible de ●◐○)', () => {
       'Lugar 10: libre, 20 % de descuento',
     ],
   ] as const)('%j', (c, texto) => expect(etiquetaCasilla(c)).toBe(texto));
+});
+
+describe('pieTarjeta', () => {
+  const con = (n: number) =>
+    armarTarjeta(
+      Array.from({ length: n }, (_, i) => ({
+        ciclo: 1,
+        posicion: i + 1,
+        estado: 'abierto' as const,
+        folio: i + 1,
+        conSaldo: false,
+      })),
+    );
+  it.each([
+    [0, '0 de 10 · faltan 5 para el 10 %'],
+    [3, '3 de 10 · faltan 2 para el 10 %'],
+    [5, '5 de 10 · faltan 5 para el 20 %'],
+    [6, '6 de 10 · faltan 4 para el 20 %'],
+    [9, '9 de 10 · falta 1 para el 20 %'],
+    [10, '10 de 10 · tarjeta completa'],
+  ])('%i ocupadas', (n, texto) => expect(pieTarjeta(con(n))).toBe(texto));
 });

@@ -107,7 +107,7 @@ export function BuscadorGlobal() {
         aria-activedescendant={idActivo}
         aria-autocomplete="list"
         autoComplete="off"
-        placeholder="Buscar pieza, cliente o vendedor ( / )"
+        placeholder="Buscar"
         value={q}
         onFocus={() => {
           asegurarCarga();
@@ -124,6 +124,14 @@ export function BuscadorGlobal() {
         onBlur={() => setAbierto(false)}
         className="campo"
       />
+      {q === '' && (
+        <kbd
+          aria-hidden="true"
+          className="pointer-events-none absolute top-3 right-3 hidden rounded border border-borde-campo px-1.5 font-mono text-meta text-tinta-suave md:block"
+        >
+          /
+        </kbd>
+      )}
       <div
         role="status"
         aria-live="polite"
@@ -136,7 +144,7 @@ export function BuscadorGlobal() {
         role="listbox"
         aria-label="Resultados"
         hidden={!visible}
-        className="lista-combo absolute inset-x-4 z-10 mt-1 overflow-hidden md:inset-x-auto md:w-full rounded-lg border border-borde bg-white shadow"
+        className="lista-combo absolute inset-x-4 mt-1 overflow-hidden md:inset-x-auto md:w-full rounded-lg border border-borde bg-superficie shadow"
       >
         {visible &&
           resultados.map((r, i) => (
@@ -163,12 +171,12 @@ export function BuscadorGlobal() {
                       height={40}
                       loading="lazy"
                       decoding="async"
-                      className="size-10 shrink-0 rounded border border-borde bg-white object-cover"
+                      className="size-10 shrink-0 rounded border border-borde bg-superficie object-cover"
                     />
                   ) : (
                     <span
                       aria-hidden="true"
-                      className="size-10 shrink-0 rounded border border-borde bg-white"
+                      className="size-10 shrink-0 rounded border border-borde bg-superficie"
                     />
                   ))}
                 <span className="min-w-0">

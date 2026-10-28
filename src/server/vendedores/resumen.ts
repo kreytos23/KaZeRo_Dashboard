@@ -1,13 +1,13 @@
 import type { Ejecutor } from '@/db/pool';
 import { hoyMX } from '@/domain/fechas';
-import { calcularMesAbierto, pendientesDeVendedora, reporteComisiones } from '@/server/comisiones/lecturas';
+import { calcularMesAbierto, comisionesPendientes, reporteComisiones } from '@/server/comisiones/lecturas';
 import { reporteDeudores } from '@/server/reportes/deudores';
 
 export interface ResumenVendedoraFicha {
   porCobrarCentavos: number;
   pedidosConSaldo: number;
   comisionEnCurso: { mes: string; nombre: string; montoCentavos: number };
-  pendientes: { mes: string; nombre: string; montoCentavos: number }[];
+  pendientes: Awaited<ReturnType<typeof comisionesPendientes>>;
 }
 
 export async function resumenDeVendedora(
@@ -19,7 +19,7 @@ export async function resumenDeVendedora(
   const [deudas, curso, pendientes] = await Promise.all([
     reporteDeudores(db, { vendedorId, hoy }),
     reporteComisiones(db, abierto, { vendedorId, hoy, abierto }),
-    pendientesDeVendedora(db, vendedorId),
+    comisionesPendientes(db, vendedorId),
   ]);
   return {
     porCobrarCentavos: deudas.totalCentavos,

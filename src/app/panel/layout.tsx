@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { BuscadorGlobal } from '@/search/BuscadorGlobal';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { accionCerrarSesion, accionCerrarTodas } from './acciones';
+import { BarraInferior } from './BarraInferior';
 import { MenuMovil } from './MenuMovil';
 import { NavPanel } from './NavPanel';
 
@@ -36,7 +37,7 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
       >
         Saltar al contenido
       </a>
-      <header className="relative border-b border-borde bg-white">
+      <header className="relative border-b border-borde bg-superficie">
         {/* Filete con el degradado del monograma: el toque de marca sin cargar imágenes. */}
         <div
           aria-hidden="true"
@@ -74,10 +75,11 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
       <main
         id="contenido"
         tabIndex={-1}
-        className="mx-auto w-full max-w-[90rem] px-4 py-6 outline-none sm:py-8"
+        className="mx-auto w-full max-w-[90rem] px-4 py-6 outline-none sm:pt-8 md:pb-8 max-md:pb-(--alto-barra-inferior)"
       >
         {children}
       </main>
+      <BarraInferior />
     </div>
   );
 }

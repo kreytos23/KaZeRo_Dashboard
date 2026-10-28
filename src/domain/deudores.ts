@@ -1,3 +1,5 @@
+import { diasEntre } from './fechas';
+
 export const DIAS_ATRASO = 30;
 
 export interface PedidoDeudor {
@@ -25,9 +27,6 @@ export interface GrupoDeudores {
   saldoCentavos: number;
 }
 
-const dia = (iso: string) =>
-  Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
-
 export function agruparDeudores(
   pedidos: PedidoDeudor[],
   hoy: string,
@@ -37,7 +36,7 @@ export function agruparDeudores(
   let numPedidos = 0;
   for (const p of pedidos) {
     if (p.saldoCentavos <= 0) continue;
-    const dias = Math.round((dia(hoy) - dia(p.fecha)) / 86_400_000);
+    const dias = diasEntre(p.fecha, hoy);
     const g = porVendedora.get(p.vendedorId) ?? {
       vendedorId: p.vendedorId,
       vendedorNombre: p.vendedorNombre,

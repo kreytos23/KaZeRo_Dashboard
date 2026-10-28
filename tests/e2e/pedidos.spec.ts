@@ -1,9 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   abrirAccion,
+  abrirFiltros,
+  type Ambito,
   elegirOpcion,
   fijarFecha,
   irA,
+  marcaDe,
+  montoSaldoFavor,
   RUTA_ESTADO,
   sembrarCliente,
   sembrarCompras,
@@ -17,7 +21,7 @@ import {
 test.use({ storageState: RUTA_ESTADO });
 
 // Los dos proyectos (escritorio y móvil) usan ramas distintas, pero cada uno conserva sus propios nombres y códigos.
-const marca = (proyecto: string) => (proyecto === 'movil' ? 'M' : 'E');
+// Marca de proyecto y reintento (`marcaDe`): el reintento de CI no repite nombres ni códigos del intento anterior.
 const estadoCon = (page: Page, texto: string) => page.getByRole('status').filter({ hasText: texto });
 const resumen = (page: Page) => page.getByRole('region', { name: 'Resumen del pedido' });
 const hoy = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Mexico_City' });
@@ -35,6 +39,20 @@ async function elegirCliente(page: Page, nombre: string) {
   // El nombre accesible de la opción incluye el subtítulo (referencia): se ancla al inicio.
   await page.getByRole('option', { name: new RegExp(`^${nombre}`) }).click();
 }
+/**
+ * Rellena los filtros del listado y los aplica: desde `md`, en el formulario en línea con «Filtrar»; en celular,
+ * en el panel «Filtros» (sus campos solo existen con él abierto) con «Ver resultados».
+ */
+async function filtrar(page: Page, rellenar: (ambito: Ambito) => Promise<void>) {
+  if (!(await page.getByRole('button', { name: /^Filtros \(\d+\)$/ }).isVisible())) {
+    await rellenar(page);
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    return;
+  }
+  const panel = await abrirFiltros(page);
+  await rellenar(panel);
+  await panel.getByRole('button', { name: 'Ver resultados' }).click();
+}
 async function folioDeLaFicha(page: Page): Promise<number> {
   await expect(page).toHaveURL(/\/panel\/pedidos\/\d+/);
   return Number(/\/panel\/pedidos\/(\d+)/.exec(page.url())![1]);
@@ -44,7 +62,7 @@ const estadoDePieza = (page: Page) => page.locator('dt:has-text("Estado") + dd')
 test('nuevo pedido con alta rápida de cliente, piezas en ráfaga (una de exhibidor), pago parcial, liquidación y tarjeta', async ({
   page,
 }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   await sembrarVendedor(`Casa ${m}`);
   await sembrarPiezas([`N${m}01`, `N${m}02`], 14900);
   await sembrarExhibidorConPieza(m, `NX${m}03`);
@@ -94,7 +112,7 @@ test('nuevo pedido con alta rápida de cliente, piezas en ráfaga (una de exhibi
 test('R-22 y R-29 derogada: la quinta compra recibe su descuento aunque haya otra nota con saldo', async ({
   page,
 }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const vendedorId = await sembrarVendedor(`Casa5 ${m}`);
   const leal = await sembrarCliente(`Leal ${m}`);
   await sembrarCompras(leal, vendedorId, 4, `C${m}L`);
@@ -117,7 +135,7 @@ test('R-22 y R-29 derogada: la quinta compra recibe su descuento aunque haya otr
 });
 
 test('cancelar regresa la pieza a su exhibidor abierto y libera la posición', async ({ page }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const { exhibidorId, codigo, folio } = await sembrarPedidoConExhibidor(m);
   await page.goto(`/panel/exhibidores/${exhibidorId}`);
   await expect(page.getByRole('heading', { name: 'Apartadas (1)' })).toBeVisible();
@@ -143,7 +161,7 @@ test('cancelar regresa la pieza a su exhibidor abierto y libera la posición', a
 test('cancelar un pedido con abono muestra el saldo a favor del cliente y libera las piezas', async ({
   page,
 }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const vendedorId = await sembrarVendedor(`CasaC ${m}`);
   const clienteId = await sembrarCliente(`Cancela ${m}`);
   const { folio } = await sembrarPedidoAbierto(clienteId, vendedorId, `CN${m}01`);
@@ -161,7 +179,7 @@ test('cancelar un pedido con abono muestra el saldo a favor del cliente y libera
   await expect(estadoCon(page, 'Pedido cancelado.')).toBeVisible();
 
   await page.goto(`/panel/clientes/${clienteId}`);
-  await expect(page.getByText('Saldo a favor: $50.00')).toBeVisible();
+  await expect(montoSaldoFavor(page)).toHaveText('$50.00');
   await page.goto(`/panel/inventario/CN${m}01`);
   await expect(estadoDePieza(page)).toHaveText('Disponible');
 });
@@ -169,7 +187,7 @@ test('cancelar un pedido con abono muestra el saldo a favor del cliente y libera
 test('editar un pedido abierto: agregar y quitar piezas; el descuento manual exige motivo', async ({
   page,
 }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const vendedorId = await sembrarVendedor(`CasaE ${m}`);
   const clienteId = await sembrarCliente(`Edita ${m}`);
   const { folio } = await sembrarPedidoAbierto(clienteId, vendedorId, `ED${m}01`);
@@ -214,7 +232,7 @@ test('editar un pedido abierto: agregar y quitar piezas; el descuento manual exi
 });
 
 test('el listado de pedidos filtra por estado, cliente y fechas', async ({ page }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const vendedorId = await sembrarVendedor(`CasaF ${m}`);
   const abierto = await sembrarCliente(`FiltroAbierto ${m}`);
   const liquidado = await sembrarCliente(`FiltroLiquidado ${m}`);
@@ -225,40 +243,45 @@ test('el listado de pedidos filtra por estado, cliente y fechas', async ({ page 
   const folioL = page.getByRole('link', { name: `KZR-${a.folio + 1}`, exact: true });
 
   // Estado.
-  await page.getByLabel('Folio o cliente').fill(`Filtro`);
-  await elegirOpcion(page, 'Estado', 'Abierto');
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await filtrar(page, async (f) => {
+    await f.getByLabel('Folio o cliente').fill(`Filtro`);
+    await elegirOpcion(f, 'Estado', 'Abierto');
+  });
   await expect(page).toHaveURL(/estado=abierto/);
   await expect(folioA).toBeVisible();
   await expect(folioL).toHaveCount(0);
-  await elegirOpcion(page, 'Estado', 'Liquidado');
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await filtrar(page, (f) => elegirOpcion(f, 'Estado', 'Liquidado'));
   await expect(page).toHaveURL(/estado=liquidado/);
   await expect(folioL).toBeVisible();
   await expect(folioA).toHaveCount(0);
 
   // Cliente.
-  await elegirOpcion(page, 'Estado', 'Todos');
-  await elegirOpcion(page, 'Cliente', `FiltroAbierto ${m}`, true);
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await filtrar(page, async (f) => {
+    await elegirOpcion(f, 'Estado', 'Todos');
+    await elegirOpcion(f, 'Cliente', `FiltroAbierto ${m}`, true);
+  });
   await expect(page).toHaveURL(/cliente=/);
+  // El formulario GET envía también los campos vacíos (`estado=`), como antes de la fase 3: lo que importa es que
+  // «Todos» no deje valor.
+  await expect(page).not.toHaveURL(/[?&]estado=[^&]/);
   await expect(folioA).toBeVisible();
   await expect(folioL).toHaveCount(0);
 
   // Fechas: «Hasta» en el pasado no deja nada; el rango que incluye hoy sí.
-  await fijarFecha(page, 'Hasta', '2020-01-01');
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await filtrar(page, (f) => fijarFecha(f, 'Hasta', '2020-01-01'));
   await expect(page).toHaveURL(/hasta=2020-01-01/);
   await expect(page.getByText('No hay pedidos con esos filtros.')).toBeVisible();
-  await fijarFecha(page, 'Hasta', '');
-  await fijarFecha(page, 'Desde', hoy());
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await filtrar(page, async (f) => {
+    await fijarFecha(f, 'Hasta', '');
+    await fijarFecha(f, 'Desde', hoy());
+  });
   await expect(page).toHaveURL(/desde=/);
+  await expect(page).not.toHaveURL(/[?&]hasta=[^&]/);
   await expect(folioA).toBeVisible();
 });
 
 test('la búsqueda global abre un pedido por su folio', async ({ page }, info) => {
-  const m = marca(info.project.name);
+  const m = marcaDe(info);
   const vendedorId = await sembrarVendedor(`CasaB ${m}`);
   const cliente = await sembrarCliente(`Busca ${m}`);
   const p = await sembrarPedidoAbierto(cliente, vendedorId, `B${m}01`);
@@ -267,7 +290,7 @@ test('la búsqueda global abre un pedido por su folio', async ({ page }, info) =
   await expect(async () => {
     await page.keyboard.press('/');
     await expect(buscador).toBeFocused({ timeout: 500 });
-  }).toPass();
+  }).toPass({ timeout: 10_000 });
   await buscador.fill(`kzr-${p.folio}`);
   await expect(page.getByRole('option', { name: new RegExp(`KZR-${p.folio}`) })).toBeVisible();
   await page.keyboard.press('Enter');

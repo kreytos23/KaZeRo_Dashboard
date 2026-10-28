@@ -5,8 +5,10 @@ import { acotarPagina } from '@/domain/paginacion';
 import { FotoPieza } from '@/features/imagenes/FotoPieza';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { CampoConLista } from '@/features/ui/CampoConLista';
+import { FiltrosPlegables } from '@/features/ui/FiltrosPlegables';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { Paginacion } from '@/features/ui/Paginacion';
+import { filtrosActivos } from '@/features/ui/filtros-url';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPieza, vistaUbicacion } from '@/features/ui/estado-visual';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -17,6 +19,8 @@ import { ETIQUETA_ESTADO, ETIQUETA_UBICACION_FILTRO } from './etiquetas';
 import { POR_PAGINA, idDeCatalogo, leerFiltros } from './filtros';
 
 export const metadata = { title: 'Inventario' };
+
+const RUTA = '/panel/inventario';
 
 export default async function PaginaInventario({
   searchParams,
@@ -54,6 +58,24 @@ export default async function PaginaInventario({
     return [cat, pz, vs.filter((v) => v.tipo !== 'casa'), n, pag] as const;
   });
   const [categorias, materiales, proveedores] = catalogos;
+  // Con vendedora elegida la ubicación va implícita: ni va en la URL ni se muestra su etiqueta.
+  const { activos, hrefLimpiar } = filtrosActivos(RUTA, [
+    { clave: 'q', valor: f.q, etiqueta: f.q && `“${f.q}”` },
+    { clave: 'estado', valor: f.estado, etiqueta: f.estado && ETIQUETA_ESTADO[f.estado] },
+    {
+      clave: 'ubicacion',
+      valor: f.vendedor ? undefined : f.ubicacion,
+      etiqueta: f.vendedor ? undefined : f.ubicacion && ETIQUETA_UBICACION_FILTRO[f.ubicacion],
+    },
+    {
+      clave: 'vendedor',
+      valor: f.vendedor,
+      etiqueta: f.vendedor && (vendedoras.find((v) => v.id === f.vendedor)?.nombre ?? 'Vendedora'),
+    },
+    { clave: 'categoria', valor: f.categoria, etiqueta: f.categoria },
+    { clave: 'material', valor: f.material, etiqueta: f.material },
+    { clave: 'proveedor', valor: f.proveedor, etiqueta: f.proveedor },
+  ]);
   const filtrado = Boolean(
     f.q || f.estado || f.categoria || f.material || f.proveedor || f.ubicacion || f.vendedor || pagina > 1,
   );
@@ -70,7 +92,7 @@ export default async function PaginaInventario({
           </Link>
         </div>
       </div>
-      <form role="search" className="flex flex-wrap items-end gap-2">
+      <FiltrosPlegables activos={activos} hrefLimpiar={hrefLimpiar}>
         <Campo etiqueta="Código o descripción" name="q" type="search" defaultValue={f.q} maxLength={120} />
         <Selector
           etiqueta="Estado"
@@ -123,8 +145,7 @@ export default async function PaginaInventario({
           maxLength={80}
           textoNuevo="Filtrar por"
         />
-        <button className="boton-secundario">Filtrar</button>
-      </form>
+      </FiltrosPlegables>
       {piezas.length === 0 ? (
         filtrado ? (
           <EstadoVacio

@@ -30,6 +30,7 @@
   --color-tinta-suave: #6a5850; /* 6.3:1 sobre crema; 5.6:1 sobre rubor suave */
   --color-borde: #efdcd5; /* decorativo: separadores de tablas y tarjetas */
   --color-borde-campo: #998075; /* contorno de campos: ≥3:1 contra blanco y crema */
+  --color-superficie: #fff; /* fondo de campos, tarjetas y paneles */
 
   /* Estados: verde azulado y carmesí, distintos entre sí y del terracota de los botones. */
   --color-exito: #22663f;
@@ -87,6 +88,10 @@
   --scale-tiny: 0.99; /* menú al cerrarse */
   --distance-micro: 4px; /* entrada de avisos y mensajes de error */
   --distance-small: 6px; /* sacudida de error */
+  --z-barra: 20; /* barra inferior del celular */
+  --z-popover: 30; /* listas de combo y menús: por encima de la barra */
+  /* Lo que el contenido deja libre bajo la barra inferior (main y scroll-padding). */
+  --alto-barra-inferior: calc(6rem + env(safe-area-inset-bottom));
   --blur-small: 2px; /* entrada de avisos y paneles */
   /* Acordeón (21) */
   --acc-expand: var(--duration-fast);
@@ -114,6 +119,16 @@
 }
 
 @layer base {
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  /* Radix compensa la barra que quita; con el canal reservado ya no hace falta y causaba el salto. */
+  body[data-scroll-locked] {
+    padding-right: 0 !important;
+    margin-right: 0 !important;
+  }
+
   body {
     background-color: var(--color-crema);
     color: var(--color-tinta);
@@ -256,7 +271,7 @@
   min-height: --spacing(11);
   border: 1px solid var(--color-borde-campo);
   border-radius: var(--radius-lg);
-  background-color: #fff;
+  background-color: var(--color-superficie);
   padding-inline: --spacing(3);
   font-variant-numeric: tabular-nums;
   color: var(--color-tinta);
@@ -287,7 +302,7 @@
 @utility tarjeta {
   border: 1px solid var(--color-borde);
   border-radius: var(--radius-xl);
-  background-color: #fff;
+  background-color: var(--color-superficie);
   box-shadow: 0 1px 2px rgb(165 78 41 / 0.06);
 }
 
@@ -295,9 +310,21 @@
 @utility fondo-acuarela {
   background-color: var(--color-crema);
   background-image:
-    radial-gradient(40rem 28rem at 0% 0%, rgb(242 207 200 / 0.55), transparent 70%),
-    radial-gradient(36rem 26rem at 100% 100%, rgb(195 217 180 / 0.45), transparent 70%),
-    radial-gradient(24rem 18rem at 100% 0%, rgb(235 179 105 / 0.18), transparent 70%);
+    radial-gradient(
+      40rem 28rem at 0% 0%,
+      color-mix(in srgb, var(--color-marca-rubor) 55%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      36rem 26rem at 100% 100%,
+      color-mix(in srgb, var(--color-marca-menta) 45%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      24rem 18rem at 100% 0%,
+      color-mix(in srgb, var(--color-marca-durazno) 18%, transparent),
+      transparent 70%
+    );
 }
 
 /*
@@ -367,7 +394,7 @@
   min-height: --spacing(11);
   border: 1px solid var(--color-secundario);
   border-radius: var(--radius-lg);
-  background-color: #fff;
+  background-color: var(--color-superficie);
   padding-inline: --spacing(4);
   font-weight: 500;
   color: var(--color-secundario);
@@ -410,7 +437,18 @@
   }
 }
 
-/* Tarjeta de lista cuyo enlace cubre toda la tarjeta: realce al pasar y presión al tocar. */
+/* Filtro activo en la fila de celular: toca para quitarlo. */
+@utility chip {
+  display: inline-flex;
+  align-items: center;
+  gap: --spacing(1);
+  min-height: --spacing(11);
+  border-radius: 9999px;
+  background-color: var(--color-secundario-suave);
+  padding-inline: --spacing(3);
+  color: var(--color-secundario-fuerte);
+}
+
 @utility fila-enlace {
   transition: background-color var(--duration-quick) var(--ease-smooth-out);
   @media (hover: hover) {
@@ -424,6 +462,7 @@
   }
 }
 
+/* Tarjeta de lista cuyo enlace cubre toda la tarjeta: realce al pasar y presión al tocar. */
 @utility tarjeta-enlace {
   transition: var(--transicion-control);
   @media (hover: hover) {
@@ -452,7 +491,7 @@
   width: 100%;
   border: 1px solid var(--color-borde-campo);
   border-radius: var(--radius-lg);
-  background-color: #fff;
+  background-color: var(--color-superficie);
   padding-inline: --spacing(3);
   color: var(--color-tinta);
   transition: var(--transicion-control);
@@ -544,7 +583,7 @@
     margin: 0;
     border: 1.5px solid var(--color-borde-campo);
     border-radius: 0.4rem;
-    background-color: #fff;
+    background-color: var(--color-superficie);
     transition:
       background-color var(--check-box) var(--ease-smooth-out),
       border-color var(--check-box) var(--ease-smooth-out),
@@ -601,7 +640,7 @@
     overflow: auto;
     border: 1px solid var(--color-borde);
     border-radius: var(--radius-xl);
-    background-color: #fff;
+    background-color: var(--color-superficie);
     padding: --spacing(1);
     box-shadow:
       0 8px 24px rgb(43 33 28 / 0.12),
@@ -625,6 +664,7 @@
   }
   /* Listas de los combobox (cliente, pieza, catálogo, buscador): aparecen con la misma entrada que los menús. */
   .lista-combo {
+    z-index: var(--z-popover);
     transform-origin: top;
     animation: menu-entra var(--duration-fast) var(--ease-smooth-out);
   }
@@ -1018,5 +1058,11 @@
   .pagina-enlace:active,
   .tarjeta-enlace:active {
     transform: none !important;
+  }
+}
+
+@media (max-width: 47.99rem) {
+  html {
+    scroll-padding-bottom: var(--alto-barra-inferior);
   }
 }
