@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, exists, gt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, gt, inArray, or } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import {
   aplicacionPago,
+  exhibidor,
   cliente,
   entregaExhibidor,
   movimientoPieza,
@@ -10,7 +11,7 @@ import {
   vExhibidor,
   vPedido,
 } from '@/db/schema';
-import { numericACentavos } from '@/domain/dinero';
+import { numericACentavos, numericConSigno } from '@/domain/dinero';
 
 // Plan 4a, Task 3: lo que el exhibidor cobró, entregó y debe entregar (E-5).
 
@@ -27,7 +28,7 @@ export async function resumenDineroExhibidor(db: Ejecutor, exhibidorId: string) 
   return {
     cobradoCentavos: numericACentavos(v?.cobrado ?? '0'),
     entregadoCentavos: numericACentavos(v?.entregado ?? '0'),
-    ajustesCentavos: numericACentavos(v?.ajustes ?? '0'),
+    ajustesCentavos: numericConSigno(v?.ajustes ?? '0'),
     porEntregarCentavos: numericACentavos(v?.porEntregar ?? '0'),
   };
 }
@@ -105,7 +106,7 @@ export async function historialDineroExhibidor(
       m: {
         fecha: e.fecha,
         tipo: e.tipo,
-        montoCentavos: numericACentavos(e.monto),
+        montoCentavos: numericConSigno(e.monto),
         folio: null,
         clienteNombre: null,
         metodo: e.metodo,
@@ -192,4 +193,40 @@ export async function exhibidoresPorEntregar(db: Ejecutor) {
     vendedorNombre: f.vendedorNombre,
     porEntregarCentavos: numericACentavos(f.porEntregar),
   }));
+}
+
+/** ¿Es la clienta especial «Venta de mostrador»? Su ficha no muestra tarjeta de lealtad. */
+export async function esClienteMostrador(db: Ejecutor, clienteId: string): Promise<boolean> {
+  const [c] = await db.select({ m: cliente.esMostrador }).from(cliente).where(eq(cliente.id, clienteId));
+  return c?.m ?? false;
+}
+
+/**
+ * El exhibidor abierto que pudo cobrar este pedido (E-4): uno de la vendedora del pedido del que salió alguna
+ * pieza de la nota. Null si no hay; la casilla «Lo cobró el exhibidor» solo aparece cuando hay uno.
+ */
+export async function exhibidorCobradorDelPedido(
+  db: Ejecutor,
+  pedidoId: string,
+  vendedorId: string,
+): Promise<{ id: string; nombre: string } | null> {
+  const [e] = await db
+    .select({ id: exhibidor.id, nombre: exhibidor.nombre })
+    .from(exhibidor)
+    .where(
+      and(
+        eq(exhibidor.vendedorId, vendedorId),
+        eq(exhibidor.estado, 'abierto'),
+        inArray(
+          exhibidor.id,
+          db
+            .select({ x: movimientoPieza.exhibidorId })
+            .from(movimientoPieza)
+            .where(and(eq(movimientoPieza.pedidoId, pedidoId), eq(movimientoPieza.tipo, 'apartado'))),
+        ),
+      ),
+    )
+    .orderBy(asc(exhibidor.nombre))
+    .limit(1);
+  return e ?? null;
 }

@@ -22,6 +22,8 @@ export type ExhibidorResumen = {
   vendedorNombre: string;
   piezasActuales: number;
   piezasApartadas: number;
+  /** numeric del dinero que el exhibidor debe entregar (Plan 4a). */
+  porEntregar: string;
 };
 
 function datosValidos(d: { nombre: string; fechaEnvio: string }) {

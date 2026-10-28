@@ -9,6 +9,7 @@ import { FECHA_LARGA } from '@/features/ui/formato';
 import { Saldo } from '@/features/ui/Saldo';
 import { calcularMesAbierto, comisionesPendientes, reporteComisiones } from '@/server/comisiones/lecturas';
 import { requerirSesion } from '@/server/auth/sesion-actual';
+import { exhibidoresPorEntregar } from '@/server/exhibidores/lecturas-dinero';
 import { reporteDeudores } from '@/server/reportes/deudores';
 
 export const metadata = { title: 'Panel' };
@@ -16,14 +17,15 @@ export const metadata = { title: 'Panel' };
 export default async function Panel() {
   await requerirSesion();
   const hoy = hoyMX();
-  const { deudas, pendientes, curso, abierto } = await conDbLectura(async (db) => {
-    const [deudas, pendientes, abierto] = await Promise.all([
+  const { deudas, pendientes, curso, abierto, porEntregar } = await conDbLectura(async (db) => {
+    const [deudas, pendientes, abierto, porEntregar] = await Promise.all([
       reporteDeudores(db, { hoy }),
       comisionesPendientes(db),
       calcularMesAbierto(db, hoy),
+      exhibidoresPorEntregar(db),
     ]);
     const curso = await reporteComisiones(db, abierto, { hoy, abierto });
-    return { deudas, pendientes, curso, abierto };
+    return { deudas, pendientes, curso, abierto, porEntregar };
   });
   const cierre = textoCierre(abierto, hoy);
   const atrasados = deudas.grupos
@@ -117,6 +119,37 @@ export default async function Panel() {
             </Link>
           </section>
         </div>
+      )}
+
+      {porEntregar.length > 0 && (
+        <section aria-labelledby="exhibidores-por-entregar" className="flex flex-col gap-3">
+          <h2 id="exhibidores-por-entregar" className="text-monto font-semibold">
+            Exhibidores con dinero por entregar
+          </h2>
+          <ul className="tarjeta flex flex-col divide-y divide-borde px-5">
+            {porEntregar.map((x) => (
+              <li
+                key={x.id}
+                className="relative flex flex-wrap items-center justify-between gap-x-3 gap-y-1 py-3"
+              >
+                <span className="text-dato">
+                  <Link
+                    href={`/panel/exhibidores/${x.id}`}
+                    className="font-semibold underline after:absolute after:inset-0 after:content-['']"
+                  >
+                    {x.nombre}
+                  </Link>{' '}
+                  <span className="text-tinta-suave">{x.vendedorNombre}</span>
+                </span>
+                <Saldo
+                  estado="abierto"
+                  saldo={centavosANumeric(x.porEntregarCentavos)}
+                  rotulo="Por entregar"
+                />
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       <section className="flex flex-col gap-3">

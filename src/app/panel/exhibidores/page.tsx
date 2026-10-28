@@ -7,6 +7,7 @@ import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoExhibidor } from '@/features/ui/estado-visual';
 import { FormAccion } from '@/features/ui/FormAccion';
+import { Saldo } from '@/features/ui/Saldo';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { listarExhibidores } from '@/server/exhibidores/servicio';
 import { listarVendedores } from '@/server/vendedores/servicio';
@@ -83,6 +84,10 @@ export default async function PaginaExhibidores({
               {e.nombre}
             </Link>
             <EtiquetaEstado vista={vistaEstadoExhibidor(e.estado)} />
+            <span className="ml-auto flex items-center gap-2">
+              <span className="text-meta text-tinta-suave">Por entregar</span>
+              <Saldo estado="abierto" saldo={e.porEntregar} rotulo="Por entregar" />
+            </span>
             <span className="basis-full text-meta text-tinta-suave">
               {e.vendedorNombre} · {fechaCorta(e.fechaEnvio)} · {e.piezasActuales}{' '}
               {e.piezasActuales === 1 ? 'pieza' : 'piezas'}

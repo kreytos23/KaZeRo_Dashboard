@@ -6,7 +6,7 @@ import { pesosACentavos } from '@/domain/dinero';
 import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
 import { partirCodigos } from '@/features/exhibidores/codigos';
 import type { EstadoAccion } from '@/features/ui/estado';
-import { ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
+import { ejecutarAccion, texto, uuidDe, uuidOpcionalDe, versionDe } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { crearCliente } from '@/server/clientes/servicio';
 import { ErrorNegocio } from '@/server/errores';
@@ -90,6 +90,7 @@ export async function accionRegistrarPago(_: EstadoAccion, fd: FormData): Promis
         metodo: texto(fd, 'metodo') as MetodoPago, // el servicio valida contra METODOS_PAGO
         pagador,
         nota: texto(fd, 'nota').slice(0, 400),
+        exhibidorId: uuidOpcionalDe(fd, 'exhibidorId'),
       }),
     );
     revalidarPedido(folio);

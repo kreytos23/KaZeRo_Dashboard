@@ -9,6 +9,7 @@ export function revalidarPedido(folio: number) {
   revalidatePath('/panel/clientes/[id]', 'page');
   revalidatePath('/panel/vendedores/[id]', 'page');
   revalidatePath('/panel/exhibidores/[id]', 'page');
+  revalidatePath('/panel/exhibidores');
   revalidatePath('/panel/inventario');
   revalidatePath('/panel/inventario/[codigo]', 'page');
 }

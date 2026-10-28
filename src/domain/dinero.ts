@@ -42,3 +42,8 @@ export function porcentajeANumeric(texto: string): string | null {
   const valor = Number(t);
   return valor > 100 ? null : valor.toFixed(2);
 }
+
+/** Como `numericACentavos`, pero admite el signo menos (los ajustes del exhibidor pueden restar). */
+export function numericConSigno(n: string): number {
+  return n.startsWith('-') ? -numericACentavos(n.slice(1)) : numericACentavos(n);
+}

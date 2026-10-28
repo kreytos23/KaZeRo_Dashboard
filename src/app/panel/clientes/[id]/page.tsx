@@ -18,6 +18,7 @@ import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { obtenerCliente } from '@/server/clientes/servicio';
+import { esClienteMostrador } from '@/server/exhibidores/lecturas-dinero';
 import { resumenCliente } from '@/server/pedidos/lecturas';
 import { movimientosSaldoFavor } from '@/server/saldo-favor/servicio';
 import { listarVendedores } from '@/server/vendedores/servicio';
@@ -33,13 +34,14 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [c, vendedores, cambios, resumen, libro] = await conDbLectura((db) =>
+  const [c, vendedores, cambios, resumen, libro, mostrador] = await conDbLectura((db) =>
     Promise.all([
       obtenerCliente(db, id.data),
       listarVendedores(db),
       historialDeCambios(db, 'cliente', id.data),
       resumenCliente(db, id.data),
       movimientosSaldoFavor(db, { clienteId: id.data, limite: 100 }),
+      esClienteMostrador(db, id.data),
     ]),
   );
   if (!c) notFound();
@@ -142,9 +144,12 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
           </section>
         </div>
         <div className="ficha-col">
-          <div className="order-2">
-            <TarjetaLealtad tarjeta={resumen.tarjeta} />
-          </div>
+          {/* Las notas de «Venta de mostrador» no cuentan en tarjeta: su ficha no la muestra. */}
+          {!mostrador && (
+            <div className="order-2">
+              <TarjetaLealtad tarjeta={resumen.tarjeta} />
+            </div>
+          )}
           <div className="order-4 flex max-w-2xl flex-col gap-3">
             <FormAccion accion={accionEditarCliente} textoBoton="Guardar cambios">
               {/* key por versión en los campos (no en el formulario): refresca los defaultValue sin perder el estado de la acción. */}
