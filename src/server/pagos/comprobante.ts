@@ -1,22 +1,22 @@
 import { eq } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { pago } from '@/db/schema';
+import { esUuid } from '@/domain/imagenes';
 import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
 import { conIdempotencia } from '@/server/idempotencia';
-import { MSG_PAGO_ANULADO } from './mensajes';
+import { MSG_PAGO_ANULADO, MSG_PAGO_NO_EXISTE } from './mensajes';
 
 export interface Comprobante {
   clave: string;
   sha256: string;
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 
 /** La imagen ya está en el almacén (la acción la sube antes); aquí solo se revisa su forma. */
 export function validarComprobante(c: Comprobante | null | undefined): Comprobante | null {
   if (!c) return null;
-  if (!UUID.test(c.clave) || !SHA256.test(c.sha256))
+  if (!esUuid(c.clave) || !SHA256.test(c.sha256))
     throw new ErrorNegocio('comprobante_invalido', 'El comprobante no es válido.', 'comprobante');
   return { clave: c.clave, sha256: c.sha256 };
 }
@@ -46,7 +46,7 @@ export function agregarComprobante(
             .from(pago)
             .where(eq(pago.id, d.pagoId))
             .for('no key update');
-          if (!p) throw new ErrorNegocio('no_encontrado', 'El pago no existe.');
+          if (!p) throw new ErrorNegocio('no_encontrado', MSG_PAGO_NO_EXISTE);
           if (p.anuladoAt) throw new ErrorNegocio('pago_anulado', MSG_PAGO_ANULADO);
           if (p.clave) throw new ErrorNegocio('comprobante_existente', 'El pago ya tiene comprobante.');
           await tx

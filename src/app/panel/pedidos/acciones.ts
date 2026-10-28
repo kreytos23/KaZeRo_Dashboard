@@ -1,6 +1,5 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { conDb } from '@/db/client';
 import { formatoMXN, numericACentavos, pesosACentavos } from '@/domain/dinero';
@@ -86,12 +85,21 @@ async function comprobanteDe(fd: FormData): Promise<Comprobante | null> {
   return bytes ? subirComprobante(almacenImagenes(), bytes) : null;
 }
 
+/** Campos de captura de un pago (P-3, P-4): referencia, comprobante ya subido y confirmación del duplicado. */
+async function datosCaptura(fd: FormData) {
+  return {
+    referencia: texto(fd, 'referencia').slice(0, 100),
+    comprobante: await comprobanteDe(fd),
+    confirmarDuplicado: texto(fd, 'confirmarDuplicado') === 'on',
+  };
+}
+
 export async function accionRegistrarPago(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   const { adminId } = await requerirSesion();
   return ejecutarAccion(async () => {
     const folio = folioDe(fd);
     const pagador = texto(fd, 'pagador') === 'vendedor' ? 'vendedor' : 'cliente';
-    const comprobante = await comprobanteDe(fd);
+    const captura = await datosCaptura(fd);
     const r = await conDb((db) =>
       registrarPagoDePedido(db, {
         key: uuidDe(fd, 'key'),
@@ -103,9 +111,7 @@ export async function accionRegistrarPago(_: EstadoAccion, fd: FormData): Promis
         pagador,
         nota: texto(fd, 'nota').slice(0, 400),
         exhibidorId: uuidOpcionalDe(fd, 'exhibidorId'),
-        referencia: texto(fd, 'referencia').slice(0, 100),
-        comprobante,
-        confirmarDuplicado: texto(fd, 'confirmarDuplicado') === 'on',
+        ...captura,
       }),
     );
     revalidarPedido(folio);
@@ -131,7 +137,7 @@ export async function accionPagoAgrupado(_: EstadoAccion, fd: FormData): Promise
         );
       return [{ pedidoId, montoCentavos }];
     });
-    const comprobante = await comprobanteDe(fd);
+    const captura = await datosCaptura(fd);
     const r = await conDb((db) =>
       registrarPagoAgrupado(db, {
         key: uuidDe(fd, 'key'),
@@ -140,10 +146,8 @@ export async function accionPagoAgrupado(_: EstadoAccion, fd: FormData): Promise
         fecha: texto(fd, 'fecha').slice(0, 20),
         montoCentavos: centavosDe(fd, 'monto', { vacioEsCero: true }),
         metodo: texto(fd, 'metodo') as MetodoPago,
-        referencia: texto(fd, 'referencia').slice(0, 100),
         aplicaciones,
-        comprobante,
-        confirmarDuplicado: texto(fd, 'confirmarDuplicado') === 'on',
+        ...captura,
       }),
     );
     revalidarPedidos();
@@ -195,7 +199,6 @@ export async function accionCancelarPedido(_: EstadoAccion, fd: FormData): Promi
       }),
     );
     revalidarPedido(folio);
-    revalidatePath('/panel/vendedores/[id]', 'page');
     return numericACentavos(r.reembolsado) > 0
       ? `Pedido cancelado. Entrega ${formatoMXN(numericACentavos(r.reembolsado))} en efectivo.`
       : 'Pedido cancelado.';
