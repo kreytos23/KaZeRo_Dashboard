@@ -53,11 +53,12 @@ export function BarraInferior() {
             href={NUEVO}
             aria-label="Nuevo pedido"
             aria-current={activa(NUEVO) ? 'page' : undefined}
-            className={`${BASE} ${color(NUEVO)} group focus-visible:outline-none`}
+            // El enlace sube con el círculo: así su caja lo abarca y el anillo de foco global rodea el control entero.
+            className={`${BASE} ${color(NUEVO)} -mt-6`}
           >
             <span
               aria-hidden="true"
-              className="-mt-6 flex size-14 items-center justify-center rounded-full bg-primario text-3xl leading-none text-white shadow-md group-focus-visible:outline-2 group-focus-visible:outline-offset-2 group-focus-visible:outline-primario"
+              className="flex size-14 items-center justify-center rounded-full bg-primario text-3xl leading-none text-white shadow-md"
             >
               +
             </span>

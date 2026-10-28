@@ -72,7 +72,9 @@ export function CampoConLista({
       <label htmlFor={`${id}-q`} className={ESTILO_ETIQUETA}>
         {etiqueta}
       </label>
-      <div className="relative flex rounded-lg border border-borde-campo bg-superficie focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-primario has-[input[aria-expanded=true]]:rounded-b-none has-[input[aria-invalid=true]]:border-error has-[input[aria-invalid=true]]:shadow-[inset_0_0_0_1px_var(--color-error)]">
+      {/* El campo ocupa todo el control y la flecha va encima, a la derecha: un solo contorno, y el anillo de foco
+          (el global de :focus-visible) es del propio campo y lo rodea entero. */}
+      <div className="relative">
         <input
           id={`${id}-q`}
           ref={entrada}
@@ -106,7 +108,7 @@ export function CampoConLista({
           onKeyDown={cb.onKeyDown}
           // Tab (o tocar fuera) cierra y acepta lo escrito tal cual.
           onBlur={() => setAbierto(false)}
-          className="min-h-11 min-w-0 flex-1 rounded-l-lg bg-transparent px-3 text-tinta outline-none"
+          className="campo pr-11 aria-expanded:rounded-b-none"
           {...aria}
         />
         <button
@@ -126,7 +128,7 @@ export function CampoConLista({
             setAbierto(true);
             entrada.current?.focus();
           }}
-          className="flex min-h-11 w-11 cursor-pointer items-center justify-center rounded-r-lg text-secundario hover:bg-secundario-suave"
+          className="absolute inset-y-px right-px flex w-11 cursor-pointer items-center justify-center rounded-r-[calc(var(--radius-lg)-1px)] text-secundario hover:bg-secundario-suave"
         >
           <svg aria-hidden="true" viewBox="0 0 20 20" width="16" height="16" fill="currentColor">
             <path d="M5.5 7.5 10 12l4.5-4.5z" />
