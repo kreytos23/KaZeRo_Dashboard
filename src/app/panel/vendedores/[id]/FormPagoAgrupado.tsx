@@ -5,6 +5,7 @@ import { Fragment, useMemo, useState } from 'react';
 import { formatoMXN, pesosACentavos } from '@/domain/dinero';
 import { fechaCorta } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
+import type { PedidoReparto } from '@/domain/reparto';
 import { AvisoDuplicado } from '@/features/pagos/AvisoDuplicado';
 import { CampoCaptura } from '@/features/pagos/CampoCaptura';
 import { avisoSinCaptura, montosDeReparto, resumenReparto } from '@/features/pagos/formato';
@@ -14,12 +15,8 @@ import { FormAccion } from '@/features/ui/FormAccion';
 import { accionPagoAgrupado } from '../../pedidos/acciones';
 import { ETIQUETA_METODO } from '../../pedidos/etiquetas';
 
-export interface PedidoAbierto {
-  id: string;
-  folio: number;
-  fecha: string;
+export interface PedidoAbierto extends PedidoReparto {
   clienteNombre: string;
-  saldoCentavos: number;
 }
 
 const METODOS = Object.entries(ETIQUETA_METODO).map(([valor, texto]) => ({ valor, texto }));

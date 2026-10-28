@@ -1,14 +1,8 @@
 import { centavosANumeric, formatoMXN, pesosACentavos } from '@/domain/dinero';
 import { fechaCorta } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
-import { repartoSugerido } from '@/domain/reparto';
-
-interface PedidoReparto {
-  id: string;
-  fecha: string;
-  folio: number;
-  saldoCentavos: number;
-}
+import { repartoSugerido, type PedidoReparto } from '@/domain/reparto';
+import type { PagoParecido } from '@/server/pagos/duplicados';
 
 /** Reparto sugerido (R-33) como textos de pesos para los campos; el pedido sin asignar queda vacío. */
 export function montosDeReparto(montoCentavos: number, pedidos: PedidoReparto[]): Record<string, string> {
@@ -59,25 +53,11 @@ export function resumenReparto(
   };
 }
 
-export interface PagoParecido {
-  pagoId: string;
-  folio: number | null;
-  fecha: string;
-  montoCentavos: number;
-}
-
-/** La lista del error `posible_duplicado` llega como `unknown` desde la acción: solo se aceptan filas con su forma. */
+/** La lista del error `posible_duplicado` llega como `unknown` desde la acción (la arma el servidor): basta un guard mínimo. */
 export function parecidosDe(detalle: unknown): PagoParecido[] {
-  if (!Array.isArray(detalle)) return [];
-  return detalle.filter(
-    (x): x is PagoParecido =>
-      typeof x === 'object' &&
-      x !== null &&
-      typeof (x as PagoParecido).pagoId === 'string' &&
-      typeof (x as PagoParecido).fecha === 'string' &&
-      Number.isSafeInteger((x as PagoParecido).montoCentavos) &&
-      ((x as PagoParecido).folio === null || Number.isSafeInteger((x as PagoParecido).folio)),
-  );
+  return Array.isArray(detalle)
+    ? detalle.filter((x): x is PagoParecido => typeof (x as PagoParecido | null)?.pagoId === 'string')
+    : [];
 }
 
 export function textoParecido(p: PagoParecido): string {

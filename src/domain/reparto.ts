@@ -1,7 +1,15 @@
+/** Pedido con saldo que recibe parte de un pago agrupado. */
+export interface PedidoReparto {
+  id: string;
+  fecha: string;
+  folio: number;
+  saldoCentavos: number;
+}
+
 /** R-33: el pago de una vendedora se reparte del pedido más viejo al más nuevo (fecha y luego folio). */
 export function repartoSugerido(
   montoCentavos: number,
-  pedidos: { id: string; fecha: string; folio: number; saldoCentavos: number }[],
+  pedidos: PedidoReparto[],
 ): { aplicaciones: { pedidoId: string; montoCentavos: number }[]; sobranteCentavos: number } {
   let resto = montoCentavos;
   const aplicaciones: { pedidoId: string; montoCentavos: number }[] = [];
