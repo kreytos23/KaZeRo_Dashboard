@@ -26,7 +26,7 @@ import { METODOS_PAGO, registrarPagoEnTx, type MetodoPago } from '@/server/pagos
 export const METODOS_ENTREGA = ['efectivo', 'transferencia', 'otro'] as const;
 export type MetodoEntrega = (typeof METODOS_ENTREGA)[number];
 
-/** La única clienta de mostrador (E-3); la migración 0021 la siembra. */
+/** La única clienta de mostrador (E-3); la migración 0023 la siembra. */
 export async function clienteMostradorId(tx: Ejecutor): Promise<string> {
   const [c] = await tx.select({ id: cliente.id }).from(cliente).where(eq(cliente.esMostrador, true));
   if (!c) throw new ErrorNegocio('sin_mostrador', 'Falta la clienta «Venta de mostrador». Avisa al soporte.');

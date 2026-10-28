@@ -33,7 +33,7 @@ export const TABLAS_NEGOCIO = [
 ] as const;
 
 /**
- * Plan 4a: la clienta «Venta de mostrador» la crea la migración 0021; quien vacía `cliente` la vuelve a sembrar
+ * Plan 4a: la clienta «Venta de mostrador» la crea la migración 0023; quien vacía `cliente` la vuelve a sembrar
  * con esta misma sentencia (idempotente).
  */
 export const SQL_SEMBRAR_MOSTRADOR = `INSERT INTO cliente (nombre, es_mostrador, notas)

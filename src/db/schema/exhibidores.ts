@@ -4,7 +4,7 @@ import { admin } from './auth';
 import { exhibidor } from './inventario';
 
 // Plan 4a: entregas y ajustes del dinero que cobra un exhibidor. Solo inserción. Que el por entregar no quede
-// negativo, la fecha y el cierre sin dinero están en drizzle/0021_exhibidores_dinero_reglas.sql.
+// negativo, la fecha y el cierre sin dinero están en drizzle/0023_exhibidores_dinero_reglas.sql.
 const ts = (nombre: string) => timestamp(nombre, { withTimezone: true });
 const dinero = (nombre: string) => numeric(nombre, { precision: 12, scale: 2 });
 

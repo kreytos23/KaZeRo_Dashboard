@@ -61,9 +61,12 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
               <h2 id="pedidos-cliente" className="text-lg font-semibold">
                 Pedidos
               </h2>
-              <Link href={`/panel/pedidos/nuevo?cliente=${c.id}`} className="boton-primario">
-                Nuevo pedido
-              </Link>
+              {/* Las ventas de mostrador nacen en el exhibidor (E-1). */}
+              {!c.esMostrador && (
+                <Link href={`/panel/pedidos/nuevo?cliente=${c.id}`} className="boton-primario">
+                  Nuevo pedido
+                </Link>
+              )}
             </div>
             <p>
               <Link

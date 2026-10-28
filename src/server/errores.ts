@@ -171,7 +171,7 @@ const MENSAJES: Record<string, string> = {
   saldo_favor_uso_faltante: PEDIDO_INCONSISTENTE,
   pago_saldo_sin_aplicacion: PEDIDO_INCONSISTENTE,
   devolucion_sin_saldo: PEDIDO_INCONSISTENTE,
-  // Plan 4a (0020/0021): el servicio valida antes; estos son la última barrera.
+  // Plan 4a (0022/0023): el servicio valida antes; estos son la última barrera.
   entrega_exhibidor_excede: mensajeEntregaExcede(),
   entrega_exhibidor_cerrado: MSG_EXHIBIDOR_CERRADO,
   entrega_exhibidor_fecha: MSG_FECHA_FUTURA,

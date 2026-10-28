@@ -127,7 +127,7 @@ export const cliente = pgTable(
     notas: text('notas').notNull().default(''),
     version: integer('version').notNull().default(1),
     ...tiempos,
-    // Plan 4a (E-3): la única clienta «Venta de mostrador» (la crea 0021; kazero_app no cambia esta columna).
+    // Plan 4a (E-3): la única clienta «Venta de mostrador» (la crea 0023; kazero_app no cambia esta columna).
     esMostrador: boolean('es_mostrador').notNull().default(false),
   },
   (t) => [

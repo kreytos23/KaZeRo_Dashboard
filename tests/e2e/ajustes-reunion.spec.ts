@@ -112,7 +112,9 @@ test('devolver una pieza de un pedido liquidado da saldo a favor, que se usa en 
   await expect(estadoCon(page, 'Pago registrado. El pedido quedó liquidado.')).toBeVisible();
   await page.getByText('Devolver por defecto').click();
   await page.getByLabel('Motivo de la devolución').fill('Broche roto');
-  await page.getByLabel(`Confirmo la devolución de ${p1}`).check();
+  const casilla = page.getByLabel(`Confirmo la devolución de ${p1}`);
+  await casilla.check();
+  await expect(casilla).toBeChecked();
   await page.getByRole('button', { name: `Devolver ${p1}` }).click();
   await expect(estadoCon(page, 'Pieza devuelta')).toBeVisible();
   await expect(page.getByText(/Devuelta el .* \$149\.00 a saldo a favor — Broche roto/)).toBeVisible();

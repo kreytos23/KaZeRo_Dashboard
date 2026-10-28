@@ -158,7 +158,7 @@ export const pago = pgTable(
       .notNull()
       .references(() => admin.id),
     createdAt: ts('created_at').notNull().defaultNow(),
-    // Plan 4a (E-4): lo cobró este exhibidor (queda «por entregar»). El trigger de 0021 exige, al aplicarlo, un
+    // Plan 4a (E-4): lo cobró este exhibidor (queda «por entregar»). El trigger de 0023 exige, al aplicarlo, un
     // exhibidor abierto de la vendedora del pedido.
     exhibidorId: uuid('exhibidor_id').references(() => exhibidor.id),
   },

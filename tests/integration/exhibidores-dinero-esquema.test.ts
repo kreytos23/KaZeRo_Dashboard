@@ -5,7 +5,7 @@ import { conDbUrl, type Db, type Ejecutor } from '@/db/pool';
 import { pgCode, pgConstraint } from '@/db/errors';
 import { reiniciarConAdmin, urlApp } from './utilidades';
 
-// Plan 4a (0020/0021): clienta de mostrador, cobro por exhibidor y entregas de dinero. SQL directo (sin
+// Plan 4a (0022/0023): clienta de mostrador, cobro por exhibidor y entregas de dinero. SQL directo (sin
 // servicios) para probar solo la BD, como kazero_app.
 const app = <T>(fn: (db: Db) => Promise<T>) => conDbUrl(urlApp(), fn);
 const q = (s: SQL) => app((db) => db.execute(s));
@@ -91,7 +91,7 @@ const entrega = (monto: string, o: OpEntrega = {}) => {
 const cerrar = (exhibidorId = b.exhibidorId) =>
   q(sql`UPDATE exhibidor SET estado = 'cerrado', cerrado_at = now() WHERE id = ${exhibidorId}`);
 
-describe('clienta «Venta de mostrador» (0021)', () => {
+describe('clienta «Venta de mostrador» (0023)', () => {
   it('existe exactamente una; una segunda → 23505', async () => {
     const r = await q(sql`SELECT count(*)::int AS n, min(nombre) AS nombre FROM cliente WHERE es_mostrador`);
     expect(r.rows[0]).toEqual({ n: 1, nombre: 'Venta de mostrador' });
@@ -129,7 +129,7 @@ describe('clienta «Venta de mostrador» (0021)', () => {
   });
 });
 
-describe('cobro por el exhibidor (0021: pago_exhibidor_coherente)', () => {
+describe('cobro por el exhibidor (0023: pago_exhibidor_coherente)', () => {
   it('a un pedido de su vendedora entra; de otra vendedora → error', async () => {
     expect(await resultado(async () => cobrar(await nuevoPedido()))).toBe('ok');
     expect(await resultado(async () => cobrar(await nuevoPedido(b.olgaId)))).toBe('pago_exhibidor_coherente');
@@ -142,7 +142,7 @@ describe('cobro por el exhibidor (0021: pago_exhibidor_coherente)', () => {
   });
 });
 
-describe('pago_exhibidor_sin_saldo (0020)', () => {
+describe('pago_exhibidor_sin_saldo (0022)', () => {
   it('un pago con saldo a favor no puede llevar exhibidor_id (23514); en efectivo sí', async () => {
     const ins = (metodo: string) =>
       q(sql`INSERT INTO pago (idempotency_key, fecha, monto, metodo, pagador_cliente_id, admin_id, exhibidor_id)
@@ -152,7 +152,7 @@ describe('pago_exhibidor_sin_saldo (0020)', () => {
   });
 });
 
-describe('entrega_exhibidor (0020/0021)', () => {
+describe('entrega_exhibidor (0022/0023)', () => {
   it('por entregar = cobrado − entregas + ajustes: 300 − 100 − 20 = 180 en v_exhibidor', async () => {
     await cobrar(await nuevoPedido());
     expect(await resultado(() => entrega('301.00'))).toBe('entrega_exhibidor_excede');
@@ -221,7 +221,7 @@ describe('entrega_exhibidor (0020/0021)', () => {
   });
 });
 
-describe('exhibidor cerrado (0021: entrega_exhibidor_cerrado)', () => {
+describe('exhibidor cerrado (0023: entrega_exhibidor_cerrado)', () => {
   it('no admite entregas ni ajustes positivos', async () => {
     expect(await resultado(() => cerrar())).toBe('ok');
     expect(await resultado(() => entrega('10.00'))).toBe('entrega_exhibidor_cerrado');
@@ -231,7 +231,7 @@ describe('exhibidor cerrado (0021: entrega_exhibidor_cerrado)', () => {
   });
 });
 
-describe('cierre del exhibidor (0021: exhibidor_cierre_con_dinero)', () => {
+describe('cierre del exhibidor (0023: exhibidor_cierre_con_dinero)', () => {
   it('con dinero por entregar no se cierra; al entregarlo todo, sí', async () => {
     await cobrar(await nuevoPedido());
     await entrega('100.00');

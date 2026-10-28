@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, exists, gt, inArray, or } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, gt, inArray, or, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import {
   aplicacionPago,
@@ -53,7 +53,7 @@ export async function historialDineroExhibidor(
         nota: pago.nota,
         folio: vPedido.folio,
         clienteNombre: cliente.nombre,
-        adminNombre: vAdmin.email,
+        adminNombre: sql<string>`coalesce(${vAdmin.nombre}, ${vAdmin.email})`,
       })
       .from(pago)
       .innerJoin(vAdmin, eq(vAdmin.id, pago.adminId))
@@ -71,7 +71,7 @@ export async function historialDineroExhibidor(
         monto: entregaExhibidor.monto,
         metodo: entregaExhibidor.metodo,
         nota: entregaExhibidor.nota,
-        adminNombre: vAdmin.email,
+        adminNombre: sql<string>`coalesce(${vAdmin.nombre}, ${vAdmin.email})`,
       })
       .from(entregaExhibidor)
       .innerJoin(vAdmin, eq(vAdmin.id, entregaExhibidor.adminId))
