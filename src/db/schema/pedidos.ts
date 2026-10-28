@@ -174,10 +174,11 @@ export const pago = pgTable(
   },
   (t) => [
     uniqueIndex('pago_idempotency_key_uq').on(t.idempotencyKey),
-    // R-36: la misma imagen no se registra dos veces (NULL no choca).
+    // R-36 / P-4: la misma imagen no se registra en dos pagos vigentes (NULL no choca). Un pago anulado sale del
+    // índice: corregir un pago es anularlo y volver a registrarlo con la misma captura.
     uniqueIndex('pago_comprobante_sha256_uq')
       .on(t.comprobanteSha256)
-      .where(sql`${t.comprobanteSha256} IS NOT NULL`),
+      .where(sql`${t.comprobanteSha256} IS NOT NULL AND ${t.anuladoAt} IS NULL`),
     index('pago_anulado_por_idx').on(t.anuladoPor),
     index('pago_exhibidor_idx').on(t.exhibidorId),
     index('pago_pagador_cliente_idx').on(t.pagadorClienteId),

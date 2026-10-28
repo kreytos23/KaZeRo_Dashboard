@@ -3,6 +3,7 @@ import { sql, type SQL } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl, type Db, type Ejecutor } from '@/db/pool';
 import { pgCode, pgConstraint } from '@/db/errors';
+import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { clavesDeImagenReferenciadas } from '@/server/piezas/imagen';
 import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 
@@ -50,11 +51,11 @@ beforeEach(async () => {
   });
 });
 
-const nuevoPedido = (ej: Ejecutor, total = '300.00') =>
+const nuevoPedido = (ej: Ejecutor, total = '300.00', vendedorId?: string) =>
   idDe(
     ej,
     sql`INSERT INTO pedido (cliente_id, vendedor_id, admin_id, fecha, total, cuenta_tarjeta)
-        VALUES (${b.clienteId}, ${b.perlaId}, ${adminId}, '2026-10-10', ${total}, false) RETURNING id`,
+        VALUES (${b.clienteId}, ${vendedorId ?? b.perlaId}, ${adminId}, '2026-10-10', ${total}, false) RETURNING id`,
   );
 type OpPago = {
   metodo?: string;
@@ -145,6 +146,16 @@ describe('pago: referencia y comprobante (0024)', () => {
     const r = await resultado(() => app((db) => nuevoPago(db, '10.00', { sha: SHA })));
     expect(r).toBe('pago_comprobante_sha256_uq');
     expect(await resultado(() => app((db) => nuevoPago(db, '10.00', { sha: 'b'.repeat(64) })))).toBe('ok');
+  });
+
+  it('un pago anulado suelta su huella: corregirlo es anular y registrar otro con la misma captura', async () => {
+    const pagoId = await app((db) => nuevoPago(db, '10.00', { sha: SHA }));
+    await anular(pagoId);
+    expect(await resultado(() => app((db) => nuevoPago(db, '12.00', { sha: SHA })))).toBe('ok');
+    // Entre los vigentes sigue siendo única.
+    expect(await resultado(() => app((db) => nuevoPago(db, '12.00', { sha: SHA })))).toBe(
+      'pago_comprobante_sha256_uq',
+    );
   });
 
   it('el comprobante se agrega después, una vez (NULL → valor)', async () => {
@@ -243,14 +254,74 @@ describe('pago: solo se anula o recibe comprobante (0025: pago_solo_anular_o_com
     ).toBe('aplicacion_pago_pago_anulado');
   });
 
-  it('con una aplicación ya anulada antes (pedido cancelado) no se anula (pago_anulacion_aplicacion_previa)', async () => {
+  it('con una aplicación anulada por cancelar su pedido no se anula (pago_anulacion_aplicacion_previa)', async () => {
+    const { pagoId, pedidoId } = await enTx(async (tx) => {
+      const id = await nuevoPago(tx, '10.00');
+      const ped = await nuevoPedido(tx);
+      await aplicar(tx, id, ped, '10.00');
+      return { pagoId: id, pedidoId: ped };
+    });
+    // Como la cancelación (R-17): anula la aplicación, pasa lo abonado a saldo a favor y cancela el pedido.
+    await enTx(async (tx) => {
+      await fijarContextoAuditoria(tx, { adminId, motivo: 'Ya no lo quiere' });
+      await tx.execute(sql`UPDATE aplicacion_pago SET anulada_at = now() WHERE pago_id = ${pagoId}`);
+      await saldoMov(tx, { tipo: 'cancelacion', monto: '10.00', pedidoId });
+      await tx.execute(sql`UPDATE pedido SET estado = 'cancelado', cancelado_at = now(),
+        cancelacion_motivo = 'Ya no lo quiere' WHERE id = ${pedidoId}`);
+    });
+    expect(await resultado(() => anular(pagoId))).toBe('pago_anulacion_aplicacion_previa');
+  });
+
+  it('las aplicaciones que anula el propio deshacer (pedidos vivos) no cuentan como previas, sea cual sea su fecha', async () => {
     const pagoId = await enTx(async (tx) => {
       const id = await nuevoPago(tx, '10.00');
       await aplicar(tx, id, await nuevoPedido(tx), '10.00');
       return id;
     });
-    await q(sql`UPDATE aplicacion_pago SET anulada_at = now() WHERE pago_id = ${pagoId}`);
-    expect(await resultado(() => anular(pagoId))).toBe('pago_anulacion_aplicacion_previa');
+    expect(
+      await resultado(() =>
+        enTx(async (tx) => {
+          await tx.execute(sql`UPDATE aplicacion_pago SET anulada_at = now() - interval '1 minute'
+            WHERE pago_id = ${pagoId}`);
+          await tx.execute(sql`UPDATE pago SET anulado_at = now(), anulacion_motivo = 'Duplicado',
+            anulado_por = ${adminId} WHERE id = ${pagoId}`);
+        }),
+      ),
+    ).toBe('ok');
+  });
+});
+
+describe('aplicaciones: tope con sobrante y pagos de vendedora (0025: kz_validar_aplicacion_pago v2)', () => {
+  it('el sobrante cuenta contra el monto: pago 100, aplicado 60, sobrante 40 → otra aplicación de 40 se rechaza', async () => {
+    const pagoId = await pagoConSobrante();
+    expect(
+      await resultado(() => app(async (db) => aplicar(db, pagoId, await nuevoPedido(db), '40.00'))),
+    ).toBe('aplicacion_pago_excede_pago');
+    expect(await resultado(() => app(async (db) => aplicar(db, pagoId, await nuevoPedido(db), '0.01')))).toBe(
+      'aplicacion_pago_excede_pago',
+    );
+  });
+
+  it('R-32/P-1: el pago de una vendedora solo se aplica a sus pedidos (aplicacion_pago_otra_vendedora)', async () => {
+    const otraId = await app((db) =>
+      idDe(db, sql`INSERT INTO vendedor (nombre, tipo) VALUES ('Rosa', 'revendedora') RETURNING id`),
+    );
+    const pagoId = await app((db) => nuevoPago(db, '100.00', { vendedor: true }));
+    expect(
+      await resultado(() =>
+        app(async (db) => aplicar(db, pagoId, await nuevoPedido(db, '300.00', otraId), '10.00')),
+      ),
+    ).toBe('aplicacion_pago_otra_vendedora');
+    expect(
+      await resultado(() => app(async (db) => aplicar(db, pagoId, await nuevoPedido(db), '10.00'))),
+    ).toBe('ok');
+    // El pago de una clienta no tiene esa restricción.
+    const deClienta = await app((db) => nuevoPago(db, '10.00'));
+    expect(
+      await resultado(() =>
+        app(async (db) => aplicar(db, deClienta, await nuevoPedido(db, '300.00', otraId), '10.00')),
+      ),
+    ).toBe('ok');
   });
 });
 
@@ -294,6 +365,13 @@ describe('libro de saldo a favor: sobrante y anulación (0024/0025)', () => {
     expect(await resultado(() => sobrante('40.00'))).toBe('ok');
     // Uno por pago (saldo_favor_mov_pago_uq).
     expect(await resultado(() => sobrante('1.00'))).toBe('saldo_favor_mov_pago_uq');
+  });
+
+  it('un sobrante sin su pago se rechaza al insertar (saldo_favor_sobrante_sin_pago)', async () => {
+    for (const vendedor of [false, true])
+      expect(
+        await resultado(() => app((db) => saldoMov(db, { tipo: 'sobrante', monto: '5.00', vendedor }))),
+      ).toBe('saldo_favor_sobrante_sin_pago');
   });
 
   it('saldo_favor_pago_origen: la anulación exige su pago; uso, retiro y demás no llevan pago', async () => {

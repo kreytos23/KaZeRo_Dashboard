@@ -3215,7 +3215,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"pago\".\"comprobante_sha256\" IS NOT NULL",
+          "where": "\"pago\".\"comprobante_sha256\" IS NOT NULL AND \"pago\".\"anulado_at\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

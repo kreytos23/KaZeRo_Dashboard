@@ -42,9 +42,9 @@ CREATE TRIGGER pago_solo_anular_o_comprobante BEFORE UPDATE ON pago
   FOR EACH ROW EXECUTE FUNCTION kz_pago_solo_anular_o_comprobante();
 --> statement-breakpoint
 -- 3. (P-5) Anular un pago. Corre después de pago_solo_anular_o_comprobante (orden por nombre):
---    (a) Ninguna aplicación anulada ANTES de esta transacción. Hoy solo la cancelación de un pedido anula una
---        aplicación suelta, y ese dinero ya pasó a saldo a favor (R-17): deshacer el pago lo contaría dos veces. El
---        servicio anula las aplicaciones con now() en la misma transacción (now() = inicio de la transacción).
+--    (a) Ninguna aplicación anulada por la cancelación de su pedido. Hoy solo la cancelación anula una aplicación
+--        suelta, y ese dinero ya pasó a saldo a favor (R-17): deshacer el pago lo contaría dos veces. Se reconoce por
+--        el pedido `cancelado`, no por la fecha: las que el servicio anula al deshacer el pago son de pedidos vivos.
 --    (b) (E-5) Lo cobrado por un exhibidor sale de su por entregar, que no queda negativo (cerrado = 0: nunca).
 --        Mismo candado consultivo que entregas, ajustes y cierre (0023); el servicio ya tiene el pago (orden de
 --        bloqueo: ... → exhibidor → piezas → pago → candados). Antes del UPDATE la suma aún cuenta este pago.
@@ -56,8 +56,8 @@ BEGIN
   IF OLD.anulado_at IS NOT NULL OR NEW.anulado_at IS NULL THEN
     RETURN NEW;
   END IF;
-  IF EXISTS (SELECT 1 FROM public.aplicacion_pago a
-             WHERE a.pago_id = NEW.id AND a.anulada_at IS NOT NULL AND a.anulada_at <> now()) THEN
+  IF EXISTS (SELECT 1 FROM public.aplicacion_pago a JOIN public.pedido p ON p.id = a.pedido_id
+             WHERE a.pago_id = NEW.id AND a.anulada_at IS NOT NULL AND p.estado::text = 'cancelado') THEN
     RAISE EXCEPTION 'El pago tiene aplicaciones anuladas por una cancelación'
       USING ERRCODE = 'check_violation', CONSTRAINT = 'pago_anulacion_aplicacion_previa';
   END IF;
@@ -77,28 +77,35 @@ REVOKE ALL ON FUNCTION public.kz_validar_anulacion_pago() FROM PUBLIC;
 CREATE TRIGGER pago_validar_anulacion BEFORE UPDATE OF anulado_at ON pago
   FOR EACH ROW EXECUTE FUNCTION kz_validar_anulacion_pago();
 --> statement-breakpoint
--- 4. kz_validar_aplicacion_pago VERSIÓN 2 = el cuerpo de 0013 SIN CAMBIOS + (v2) un pago anulado no recibe
---    aplicaciones. Se lee bajo el mismo FOR NO KEY UPDATE del pago: una anulación concurrente espera o ya se ve.
+-- 4. kz_validar_aplicacion_pago VERSIÓN 2 = el cuerpo de 0013 + (v2, marcado):
+--    - un pago anulado no recibe aplicaciones;
+--    - (R-32/P-1) el pago de una vendedora solo se aplica a pedidos suyos (con P-2 su saldo a favor también paga);
+--    - (P-2) el tope cuenta el sobrante ya pasado al saldo: aplicaciones vigentes + sobrante ≤ monto.
+--    Todo se lee bajo el FOR NO KEY UPDATE del pago, que también toma el sobrante (§5): una anulación o un sobrante
+--    concurrentes esperan o ya se ven.
 --    Mismo SECURITY DEFINER y search_path; CREATE OR REPLACE conserva el oid, el trigger y el REVOKE.
 CREATE OR REPLACE FUNCTION public.kz_validar_aplicacion_pago() RETURNS trigger
   LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp
   AS $$
 DECLARE
   estado_pedido_tx text;
+  vendedor_pedido uuid;
   monto_pago numeric(12,2);
   pago_anulado timestamptz;
+  pagador_vendedor uuid;
   aplicado numeric(12,2);
 BEGIN
   -- Anular (o una aplicación que nace anulada) solo resta: no hay nada que validar ni bloquear.
   IF NEW.anulada_at IS NOT NULL THEN
     RETURN NEW;
   END IF;
-  SELECT p.estado::text INTO estado_pedido_tx FROM public.pedido p WHERE p.id = NEW.pedido_id FOR NO KEY UPDATE;
+  SELECT p.estado::text, p.vendedor_id INTO estado_pedido_tx, vendedor_pedido
+    FROM public.pedido p WHERE p.id = NEW.pedido_id FOR NO KEY UPDATE;
   IF estado_pedido_tx = 'cancelado' THEN
     RAISE EXCEPTION 'No se aplican pagos a un pedido cancelado'
       USING ERRCODE = 'P0001', CONSTRAINT = 'aplicacion_pago_pedido_cancelado';
   END IF;
-  SELECT pg.monto, pg.anulado_at INTO monto_pago, pago_anulado
+  SELECT pg.monto, pg.anulado_at, pg.pagador_vendedor_id INTO monto_pago, pago_anulado, pagador_vendedor
     FROM public.pago pg WHERE pg.id = NEW.pago_id FOR NO KEY UPDATE;
   IF NOT FOUND THEN
     RETURN NEW; -- La FK rechaza la fila.
@@ -108,9 +115,17 @@ BEGIN
     RAISE EXCEPTION 'El pago está anulado'
       USING ERRCODE = 'P0001', CONSTRAINT = 'aplicacion_pago_pago_anulado';
   END IF;
+  -- (v2) R-32/P-1. Un pedido sin encontrar lo rechaza la FK (vendedor_pedido NULL no llega a confirmarse).
+  IF pagador_vendedor IS NOT NULL AND vendedor_pedido IS NOT NULL AND vendedor_pedido <> pagador_vendedor THEN
+    RAISE EXCEPTION 'El pago de una vendedora solo se aplica a sus pedidos'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'aplicacion_pago_otra_vendedora';
+  END IF;
   SELECT coalesce(sum(a.monto), 0) INTO aplicado
     FROM public.aplicacion_pago a
     WHERE a.pago_id = NEW.pago_id AND a.anulada_at IS NULL AND a.id <> NEW.id;
+  -- (v2) P-2: el sobrante ya es saldo a favor; no se puede volver a aplicar.
+  aplicado := aplicado + coalesce((SELECT s.monto FROM public.saldo_favor_mov s
+                                   WHERE s.pago_id = NEW.pago_id AND s.tipo::text = 'sobrante'), 0);
   IF aplicado + NEW.monto > monto_pago THEN
     RAISE EXCEPTION 'Lo aplicado supera el monto del pago'
       USING ERRCODE = 'P0001', CONSTRAINT = 'aplicacion_pago_excede_pago';
@@ -121,11 +136,13 @@ $$;
 --> statement-breakpoint
 -- 5. kz_validar_saldo_favor VERSIÓN 3 = el cuerpo de la v2 (0017) SIN CAMBIOS + dos ramas de origen y la anulación
 --    en "nunca negativo" (marcadas v3). Mismo trigger saldo_favor_libro (0013): CREATE OR REPLACE conserva el oid.
---    - sobrante con pago (P-2): titular = pagador, pago vigente y no de saldo a favor, y sobrante + lo aplicado
---      vigente ≤ monto (el servicio aplica primero y luego registra el sobrante). Sin pago_id: los de antes.
+--    - sobrante (P-2): siempre con su pago (saldo_favor_sobrante_sin_pago; solo al insertar: no revalida filas
+--      viejas). Titular = pagador, pago vigente y no de saldo a favor, y sobrante + lo aplicado vigente ≤ monto (el
+--      servicio aplica primero y luego registra el sobrante). Toma el pago FOR NO KEY UPDATE, como una aplicación
+--      (§4): sobrante y aplicación concurrentes se serializan y ninguno pasa el tope.
 --    - anulacion (P-5): el pago ya está anulado (el servicio lo marca antes de escribir el libro), mismo titular y
---      monto = +monto del pago si se pagó con saldo a favor (todo aplicado: lo exige 0017, y 0025 §3a que nada se
---      anulara antes), o −su sobrante. Uno por pago (saldo_favor_mov_pago_uq); su pago lo exige saldo_favor_pago_origen.
+--      monto = +monto del pago si se pagó con saldo a favor (todo aplicado: lo exige 0017, y 0025 §3a que ninguna
+--      se anulara por cancelación), o −su sobrante. Uno por pago (saldo_favor_mov_pago_uq); su pago lo exige saldo_favor_pago_origen.
 CREATE OR REPLACE FUNCTION public.kz_validar_saldo_favor() RETURNS trigger
   LANGUAGE plpgsql
   AS $$
@@ -166,7 +183,13 @@ BEGIN
         USING ERRCODE = 'P0001', CONSTRAINT = 'saldo_favor_devolucion_incoherente';
     END IF;
   -- (v3)
+  ELSIF NEW.tipo::text = 'sobrante' AND NEW.pago_id IS NULL THEN
+    RAISE EXCEPTION 'Un sobrante nace de un pago'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'saldo_favor_sobrante_sin_pago';
   ELSIF NEW.tipo::text IN ('sobrante', 'anulacion') AND NEW.pago_id IS NOT NULL THEN
+    IF NEW.tipo::text = 'sobrante' THEN
+      PERFORM 1 FROM public.pago p WHERE p.id = NEW.pago_id FOR NO KEY UPDATE;
+    END IF;
     SELECT p.monto, p.metodo::text AS metodo, p.anulado_at, p.pagador_cliente_id, p.pagador_vendedor_id INTO pa
       FROM public.pago p WHERE p.id = NEW.pago_id;
     IF NOT FOUND THEN

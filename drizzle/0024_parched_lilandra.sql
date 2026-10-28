@@ -11,7 +11,7 @@ ALTER TABLE "pago" ADD COLUMN "anulado_por" uuid;--> statement-breakpoint
 ALTER TABLE "saldo_favor_mov" ADD COLUMN "pago_id" uuid;--> statement-breakpoint
 ALTER TABLE "pago" ADD CONSTRAINT "pago_anulado_por_admin_id_fk" FOREIGN KEY ("anulado_por") REFERENCES "public"."admin"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "saldo_favor_mov" ADD CONSTRAINT "saldo_favor_mov_pago_id_pago_id_fk" FOREIGN KEY ("pago_id") REFERENCES "public"."pago"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
-CREATE UNIQUE INDEX "pago_comprobante_sha256_uq" ON "pago" USING btree ("comprobante_sha256") WHERE "pago"."comprobante_sha256" IS NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "pago_comprobante_sha256_uq" ON "pago" USING btree ("comprobante_sha256") WHERE "pago"."comprobante_sha256" IS NOT NULL AND "pago"."anulado_at" IS NULL;--> statement-breakpoint
 CREATE INDEX "pago_anulado_por_idx" ON "pago" USING btree ("anulado_por");--> statement-breakpoint
 CREATE UNIQUE INDEX "saldo_favor_mov_pago_uq" ON "saldo_favor_mov" USING btree ("pago_id","tipo");--> statement-breakpoint
 ALTER TABLE "pago" ADD CONSTRAINT "pago_referencia_largo" CHECK ("pago"."referencia" IS NULL OR char_length(btrim("pago"."referencia")) BETWEEN 1 AND 60);--> statement-breakpoint
