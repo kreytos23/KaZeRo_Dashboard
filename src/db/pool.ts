@@ -1,7 +1,10 @@
 import { Pool } from '@neondatabase/serverless';
 import { drizzle, type NeonDatabase } from 'drizzle-orm/neon-serverless';
+import { configurarProxyLocal } from './proxy-local';
 import { etiquetaErrorBd } from './reintento';
 import * as schema from './schema';
+
+configurarProxyLocal();
 
 export type Db = NeonDatabase<typeof schema>;
 

@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { hostNormalizado } from './lib/guarda-bd';
 import { asignarPasswordApp, migrar } from './lib/migrar';
 import { borrarRama, cadenaConexion, contarRamas, crearRama } from './lib/neon';
-import { ARCHIVO_RAMA_PRUEBA, archivoRamaTrabajador } from './lib/rama-prueba';
+import { borrarBases, crearBases, nombresBases } from './lib/pg-directo';
+import { ARCHIVO_RAMA_PRUEBA, archivoRamaTrabajador, MENSAJE_SIN_MODO, modoPruebas } from './lib/rama-prueba';
 import { LIMITE_RAMAS_NEON, trabajadoresDisponibles, trabajadoresPedidos } from './lib/ramas-paralelas';
 
 const modo = process.argv[2];
@@ -14,6 +15,15 @@ if (modo !== 'integracion' && modo !== 'e2e') {
   console.error('Uso: tsx scripts/test-neon.ts <integracion|e2e> [args extra]');
   process.exit(2);
 }
+
+// Por defecto ya no se crean ramas Neon: una rama por worker y corrida agotó la cuota de almacenamiento del
+// proyecto. En CI se usa el Postgres de servicio de Actions (KAZERO_PG_PRUEBAS_URL); Neon solo a propósito.
+const bdModo = modoPruebas(process.env);
+if (!bdModo) {
+  console.error(`[test-neon] ${MENSAJE_SIN_MODO}`);
+  process.exit(2);
+}
+const pgDirecto = bdModo === 'pg' ? process.env.KAZERO_PG_PRUEBAS_URL! : null;
 
 const sufijo = process.env.GITHUB_RUN_ID
   ? `ci-${process.env.GITHUB_RUN_ID}-${process.env.GITHUB_RUN_ATTEMPT ?? '1'}-${modo}`
@@ -39,11 +49,12 @@ const hijos: ReturnType<typeof spawn>[] = [];
 let limpio = false;
 
 /** Idempotente: se llama desde el finally y desde Ctrl+C/SIGTERM. Intenta borrar TODAS aunque alguna falle. */
-function limpiar() {
+async function limpiar() {
   if (limpio) return;
   limpio = true;
   for (const f of archivos) rmSync(f, { force: true });
   for (const d of dirsImagenes) rmSync(d, { recursive: true, force: true });
+  if (pgDirecto) return borrarBases(pgDirecto, creadas);
   for (const nombre of creadas) {
     console.log(`[test-neon] Borrando rama ${nombre}…`);
     try {
@@ -58,8 +69,7 @@ for (const senal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(senal, () => {
     console.error(`[test-neon] ${senal}: abortando y borrando las ramas…`);
     for (const h of hijos) h.kill();
-    limpiar();
-    process.exit(130);
+    void limpiar().finally(() => process.exit(130));
   });
 }
 
@@ -72,46 +82,54 @@ try {
   const extra = process.argv.slice(3);
   const eligeProyecto = extra.some((a) => a === '--project' || a.startsWith('--project=') || a === '-p');
   if (modo === 'e2e' && !eligeProyecto) n = PROYECTOS_E2E.length;
-  if (modo === 'integracion' || n > 1) {
-    const pedidos = modo === 'integracion' ? trabajadoresPedidos(process.env.KAZERO_TEST_WORKERS) : n;
-    const limite = Number(process.env.KAZERO_LIMITE_RAMAS) || LIMITE_RAMAS_NEON;
-    n = trabajadoresDisponibles(pedidos, contarRamas(), limite);
-    // Otra corrida de CI en paralelo puede tener ocupado el cupo: se espera a que libere sus ramas (las borra
-    // al terminar) en vez de fallar de inmediato.
-    for (let espera = 0; n < 1 && espera < ESPERA_MAX_CUPO_MS; espera += PAUSA_CUPO_MS) {
-      console.warn(
-        `[test-neon] Sin cupo de ramas (límite ${limite}); se reintenta en ${PAUSA_CUPO_MS / 1000} s…`,
-      );
-      await new Promise((r) => setTimeout(r, PAUSA_CUPO_MS));
+  if (pgDirecto) {
+    // Postgres directo: sin límite de ramas; una base test_* por worker.
+    if (modo === 'integracion') n = trabajadoresPedidos(process.env.KAZERO_TEST_WORKERS);
+    creadas.push(...nombresBases(sufijo, n));
+    console.log(`[test-neon] Creando ${n} base(s) de prueba en Postgres directo…`);
+    ramas.push(...(await crearBases(pgDirecto, creadas)));
+  } else {
+    if (modo === 'integracion' || n > 1) {
+      const pedidos = modo === 'integracion' ? trabajadoresPedidos(process.env.KAZERO_TEST_WORKERS) : n;
+      const limite = Number(process.env.KAZERO_LIMITE_RAMAS) || LIMITE_RAMAS_NEON;
       n = trabajadoresDisponibles(pedidos, contarRamas(), limite);
+      // Otra corrida de CI en paralelo puede tener ocupado el cupo: se espera a que libere sus ramas (las borra
+      // al terminar) en vez de fallar de inmediato.
+      for (let espera = 0; n < 1 && espera < ESPERA_MAX_CUPO_MS; espera += PAUSA_CUPO_MS) {
+        console.warn(
+          `[test-neon] Sin cupo de ramas (límite ${limite}); se reintenta en ${PAUSA_CUPO_MS / 1000} s…`,
+        );
+        await new Promise((r) => setTimeout(r, PAUSA_CUPO_MS));
+        n = trabajadoresDisponibles(pedidos, contarRamas(), limite);
+      }
+      if (n < 1)
+        throw new Error(`No caben ramas de prueba (límite ${limite} en el plan). Borra ramas test-* viejas.`);
+      if (n < pedidos)
+        console.warn(`[test-neon] Solo caben ${n} de ${pedidos} workers por el límite de ramas.`);
     }
-    if (n < 1)
-      throw new Error(`No caben ramas de prueba (límite ${limite} en el plan). Borra ramas test-* viejas.`);
-    if (n < pedidos)
-      console.warn(`[test-neon] Solo caben ${n} de ${pedidos} workers por el límite de ramas.`);
-  }
 
-  // Hijas de development: copia instantánea (copy-on-write). Caducan en 2 h por si el proceso muere antes de borrarlas.
-  for (let i = 0; i < n; i++) {
-    const nombre = n === 1 ? `test-${sufijo}` : `test-${sufijo}-w${i + 1}`;
-    console.log(`[test-neon] Creando rama temporal ${nombre} (padre: development)…`);
-    try {
-      crearRama(nombre, 'development', 2);
-    } catch (e) {
-      // Una carrera con otro CI pudo agotar el cupo: seguimos con las que ya hay.
-      if (creadas.length === 0) throw e;
-      console.warn(`[test-neon] No se pudo crear ${nombre}; se sigue con ${creadas.length} worker(s).`);
-      break;
+    // Hijas de development: copia instantánea (copy-on-write). Caducan en 2 h por si el proceso muere antes de borrarlas.
+    for (let i = 0; i < n; i++) {
+      const nombre = n === 1 ? `test-${sufijo}` : `test-${sufijo}-w${i + 1}`;
+      console.log(`[test-neon] Creando rama temporal ${nombre} (padre: development)…`);
+      try {
+        crearRama(nombre, 'development', 2);
+      } catch (e) {
+        // Una carrera con otro CI pudo agotar el cupo: seguimos con las que ya hay.
+        if (creadas.length === 0) throw e;
+        console.warn(`[test-neon] No se pudo crear ${nombre}; se sigue con ${creadas.length} worker(s).`);
+        break;
+      }
+      creadas.push(nombre);
     }
-    creadas.push(nombre);
+    await Promise.all(
+      creadas.map(async (rama) => {
+        const owner = cadenaConexion(rama);
+        await migrar(owner);
+        ramas.push({ rama, owner, app: await asignarPasswordApp(owner) });
+      }),
+    );
   }
-  await Promise.all(
-    creadas.map(async (rama) => {
-      const owner = cadenaConexion(rama);
-      await migrar(owner);
-      ramas.push({ rama, owner, app: await asignarPasswordApp(owner) });
-    }),
-  );
   ramas.sort((a, b) => a.rama.localeCompare(b.rama));
 
   const base = {
@@ -185,5 +203,5 @@ try {
   }
   process.exitCode = codigos.find((c) => c !== 0) ?? 0;
 } finally {
-  limpiar();
+  await limpiar();
 }
