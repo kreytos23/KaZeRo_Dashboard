@@ -121,7 +121,7 @@ test('devolver una pieza de un pedido liquidado da saldo a favor, que se usa en 
   await expect(page.getByText('Devuelto: $149.00')).toBeVisible();
 
   // El saldo aparece en la ficha del cliente, con su historial.
-  await page.getByRole('link', { name: nombre }).click();
+  await page.getByRole('link', { name: nombre, exact: true }).click();
   await expect(montoSaldoFavor(page)).toHaveText('$149.00');
   await expect(page.getByText(`Devolución de KZR-${folio}: Broche roto`)).toBeVisible();
 
@@ -133,7 +133,7 @@ test('devolver una pieza de un pedido liquidado da saldo a favor, que se usa en 
   await expect(estadoCon(page, 'Pago registrado.')).toBeVisible();
 
   // Retirar el resto en efectivo.
-  await page.getByRole('link', { name: nombre }).click();
+  await page.getByRole('link', { name: nombre, exact: true }).click();
   await expect(montoSaldoFavor(page)).toHaveText('$49.00');
   await expect(page.getByText(`Usado en KZR-${segundo.folio}`)).toBeVisible();
   await expect(page.getByLabel('Monto a devolver')).toHaveValue('49.00');

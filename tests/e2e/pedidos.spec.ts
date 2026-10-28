@@ -105,7 +105,7 @@ test('nuevo pedido con alta rápida de cliente, piezas en ráfaga (una de exhibi
 
   // R-25: la tarjeta del cliente cuenta la compra.
   await page.goto(`/panel/pedidos/${folio}`);
-  await page.getByRole('link', { name: `Ana Pedido ${m}` }).click();
+  await page.getByRole('link', { name: `Ana Pedido ${m}`, exact: true }).click();
   await expect(page.getByRole('listitem', { name: `Lugar 1: KZR-${folio}` })).toBeVisible();
 });
 
