@@ -4,6 +4,7 @@ import { createReadStream } from 'node:fs';
 import { link, mkdir, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { Readable } from 'node:stream';
+import { RAICES_IMAGEN } from '@/domain/imagenes';
 import type { AlmacenImagenes } from './almacen';
 import { exigirLimite, exigirPrefijo, exigirRuta, LIMITE_LISTA, paginarRutas } from './ruta';
 
@@ -54,7 +55,7 @@ export function crearAlmacenDisco(dir: string): AlmacenImagenes {
       exigirPrefijo(prefijo);
       exigirLimite(limite);
       const rutas: string[] = [];
-      for (const raiz of ['piezas', 'comprobantes']) {
+      for (const raiz of RAICES_IMAGEN) {
         try {
           for (const carpeta of await readdir(join(base, raiz))) {
             try {

@@ -1,5 +1,5 @@
 import 'server-only';
-import { esRutaImagen } from '@/domain/imagenes';
+import { GRUPO_RAICES, esRutaImagen } from '@/domain/imagenes';
 
 /** Defensa en profundidad: toda implementación valida la ruta antes de tocar nada. */
 export function exigirRuta(ruta: string): string {
@@ -8,7 +8,7 @@ export function exigirRuta(ruta: string): string {
 }
 
 // Prefijo parcial de una ruta de foto: `piezas/`, `comprobantes/`, `piezas/<uuid>/`, `piezas/<uuid>/<medio uuid>`…
-const PREFIJO = /^(piezas|comprobantes)\/[0-9a-f-]*(\/[0-9a-f-]*)?$/;
+const PREFIJO = new RegExp(`^${GRUPO_RAICES}/[0-9a-f-]*(/[0-9a-f-]*)?$`);
 
 export function exigirPrefijo(prefijo: string): string {
   if (!PREFIJO.test(prefijo)) throw new RangeError('Prefijo de imagen inválido');

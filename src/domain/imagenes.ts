@@ -16,10 +16,15 @@ export const CALIDADES_SUBIDA = [0.9, 0.8, 0.7] as const;
 export const MENSAJE_FOTO_GRANDE = 'La foto es demasiado grande (máximo 30 megapíxeles).';
 export const MENSAJE_FOTO_ILEGIBLE = 'No se pudo leer la foto. Intenta con otra.';
 
+/** Carpetas del almacén: fotos de pieza y (Plan 4b) comprobantes de pago. Comparten esquema de ruta y barrido. */
+export const RAICES_IMAGEN = ['piezas', 'comprobantes'] as const;
+/** `(piezas|comprobantes)` para las expresiones de rutas y prefijos. */
+export const GRUPO_RAICES = `(${RAICES_IMAGEN.join('|')})`;
+
 const VARIANTES: readonly Variante[] = ['grande', 'mini'];
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const RUTA =
-  /^(piezas|comprobantes)\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(grande|mini)\.webp$/;
+const UUID_RE = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const UUID = new RegExp(`^${UUID_RE}$`);
+const RUTA = new RegExp(`^${GRUPO_RAICES}/${UUID_RE}/${UUID_RE}-(grande|mini)\\.webp$`);
 // Marcas ISO-BMFF (ftyp) de HEIF/HEIC; 'avif'/'avis' son AVIF.
 const MARCAS_HEIC = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);
 const MARCAS_AVIF = new Set(['avif', 'avis']);
