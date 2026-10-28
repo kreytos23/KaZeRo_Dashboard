@@ -176,6 +176,8 @@ export const pago = pgTable(
       'pago_saldo_favor_cliente',
       sql`${t.metodo}::text <> 'saldo_favor' OR ${t.pagadorClienteId} IS NOT NULL`,
     ),
+    // Plan 4a: usar saldo a favor no es dinero que el exhibidor cobró (no se le pide entregarlo).
+    check('pago_exhibidor_sin_saldo', sql`${t.exhibidorId} IS NULL OR ${t.metodo}::text <> 'saldo_favor'`),
   ],
 );
 

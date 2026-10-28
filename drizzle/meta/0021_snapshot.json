@@ -1,6 +1,6 @@
 {
-  "id": "4740a3b4-183e-4131-aebf-b0fe91e210aa",
-  "prevId": "737746a9-db64-4a53-92ed-002cad3a8316",
+  "id": "e8db9ded-76f5-4b27-a513-4b2db5d687b9",
+  "prevId": "cd8d14a5-06ee-46f3-9ecf-e4a0daa688bb",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -3291,6 +3291,10 @@
         "pago_saldo_favor_cliente": {
           "name": "pago_saldo_favor_cliente",
           "value": "\"pago\".\"metodo\"::text <> 'saldo_favor' OR \"pago\".\"pagador_cliente_id\" IS NOT NULL"
+        },
+        "pago_exhibidor_sin_saldo": {
+          "name": "pago_exhibidor_sin_saldo",
+          "value": "\"pago\".\"exhibidor_id\" IS NULL OR \"pago\".\"metodo\"::text <> 'saldo_favor'"
         }
       },
       "isRLSEnabled": false

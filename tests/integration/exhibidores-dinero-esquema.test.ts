@@ -132,6 +132,16 @@ describe('cobro por el exhibidor (0021: pago_exhibidor_coherente)', () => {
   });
 });
 
+describe('pago_exhibidor_sin_saldo (0020)', () => {
+  it('un pago con saldo a favor no puede llevar exhibidor_id (23514); en efectivo sí', async () => {
+    const ins = (metodo: string) =>
+      q(sql`INSERT INTO pago (idempotency_key, fecha, monto, metodo, pagador_cliente_id, admin_id, exhibidor_id)
+        VALUES (${randomUUID()}, '2026-10-12', '10.00', ${metodo}, ${b.clienteId}, ${adminId}, ${b.exhibidorId})`);
+    expect(await resultado(() => ins('saldo_favor'))).toBe('pago_exhibidor_sin_saldo');
+    expect(await resultado(() => ins('efectivo'))).toBe('ok');
+  });
+});
+
 describe('entrega_exhibidor (0020/0021)', () => {
   it('por entregar = cobrado − entregas + ajustes: 300 − 100 − 20 = 180 en v_exhibidor', async () => {
     await cobrar(await nuevoPedido());
@@ -198,6 +208,16 @@ describe('entrega_exhibidor (0020/0021)', () => {
     for (const s of [sql`UPDATE entrega_exhibidor SET monto = 1`, sql`DELETE FROM entrega_exhibidor`]) {
       expect(await codigo(() => q(s))).toBe('42501');
     }
+  });
+});
+
+describe('exhibidor cerrado (0021: entrega_exhibidor_cerrado)', () => {
+  it('no admite entregas ni ajustes positivos', async () => {
+    expect(await resultado(() => cerrar())).toBe('ok');
+    expect(await resultado(() => entrega('10.00'))).toBe('entrega_exhibidor_cerrado');
+    expect(await resultado(() => entrega('10.00', { tipo: 'ajuste', nota: 'Sobrante' }))).toBe(
+      'entrega_exhibidor_cerrado',
+    );
   });
 });
 

@@ -89,6 +89,12 @@ BEGIN
       USING ERRCODE = 'check_violation', CONSTRAINT = 'entrega_exhibidor_fecha';
   END IF;
   PERFORM pg_advisory_xact_lock(hashtext('kz_exhibidor_dinero:' || NEW.exhibidor_id));
+  -- Cerrado implica por entregar = 0 (E-8): ni entregas ni ajustes sobre un exhibidor cerrado. El cierre toma este
+  -- mismo candado, así que no hay carrera con la lectura.
+  IF EXISTS (SELECT 1 FROM public.exhibidor e WHERE e.id = NEW.exhibidor_id AND e.estado::text = 'cerrado') THEN
+    RAISE EXCEPTION 'El exhibidor está cerrado'
+      USING ERRCODE = 'check_violation', CONSTRAINT = 'entrega_exhibidor_cerrado';
+  END IF;
   IF public.kz_por_entregar(NEW.exhibidor_id)
      + CASE WHEN NEW.tipo::text = 'entrega' THEN -NEW.monto ELSE NEW.monto END < 0 THEN
     RAISE EXCEPTION 'La entrega supera el dinero por entregar del exhibidor'

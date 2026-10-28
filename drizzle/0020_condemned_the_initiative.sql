@@ -24,4 +24,5 @@ CREATE INDEX "entrega_exhibidor_exhibidor_idx" ON "entrega_exhibidor" USING btre
 CREATE INDEX "entrega_exhibidor_admin_idx" ON "entrega_exhibidor" USING btree ("admin_id");--> statement-breakpoint
 ALTER TABLE "pago" ADD CONSTRAINT "pago_exhibidor_id_exhibidor_id_fk" FOREIGN KEY ("exhibidor_id") REFERENCES "public"."exhibidor"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 CREATE UNIQUE INDEX "cliente_mostrador_uq" ON "cliente" USING btree ("es_mostrador") WHERE "cliente"."es_mostrador";--> statement-breakpoint
-CREATE INDEX "pago_exhibidor_idx" ON "pago" USING btree ("exhibidor_id");
+CREATE INDEX "pago_exhibidor_idx" ON "pago" USING btree ("exhibidor_id");--> statement-breakpoint
+ALTER TABLE "pago" ADD CONSTRAINT "pago_exhibidor_sin_saldo" CHECK ("pago"."exhibidor_id" IS NULL OR "pago"."metodo"::text <> 'saldo_favor');

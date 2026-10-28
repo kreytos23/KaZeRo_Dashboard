@@ -397,4 +397,18 @@ describe('importar notas KZR', () => {
       { cliente_id: dora },
     ]);
   });
+
+  it('nunca liga una clienta del Excel a la de mostrador: con el mismo nombre crea otra', async () => {
+    const filas = [fila(2, { cliente: 'Venta de mostrador' })];
+    const plan = await simular(urlOwner(), filas, HOY);
+    expect(plan.clientesPorCrear).toHaveLength(1);
+    const r = await aplicar(filas, plan.hash);
+    expect(r.insertados).toMatchObject({ clientes: 1, pedidos: 1 });
+    const ped = (
+      await owner((db) =>
+        db.execute(sql`SELECT c.es_mostrador FROM pedido p JOIN cliente c ON c.id = p.cliente_id`),
+      )
+    ).rows;
+    expect(ped).toEqual([{ es_mostrador: false }]);
+  });
 });
