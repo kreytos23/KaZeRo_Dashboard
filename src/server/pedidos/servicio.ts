@@ -3,6 +3,7 @@ import type { Ejecutor } from '@/db/pool';
 import {
   aplicacionPago,
   cliente,
+  devolucion,
   pago,
   pedido,
   pedidoItem,
@@ -23,6 +24,7 @@ import {
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 import { MSG_FECHA_FUTURA } from '@/server/exhibidores/mensajes';
+import { MSG_CANCELAR_CON_DEVOLUCIONES } from '@/server/pagos/mensajes';
 import { conIdempotencia } from '@/server/idempotencia';
 import { exigirCustodiaDe } from '@/server/piezas/custodia';
 import { retirarEnTx, validarNotaRetiro } from '@/server/saldo-favor/servicio';
@@ -300,6 +302,15 @@ export async function cancelarPedido(
           if (p.estado === 'cancelado')
             throw new ErrorNegocio('pedido_cancelado', 'El pedido ya está cancelado.');
           if (p.version !== d.version) throw conflictoVersion();
+          // P-5: un pedido reabierto con devoluciones no se cancela (su crédito ya está en el saldo a favor).
+          const [devuelta] = await tx
+            .select({ id: devolucion.id })
+            .from(devolucion)
+            .innerJoin(pedidoItem, eq(pedidoItem.id, devolucion.pedidoItemId))
+            .where(eq(pedidoItem.pedidoId, p.id))
+            .limit(1);
+          if (devuelta)
+            throw new ErrorNegocio('pedido_cancelado_con_devoluciones', MSG_CANCELAR_CON_DEVOLUCIONES);
           const { piezas, abiertos, itemIds } = await bloquearPiezasDelPedido(tx, p.id);
           const r = await liberarPiezas(tx, {
             pedidoId: p.id,
@@ -365,6 +376,7 @@ export async function cancelarPedido(
                 ...t,
                 montoCentavos: t.c,
                 nota: reembolso,
+                pedidoId: p.id,
                 adminId: d.adminId,
                 fecha: hoyMX(),
               });

@@ -296,6 +296,32 @@ describe('P-5: deshacer un pago', () => {
       });
       expect(await ficha(v.pedidoId)).toMatchObject({ estado: 'liquidado' });
     });
+
+    it('concurrencia: deshacer el cobro y entregarlo a la vez; solo uno gana y el por entregar no queda negativo', async () => {
+      const v = await venta();
+      const pagoId = await pagoDe(v.pedidoId);
+      const r = await Promise.allSettled([
+        anular(pagoId),
+        app((db) =>
+          registrarEntregaExhibidor(db, {
+            key: randomUUID(),
+            adminId,
+            exhibidorId,
+            montoCentavos: 10000,
+            metodo: 'efectivo',
+          }),
+        ),
+      ]);
+      expect(r.filter((x) => x.status === 'fulfilled')).toHaveLength(1);
+      const error = (r.find((x) => x.status === 'rejected') as PromiseRejectedResult).reason as {
+        codigo: string;
+      };
+      const anulado = r[0]!.status === 'fulfilled';
+      if (anulado) expect(['excede', 'entrega_exhibidor_excede']).toContain(error.codigo);
+      else expect(error.codigo).toBe('pago_anulacion_exhibidor_negativo');
+      expect(await app((db) => porEntregarCentavos(db, exhibidorId))).toBe(0);
+      expect(await ficha(v.pedidoId)).toMatchObject({ estado: anulado ? 'abierto' : 'liquidado' });
+    });
   });
 
   it('comisión de un mes cerrado: la línea no cambia y al volver a liquidarse no se comisiona otra vez', async () => {
@@ -357,6 +383,67 @@ describe('P-5: deshacer un pago', () => {
     expect(await estadoPieza('AN15')).toBe('vendida');
   });
 
+  it('un pedido reabierto con devoluciones no se cancela y el saldo a favor no se mueve', async () => {
+    const p = await pedidoCon(['AN19', 'AN20']);
+    const pg = await pagar(p.id, 20000);
+    const [linea] = await filas<{ id: string }>(
+      sql`SELECT i.id::text FROM pedido_item i JOIN pieza z ON z.id = i.pieza_id
+          WHERE i.pedido_id = ${p.id} AND z.codigo = 'AN19'`,
+    );
+    await app((db) =>
+      devolverPiezaDefectuosa(db, {
+        key: randomUUID(),
+        adminId,
+        pedidoId: p.id,
+        itemId: linea!.id,
+        motivo: 'Se rompió el broche',
+      }),
+    );
+    await anular(pg.pagoId);
+    expect(await saldoClienta()).toBe('100.00');
+
+    const e = await falla(cancelar(p.id, { nota: 'Se le devolvió en efectivo' }));
+    expect(e).toMatchObject({
+      codigo: 'pedido_cancelado_con_devoluciones',
+      message:
+        'Este pedido tiene piezas devueltas: no se puede cancelar. Registra el pago de lo que se queda.',
+    });
+    expect(await falla(cancelar(p.id))).toMatchObject({ codigo: 'pedido_cancelado_con_devoluciones' });
+    expect(await saldoClienta()).toBe('100.00');
+    expect(await ficha(p.id)).toMatchObject({ estado: 'abierto' });
+    expect(await estadoPieza('AN20')).toBe('apartada');
+
+    // La BD es la última barrera.
+    const bd = await app((db) =>
+      db.transaction((tx) =>
+        tx.execute(
+          sql`UPDATE pedido SET estado = 'cancelado', cancelado_at = now(), cancelacion_motivo = 'x' WHERE id = ${p.id}`,
+        ),
+      ),
+    ).catch((x: unknown) => x);
+    expect(String((bd as Error).cause ?? bd)).toContain('Un pedido con devoluciones no se cancela');
+  });
+
+  it('concurrencia: deshacer un abono y cancelar su pedido a la vez; el abono cuenta una sola vez', async () => {
+    const p = await pedidoCon(['AN21']);
+    const pg = await pagar(p.id, 4000);
+    const r = await Promise.allSettled([anular(pg.pagoId), cancelar(p.id)]);
+    // Cancelar gana siempre: si va primero, el abono pasa a saldo a favor y deshacerlo se rechaza; si va
+    // después, ya no hay abono vigente y cancela sin saldo a favor.
+    expect(r[1]!.status).toBe('fulfilled');
+    const anulado = r[0]!.status === 'fulfilled';
+    if (!anulado)
+      expect((r[0] as PromiseRejectedResult).reason).toMatchObject({
+        codigo: 'pago_anulacion_aplicacion_previa',
+      });
+    expect((r[1] as PromiseFulfilledResult<{ saldoFavor: string }>).value.saldoFavor).toBe(
+      anulado ? '0.00' : '40.00',
+    );
+    expect(await saldoClienta()).toBe(anulado ? '0.00' : '40.00');
+    expect(await ficha(p.id)).toMatchObject({ estado: 'cancelado', pagado: '0.00' });
+    expect(await estadoPieza('AN21')).toBe('disponible');
+  });
+
   it('la BD no deja pasar una pieza vendida a apartada fuera de una anulación', async () => {
     const p = await pedidoCon(['AN16']);
     await pagar(p.id, 10000);
@@ -381,9 +468,11 @@ describe('P-5: deshacer un pago', () => {
     const error = (r.find((x) => x.status === 'rejected') as PromiseRejectedResult).reason as {
       codigo: string;
     };
-    expect(['sobrante_usado', 'saldo_insuficiente', 'saldo_favor_insuficiente']).toContain(error.codigo);
-    expect(await saldoVendedora()).toBe('0.00');
     const anulado = r[0]!.status === 'fulfilled';
+    // Si pierde la anulación, el rechazo del libro se traduce a sobrante_usado; si pierde el uso, es suyo.
+    if (anulado) expect(['saldo_insuficiente', 'saldo_favor_insuficiente']).toContain(error.codigo);
+    else expect(error.codigo).toBe('sobrante_usado');
+    expect(await saldoVendedora()).toBe('0.00');
     expect(await ficha(a.id)).toMatchObject({ estado: anulado ? 'abierto' : 'liquidado' });
     expect(await ficha(b.id)).toMatchObject({ pagado: anulado ? '0.00' : '50.00' });
   });
@@ -399,12 +488,13 @@ describe('P-6: cancelar con reembolso en efectivo', () => {
     expect(await ficha(p.id)).toMatchObject({ estado: 'cancelado' });
     expect(await saldoClienta()).toBe('0.00');
     expect(await saldoVendedora()).toBe('0.00');
-    const retiros = await filas<{ monto: string; nota: string; v: boolean }>(
-      sql`SELECT monto::text, nota, vendedor_id IS NOT NULL AS v FROM saldo_favor_mov WHERE tipo::text = 'retiro' ORDER BY v`,
+    const retiros = await filas<{ monto: string; nota: string; v: boolean; pedido: string }>(
+      sql`SELECT monto::text, nota, vendedor_id IS NOT NULL AS v, pedido_id::text AS pedido
+          FROM saldo_favor_mov WHERE tipo::text = 'retiro' ORDER BY v`,
     );
     expect(retiros).toEqual([
-      { monto: '-30.00', nota: 'Se le devolvió en efectivo', v: false },
-      { monto: '-20.00', nota: 'Se le devolvió en efectivo', v: true },
+      { monto: '-30.00', nota: 'Se le devolvió en efectivo', v: false, pedido: p.id },
+      { monto: '-20.00', nota: 'Se le devolvió en efectivo', v: true, pedido: p.id },
     ]);
   });
 

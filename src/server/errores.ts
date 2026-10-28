@@ -10,6 +10,7 @@ import {
 } from '@/server/exhibidores/mensajes';
 import {
   MSG_APLICACION_PREVIA,
+  MSG_CANCELAR_CON_DEVOLUCIONES,
   MSG_COMPROBANTE_REPETIDO,
   MSG_EXHIBIDOR_NEGATIVO,
   MSG_MOTIVO_ANULACION,
@@ -212,6 +213,7 @@ const MENSAJES: Record<string, string> = {
   pago_anulacion_exhibidor_negativo: MSG_EXHIBIDOR_NEGATIVO,
   pago_anulado_incompleto: PEDIDO_INCONSISTENTE,
   saldo_favor_anulacion_incoherente: PEDIDO_INCONSISTENTE,
+  pedido_cancelado_con_devoluciones: MSG_CANCELAR_CON_DEVOLUCIONES,
   pedido_mostrador_sin_tarjeta: 'Las notas de venta de mostrador no cuentan en tarjeta.',
 };
 

@@ -21,7 +21,9 @@ import {
   MSG_APLICACION_PREVIA,
   MSG_EXHIBIDOR_NEGATIVO,
   MSG_MOTIVO_ANULACION,
+  MSG_PAGO_NO_EXISTE,
   MSG_YA_ANULADO,
+  mensajePiezasNoVendidas,
   mensajeSobranteUsado,
 } from './mensajes';
 
@@ -61,7 +63,7 @@ export async function anularPago(db: Ejecutor, d: DatosAnulacion): Promise<{ rea
               .select({ clienteId: pago.pagadorClienteId, exhibidorId: pago.exhibidorId })
               .from(pago)
               .where(eq(pago.id, d.pagoId));
-            if (!previo) throw new ErrorNegocio('no_encontrado', 'El pago no existe.');
+            if (!previo) throw new ErrorNegocio('no_encontrado', MSG_PAGO_NO_EXISTE);
             const refs = await tx
               .select({ pedidoId: aplicacionPago.pedidoId, clienteId: pedido.clienteId })
               .from(aplicacionPago)
@@ -183,7 +185,7 @@ export async function anularPago(db: Ejecutor, d: DatosAnulacion): Promise<{ rea
               if (noVendidas.length)
                 throw new ErrorNegocio(
                   'inconsistente',
-                  `Las piezas del pedido ya no están vendidas: ${noVendidas.map((x) => `${x.codigo} (${x.estado})`).join(', ')}. Recarga la página.`,
+                  mensajePiezasNoVendidas(noVendidas.map((x) => `${x.codigo} (${x.estado})`)),
                 );
               if (suyas.length) {
                 await tx

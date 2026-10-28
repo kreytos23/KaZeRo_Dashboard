@@ -88,6 +88,8 @@ export async function retirarEnTx(
     nota: string;
     adminId: string;
     fecha: string;
+    /** P-6: el pedido cancelado del reembolso, para que el historial del saldo lo muestre. */
+    pedidoId?: string;
   },
 ): Promise<number> {
   const disponible = numericACentavos(
@@ -100,6 +102,7 @@ export async function retirarEnTx(
     tipo: 'retiro',
     monto: centavosANumericConSigno(-d.montoCentavos),
     nota: d.nota,
+    pedidoId: d.pedidoId ?? null,
     adminId: d.adminId,
     fecha: d.fecha,
   });

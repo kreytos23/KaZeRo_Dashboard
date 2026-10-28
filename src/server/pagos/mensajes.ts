@@ -17,3 +17,11 @@ export function mensajeSobranteUsado(sobrante?: string, saldo?: string): string 
   const detalle = sobrante && saldo ? ` (sobrante ${sobrante}, saldo a favor ${saldo})` : '';
   return `No se puede deshacer: el sobrante de este pago ya se usó${detalle}. Primero deshaz lo que lo usó.`;
 }
+export const MSG_PAGO_NO_EXISTE = 'El pago no existe.';
+export function mensajePiezasNoVendidas(piezas: string[]): string {
+  return `Las piezas del pedido ya no están vendidas: ${piezas.join(', ')}. Recarga la página.`;
+}
+
+// Al reabrir, una devolución ya está en el saldo a favor: cancelar dejaría ese crédito sin respaldo.
+export const MSG_CANCELAR_CON_DEVOLUCIONES =
+  'Este pedido tiene piezas devueltas: no se puede cancelar. Registra el pago de lo que se queda.';

@@ -430,3 +430,27 @@ BEGIN
   RETURN NEW;
 END
 $$;
+--> statement-breakpoint
+-- 10. (P-5) kz_validar_transicion_pedido VERSIÓN 2 = el cuerpo de 0013 SIN CAMBIOS + un agregado (v2, marcado):
+--     deshacer un pago reabre un pedido que puede tener devoluciones, cuyo crédito ya está en el saldo a favor.
+--     Cancelarlo dejaría ese crédito sin respaldo (y la pieza conservada de vuelta en inventario): prohibido.
+CREATE OR REPLACE FUNCTION public.kz_validar_transicion_pedido() RETURNS trigger
+  LANGUAGE plpgsql
+  AS $$
+BEGIN
+  IF OLD.estado <> NEW.estado AND (OLD.estado::text || '>' || NEW.estado::text) <> ALL (ARRAY[
+    'abierto>liquidado', 'liquidado>abierto', 'abierto>cancelado'
+  ]) THEN
+    RAISE EXCEPTION 'Transición de pedido no permitida: % → %', OLD.estado, NEW.estado
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pedido_transicion';
+  END IF;
+  -- (v2) Un pedido con devoluciones no se cancela.
+  IF OLD.estado::text <> 'cancelado' AND NEW.estado::text = 'cancelado'
+     AND EXISTS (SELECT 1 FROM public.devolucion d JOIN public.pedido_item i ON i.id = d.pedido_item_id
+                 WHERE i.pedido_id = NEW.id) THEN
+    RAISE EXCEPTION 'Un pedido con devoluciones no se cancela'
+      USING ERRCODE = 'P0001', CONSTRAINT = 'pedido_cancelado_con_devoluciones';
+  END IF;
+  RETURN NEW;
+END
+$$;
