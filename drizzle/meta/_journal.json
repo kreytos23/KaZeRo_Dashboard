@@ -141,6 +141,20 @@
       "when": 1793090090024,
       "tag": "0019_comisiones_reglas",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793171667359,
+      "tag": "0020_chemical_moonstone",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793171676809,
+      "tag": "0021_exhibidores_dinero_reglas",
+      "breakpoints": true
     }
   ]
 }

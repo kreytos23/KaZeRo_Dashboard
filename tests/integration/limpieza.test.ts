@@ -37,7 +37,7 @@ describe('limpiarDatosPrueba', () => {
     expect(r).toMatchObject({
       pieza: 1,
       pedido: 1,
-      cliente: 1,
+      cliente: 2, // + la clienta de mostrador (Plan 4a)
       vendedor: 1,
       categoria: 1,
       movimiento_pieza: 1,
@@ -53,7 +53,10 @@ describe('limpiarDatosPrueba', () => {
       ),
     );
     expect(n.rows[0]).toMatchObject({ admins: 1, sesiones: 1, accesos: 1 });
-    expect(Number(n.rows[0]!.negocio)).toBe(0);
+    // Solo queda la clienta de mostrador, resembrada (Plan 4a).
+    expect(Number(n.rows[0]!.negocio)).toBe(1);
+    const m = await owner((db) => db.execute(sql`SELECT nombre FROM cliente WHERE es_mostrador`));
+    expect(m.rows).toEqual([{ nombre: 'Venta de mostrador' }]);
   });
 
   it('reinicia los contadores: el siguiente pedido es el primer folio y movimientos/auditoría vuelven a 1; las tablas conservadas no se tocan', async () => {

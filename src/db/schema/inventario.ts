@@ -127,9 +127,14 @@ export const cliente = pgTable(
     notas: text('notas').notNull().default(''),
     version: integer('version').notNull().default(1),
     ...tiempos,
+    // Plan 4a (E-3): la única clienta «Venta de mostrador» (la crea 0021; kazero_app no cambia esta columna).
+    esMostrador: boolean('es_mostrador').notNull().default(false),
   },
   (t) => [
     largo('cliente_nombre_largo', t.nombre, 1, 120),
+    uniqueIndex('cliente_mostrador_uq')
+      .on(t.esMostrador)
+      .where(sql`${t.esMostrador}`),
     index('cliente_vendedor_habitual_idx').on(t.vendedorHabitualId),
     maxLargo('cliente_referencia_largo', t.referencia, 120),
     maxLargo('cliente_telefono_largo', t.telefono, 30),

@@ -14,7 +14,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { admin } from './auth';
-import { cliente, pieza, vendedor } from './inventario';
+import { cliente, exhibidor, pieza, vendedor } from './inventario';
 
 // Plan 3. Reglas que no caben en un CHECK (máquina de estados, auditoría, privilegios por columna, vistas) en
 // drizzle/0013_pedidos_reglas.sql.
@@ -158,9 +158,13 @@ export const pago = pgTable(
       .notNull()
       .references(() => admin.id),
     createdAt: ts('created_at').notNull().defaultNow(),
+    // Plan 4a (E-4): lo cobró este exhibidor (queda «por entregar»). El trigger de 0021 exige, al aplicarlo, un
+    // exhibidor abierto de la vendedora del pedido.
+    exhibidorId: uuid('exhibidor_id').references(() => exhibidor.id),
   },
   (t) => [
     uniqueIndex('pago_idempotency_key_uq').on(t.idempotencyKey),
+    index('pago_exhibidor_idx').on(t.exhibidorId),
     index('pago_pagador_cliente_idx').on(t.pagadorClienteId),
     index('pago_pagador_vendedor_idx').on(t.pagadorVendedorId),
     index('pago_admin_idx').on(t.adminId),

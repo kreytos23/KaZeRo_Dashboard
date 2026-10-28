@@ -48,7 +48,7 @@ async function contar() {
     db.execute(
       sql`SELECT (SELECT count(*) FROM pedido)::int AS pedidos, (SELECT count(*) FROM pedido_item)::int AS items,
         (SELECT count(*) FROM movimiento_pieza WHERE tipo = 'apartado')::int AS movs, (SELECT count(*) FROM origen_excel)::int AS origen,
-        (SELECT count(*) FROM cliente)::int AS clientes,
+        (SELECT count(*) FROM cliente WHERE NOT es_mostrador)::int AS clientes,
         (SELECT count(*) FROM pieza WHERE estado = 'apartada')::int AS apartadas,
         (SELECT count(*) FROM admin WHERE lower(email) = ${EMAIL_ADMIN_MIGRACION})::int AS admin_mig`,
     ),

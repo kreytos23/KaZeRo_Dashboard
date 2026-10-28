@@ -1,6 +1,7 @@
 export * from './auditoria';
 export * from './auth';
 export * from './comisiones';
+export * from './exhibidores';
 export * from './inventario';
 export * from './migracion';
 export * from './pedidos';
