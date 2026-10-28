@@ -4,7 +4,13 @@ import { conDbUrl } from '@/db/pool';
 import { accesoLog, admin, sesion } from '@/db/schema';
 import { codigoRecuperacion } from '@/db/schema';
 import { crearAdmin } from '@/server/auth/admin';
-import { agregarAdmin, listarAdmins, regenerarTotp } from '@/server/auth/administradores';
+import {
+  agregarAdmin,
+  guardarNombreAdmin,
+  listarAdmins,
+  nombreDeAdmin,
+  regenerarTotp,
+} from '@/server/auth/administradores';
 import {
   cerrarSesion,
   cerrarTodas,
@@ -75,6 +81,39 @@ const eventos = (email: string) =>
   app((db) => db.select({ evento: accesoLog.evento }).from(accesoLog).where(eq(accesoLog.email, email))).then(
     (f) => f.map((x) => x.evento),
   );
+
+describe('nombre del administrador', () => {
+  it('kazero_app lo guarda, lo quita con vacío y el CHECK valida el largo', async () => {
+    expect(await app((db) => nombreDeAdmin(db, adminId))).toBeNull();
+    await app((db) => guardarNombreAdmin(db, adminId, '  Kazero  '));
+    expect(await app((db) => nombreDeAdmin(db, adminId))).toBe('Kazero');
+    expect((await app((db) => listarAdmins(db)))[0]!.nombre).toBe('Kazero');
+    await expect(app((db) => guardarNombreAdmin(db, adminId, 'x'.repeat(61)))).rejects.toThrow(/60/);
+    await app((db) => guardarNombreAdmin(db, adminId, '   '));
+    expect(await app((db) => nombreDeAdmin(db, adminId))).toBeNull();
+  });
+  it('se puede dar al agregar un administrador', async () => {
+    const r = await app((db) =>
+      agregarAdmin(
+        db,
+        {
+          adminActualId: adminId,
+          sesionActualId: SIN_SESION,
+          passwordActual: PASS,
+          email: 'otra@kazero.mx',
+          nombre: 'Otra',
+          password: 'una-contraseña-larga-123',
+          confirmacion: 'una-contraseña-larga-123',
+          ...red,
+        },
+        llaveTotp(),
+      ),
+    );
+    expect(r.ok).toBe(true);
+    const f = await app((db) => listarAdmins(db));
+    expect(f.find((a) => a.email === 'otra@kazero.mx')?.nombre).toBe('Otra');
+  });
+});
 
 describe('agregar administrador', () => {
   it('exige la contraseña actual y registra el fallo (cuenta para el bloqueo)', async () => {

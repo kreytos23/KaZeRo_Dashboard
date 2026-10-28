@@ -1,14 +1,16 @@
 import Link from 'next/link';
 import { conDbLectura } from '@/db/client';
 import { centavosANumeric, formatoMXN } from '@/domain/dinero';
-import { hoyMX } from '@/domain/fechas';
+import { hoyMX, saludoSegunHora } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
 import { textoCierre, textoReporteDeudores } from '@/domain/recordatorios';
+import { Anillo } from '@/features/pedidos/iconos-lealtad';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
 import { FECHA_LARGA } from '@/features/ui/formato';
 import { PorEntregar } from '@/features/exhibidores/PorEntregar';
 import { Saldo } from '@/features/ui/Saldo';
 import { calcularMesAbierto, comisionesPendientes, reporteComisiones } from '@/server/comisiones/lecturas';
+import { nombreDeAdmin } from '@/server/auth/administradores';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { exhibidoresPorEntregar } from '@/server/exhibidores/lecturas-dinero';
 import { reporteDeudores } from '@/server/reportes/deudores';
@@ -16,17 +18,19 @@ import { reporteDeudores } from '@/server/reportes/deudores';
 export const metadata = { title: 'Panel' };
 
 export default async function Panel() {
-  await requerirSesion();
-  const hoy = hoyMX();
-  const { deudas, pendientes, curso, abierto, porEntregar } = await conDbLectura(async (db) => {
-    const [deudas, pendientes, abierto, porEntregar] = await Promise.all([
+  const { adminId } = await requerirSesion();
+  const ahora = new Date();
+  const hoy = hoyMX(ahora);
+  const { nombre, deudas, pendientes, curso, abierto, porEntregar } = await conDbLectura(async (db) => {
+    const [nombre, deudas, pendientes, abierto, porEntregar] = await Promise.all([
+      nombreDeAdmin(db, adminId),
       reporteDeudores(db, { hoy }),
       comisionesPendientes(db),
       calcularMesAbierto(db, hoy),
       exhibidoresPorEntregar(db),
     ]);
     const curso = await reporteComisiones(db, abierto, { hoy, abierto });
-    return { deudas, pendientes, curso, abierto, porEntregar };
+    return { nombre, deudas, pendientes, curso, abierto, porEntregar };
   });
   const cierre = textoCierre(abierto, hoy);
   const atrasados = deudas.grupos
@@ -37,6 +41,10 @@ export default async function Panel() {
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="-mb-3 flex items-center gap-2 text-monto text-tinta-suave">
+        <Anillo className="size-5 shrink-0" />
+        {nombre ? `${saludoSegunHora(ahora)}, ${nombre}` : saludoSegunHora(ahora)}
+      </p>
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <h1 className="text-2xl font-semibold first-letter:uppercase">
           {FECHA_LARGA.format(new Date(`${hoy}T12:00:00Z`))}

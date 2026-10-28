@@ -1,5 +1,5 @@
 -- Plan 4a: clienta de mostrador (E-3), cobro por exhibidor (E-4), por entregar (E-5), entregas y ajustes (E-6) y
--- cierre sin dinero (E-8). Reglas que no caben en un CHECK. Los enums nacen con CREATE TYPE en 0020, pero igual
+-- cierre sin dinero (E-8). Reglas que no caben en un CHECK. Los enums nacen con CREATE TYPE en 0022, pero igual
 -- que en 0019 se comparan como `::text`.
 
 -- 1. (E-3) La única clienta «Venta de mostrador» (índice único parcial cliente_mostrador_uq). Idempotente; quien
@@ -88,7 +88,7 @@ BEGIN
     RAISE EXCEPTION 'La fecha de la entrega no puede ser futura'
       USING ERRCODE = 'check_violation', CONSTRAINT = 'entrega_exhibidor_fecha';
   END IF;
-  PERFORM pg_advisory_xact_lock(hashtext('kz_exhibidor_dinero:' || NEW.exhibidor_id));
+  PERFORM pg_advisory_xact_lock(hashtextextended('kz_exhibidor_dinero:' || NEW.exhibidor_id, 0));
   -- Cerrado implica por entregar = 0 (E-8): ni entregas ni ajustes sobre un exhibidor cerrado. El cierre toma este
   -- mismo candado, así que no hay carrera con la lectura.
   IF EXISTS (SELECT 1 FROM public.exhibidor e WHERE e.id = NEW.exhibidor_id AND e.estado::text = 'cerrado') THEN
@@ -116,7 +116,7 @@ CREATE OR REPLACE FUNCTION public.kz_exhibidor_cierre_sin_dinero() RETURNS trigg
   AS $$
 BEGIN
   IF NEW.estado::text = 'cerrado' AND OLD.estado::text <> 'cerrado' THEN
-    PERFORM pg_advisory_xact_lock(hashtext('kz_exhibidor_dinero:' || NEW.id));
+    PERFORM pg_advisory_xact_lock(hashtextextended('kz_exhibidor_dinero:' || NEW.id, 0));
     IF public.kz_por_entregar(NEW.id) <> 0 THEN
       RAISE EXCEPTION 'El exhibidor tiene dinero por entregar'
         USING ERRCODE = 'check_violation', CONSTRAINT = 'exhibidor_cierre_con_dinero';

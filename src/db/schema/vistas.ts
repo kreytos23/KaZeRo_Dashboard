@@ -120,6 +120,7 @@ export const vAdmin = pgView('v_admin', {
   id: uuid('id').notNull(),
   email: text('email').notNull(),
   createdAt: ts('created_at').notNull(),
+  nombre: text('nombre'),
 }).existing();
 
 // Creada en 0009_auditoria_reglas.sql: una fila por campo cambiado, con el correo del admin (sin N+1).

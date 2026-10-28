@@ -25,6 +25,12 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
   });
   it('sí puede actualizar el paso TOTP (lo usa el login)', async () => {
     expect(await codigoAl(urlApp(), sql`UPDATE admin SET totp_ultimo_paso = totp_ultimo_paso`)).toBe('ok');
+    expect(await codigoAl(urlApp(), sql`UPDATE admin SET nombre = 'Kazero'`)).toBe('ok');
+    // CHECK admin_nombre_largo (23514): vacío y de más de 60 caracteres se rechazan (INSERT: no depende de que haya filas).
+    const alta = (n: ReturnType<typeof sql>) =>
+      sql`INSERT INTO admin (email, nombre, password_hash, totp_secret_cifrado) VALUES ('n@n.mx', ${n}, 'h', 'c')`;
+    expect(await codigoAl(urlApp(), alta(sql`''`))).toBe('23514');
+    expect(await codigoAl(urlApp(), alta(sql`repeat('x', 61)`))).toBe('23514');
   });
   it('no puede reescribir códigos de recuperación ni revivir uno usado', async () => {
     await truncarTodo();
@@ -72,6 +78,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       'created_at',
       'email',
       'id',
+      'nombre',
       'password_hash',
       'rol',
       'totp_secret_cifrado',
@@ -84,10 +91,10 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       [
         // SELECT de tabla: el login lee password_hash y el TOTP.
         ...columnasAdmin.map((c) => `admin.${c}:SELECT`),
-        // Alta: solo estas tres columnas (no puede elegir `rol`).
-        ...['email', 'password_hash', 'totp_secret_cifrado'].map((c) => `admin.${c}:INSERT`),
-        // Regenerar TOTP y el paso del login; nunca contraseña, correo ni rol.
-        ...['totp_secret_cifrado', 'totp_ultimo_paso', 'updated_at', 'version'].map(
+        // Alta: solo estas columnas (no puede elegir `rol`).
+        ...['email', 'nombre', 'password_hash', 'totp_secret_cifrado'].map((c) => `admin.${c}:INSERT`),
+        // Regenerar TOTP, el paso del login y el nombre; nunca contraseña, correo ni rol.
+        ...['nombre', 'totp_secret_cifrado', 'totp_ultimo_paso', 'updated_at', 'version'].map(
           (c) => `admin.${c}:UPDATE`,
         ),
         ...columnasCodigo.map((c) => `codigo_recuperacion.${c}:SELECT`),

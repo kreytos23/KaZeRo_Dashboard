@@ -23,7 +23,9 @@ const ENLACES = [
 ] as const;
 
 const RUTAS = [...ENLACES.map(([href]) => href), NUEVO];
-const BASE = 'flex min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-meta';
+// Columnas iguales (grid-cols-5): el «+» queda al centro sin importar el largo de cada etiqueta.
+const BASE =
+  'flex w-full min-h-11 min-w-11 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-meta';
 
 /** Accesos rápidos fijos al pie en celular (< md). El botón central, «Nuevo pedido», es el destacado. */
 export function BarraInferior() {
@@ -46,7 +48,7 @@ export function BarraInferior() {
       className="fixed inset-x-0 bottom-0 z-(--z-barra) border-t border-borde bg-superficie md:hidden"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="mx-auto flex max-w-md items-end justify-around px-2 pt-1 pb-1">
+      <ul className="mx-auto grid max-w-md grid-cols-5 items-end px-2 pt-1 pb-1">
         {ENLACES.slice(0, 2).map(enlace)}
         <li>
           <Link

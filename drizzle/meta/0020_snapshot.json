@@ -1,5 +1,5 @@
 {
-  "id": "cd8d14a5-06ee-46f3-9ecf-e4a0daa688bb",
+  "id": "ce9ba7a7-750e-4843-9e77-19c68540a8c8",
   "prevId": "eee8c87e-5a60-4cbf-afa0-917fec9d49dc",
   "version": "7",
   "dialect": "postgresql",
@@ -354,6 +354,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "password_hash": {
           "name": "password_hash",
           "type": "text",
@@ -424,7 +430,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "admin_nombre_largo": {
+          "name": "admin_nombre_largo",
+          "value": "\"admin\".\"nombre\" IS NULL OR char_length(\"admin\".\"nombre\") BETWEEN 1 AND 60"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.codigo_recuperacion": {
@@ -1145,158 +1156,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.entrega_exhibidor": {
-      "name": "entrega_exhibidor",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
-        },
-        "exhibidor_id": {
-          "name": "exhibidor_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "tipo": {
-          "name": "tipo",
-          "type": "tipo_entrega_exhibidor",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "monto": {
-          "name": "monto",
-          "type": "numeric(12, 2)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "fecha": {
-          "name": "fecha",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "metodo": {
-          "name": "metodo",
-          "type": "metodo_entrega",
-          "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "nota": {
-          "name": "nota",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "admin_id": {
-          "name": "admin_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "entrega_exhibidor_exhibidor_idx": {
-          "name": "entrega_exhibidor_exhibidor_idx",
-          "columns": [
-            {
-              "expression": "exhibidor_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "fecha",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "entrega_exhibidor_admin_idx": {
-          "name": "entrega_exhibidor_admin_idx",
-          "columns": [
-            {
-              "expression": "admin_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "entrega_exhibidor_exhibidor_id_exhibidor_id_fk": {
-          "name": "entrega_exhibidor_exhibidor_id_exhibidor_id_fk",
-          "tableFrom": "entrega_exhibidor",
-          "tableTo": "exhibidor",
-          "columnsFrom": [
-            "exhibidor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        },
-        "entrega_exhibidor_admin_id_admin_id_fk": {
-          "name": "entrega_exhibidor_admin_id_admin_id_fk",
-          "tableFrom": "entrega_exhibidor",
-          "tableTo": "admin",
-          "columnsFrom": [
-            "admin_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "entrega_exhibidor_monto": {
-          "name": "entrega_exhibidor_monto",
-          "value": "(\"entrega_exhibidor\".\"tipo\" = 'entrega' AND \"entrega_exhibidor\".\"monto\" > 0) OR (\"entrega_exhibidor\".\"tipo\" = 'ajuste' AND \"entrega_exhibidor\".\"monto\" <> 0)"
-        },
-        "entrega_exhibidor_metodo": {
-          "name": "entrega_exhibidor_metodo",
-          "value": "(\"entrega_exhibidor\".\"tipo\" = 'entrega') = (\"entrega_exhibidor\".\"metodo\" IS NOT NULL)"
-        },
-        "entrega_exhibidor_nota": {
-          "name": "entrega_exhibidor_nota",
-          "value": "\"entrega_exhibidor\".\"nota\" IS NULL OR char_length(\"entrega_exhibidor\".\"nota\") <= 200"
-        },
-        "entrega_exhibidor_ajuste_motivo": {
-          "name": "entrega_exhibidor_ajuste_motivo",
-          "value": "\"entrega_exhibidor\".\"tipo\" <> 'ajuste' OR (\"entrega_exhibidor\".\"nota\" IS NOT NULL AND char_length(btrim(\"entrega_exhibidor\".\"nota\")) BETWEEN 1 AND 200)"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.categoria": {
       "name": "categoria",
       "schema": "",
@@ -1429,32 +1288,9 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "es_mostrador": {
-          "name": "es_mostrador",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {
-        "cliente_mostrador_uq": {
-          "name": "cliente_mostrador_uq",
-          "columns": [
-            {
-              "expression": "es_mostrador",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"cliente\".\"es_mostrador\"",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "cliente_vendedor_habitual_idx": {
           "name": "cliente_vendedor_habitual_idx",
           "columns": [
@@ -3133,12 +2969,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "exhibidor_id": {
-          "name": "exhibidor_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -3153,21 +2983,6 @@
             }
           ],
           "isUnique": true,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "pago_exhibidor_idx": {
-          "name": "pago_exhibidor_idx",
-          "columns": [
-            {
-              "expression": "exhibidor_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -3257,19 +3072,6 @@
           ],
           "onDelete": "no action",
           "onUpdate": "no action"
-        },
-        "pago_exhibidor_id_exhibidor_id_fk": {
-          "name": "pago_exhibidor_id_exhibidor_id_fk",
-          "tableFrom": "pago",
-          "tableTo": "exhibidor",
-          "columnsFrom": [
-            "exhibidor_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -3291,10 +3093,6 @@
         "pago_saldo_favor_cliente": {
           "name": "pago_saldo_favor_cliente",
           "value": "\"pago\".\"metodo\"::text <> 'saldo_favor' OR \"pago\".\"pagador_cliente_id\" IS NOT NULL"
-        },
-        "pago_exhibidor_sin_saldo": {
-          "name": "pago_exhibidor_sin_saldo",
-          "value": "\"pago\".\"exhibidor_id\" IS NULL OR \"pago\".\"metodo\"::text <> 'saldo_favor'"
         }
       },
       "isRLSEnabled": false
@@ -4149,23 +3947,6 @@
         "otro"
       ]
     },
-    "public.metodo_entrega": {
-      "name": "metodo_entrega",
-      "schema": "public",
-      "values": [
-        "efectivo",
-        "transferencia",
-        "otro"
-      ]
-    },
-    "public.tipo_entrega_exhibidor": {
-      "name": "tipo_entrega_exhibidor",
-      "schema": "public",
-      "values": [
-        "entrega",
-        "ajuste"
-      ]
-    },
     "public.estado_exhibidor": {
       "name": "estado_exhibidor",
       "schema": "public",
@@ -4276,6 +4057,12 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
+        },
+        "nombre": {
+          "name": "nombre",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "name": "v_admin",
@@ -4593,30 +4380,6 @@
         "piezas_apartadas": {
           "name": "piezas_apartadas",
           "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "cobrado": {
-          "name": "cobrado",
-          "type": "numeric",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "entregado": {
-          "name": "entregado",
-          "type": "numeric",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "ajustes": {
-          "name": "ajustes",
-          "type": "numeric",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "por_entregar": {
-          "name": "por_entregar",
-          "type": "numeric",
           "primaryKey": false,
           "notNull": true
         }

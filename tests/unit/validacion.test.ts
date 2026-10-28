@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { esquemaCorreo, validarAltaAdmin } from '@/server/auth/validacion';
+import { esquemaCorreo, validarAltaAdmin, validarNombre } from '@/server/auth/validacion';
 
 const BUENA = 'contraseña-suficientemente-larga';
 
@@ -27,5 +27,16 @@ describe('validarAltaAdmin', () => {
     expect(validarAltaAdmin({ email: 'a@kazero.mx', password: 'corta', confirmacion: 'corta' })).toMatch(
       /12/,
     );
+  });
+});
+
+describe('validarNombre', () => {
+  it('recorta, junta espacios y trata vacío como sin nombre', () => {
+    expect(validarNombre('  Ana   María ')).toEqual({ nombre: 'Ana María', error: null });
+    expect(validarNombre('   ')).toEqual({ nombre: null, error: null });
+  });
+  it('rechaza más de 60 caracteres', () => {
+    expect(validarNombre('x'.repeat(60)).error).toBeNull();
+    expect(validarNombre('x'.repeat(61)).error).toMatch(/60/);
   });
 });

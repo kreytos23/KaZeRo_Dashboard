@@ -3,11 +3,17 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { conDb } from '@/db/client';
-import { agregarAdmin, regenerarTotp, type ResultadoEnrolamiento } from '@/server/auth/administradores';
+import {
+  agregarAdmin,
+  guardarNombreAdmin,
+  regenerarTotp,
+  type ResultadoEnrolamiento,
+} from '@/server/auth/administradores';
 import { qrComoDataUrl } from '@/server/auth/qr';
 import { datosRed } from '@/server/auth/red';
 import { requerirSesion } from '@/server/auth/sesion-actual';
-import { texto } from '@/server/acciones';
+import type { EstadoAccion } from '@/features/ui/estado';
+import { ejecutarAccion, texto, uuidDe } from '@/server/acciones';
 import { env } from '@/server/env';
 import type { EstadoEnrolamiento } from './tipos';
 
@@ -35,6 +41,7 @@ export async function accionAgregarAdmin(_: EstadoEnrolamiento, fd: FormData): P
         passwordActual: texto(fd, 'passwordActual'),
         // `usuarioActual` (campo oculto para el gestor de contraseñas) se ignora a propósito.
         email: texto(fd, 'correoNuevo'),
+        nombre: texto(fd, 'nombre'),
         password: texto(fd, 'password'),
         confirmacion: texto(fd, 'confirmacion'),
         ...red,
@@ -63,4 +70,13 @@ export async function accionRegenerarTotp(_: EstadoEnrolamiento, fd: FormData): 
   if (!r.ok && r.bloqueado) redirect('/login?motivo=bloqueado');
   if (!r.ok) await requerirSesion();
   return presentar(r);
+}
+
+export async function accionGuardarNombre(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  await requerirSesion();
+  return ejecutarAccion(async () => {
+    await conDb((db) => guardarNombreAdmin(db, uuidDe(fd, 'adminId'), texto(fd, 'nombre')));
+    revalidatePath('/panel');
+    revalidatePath('/panel/administradores');
+  });
 }
