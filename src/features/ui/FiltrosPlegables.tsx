@@ -46,8 +46,8 @@ export function FiltrosPlegables({
         </button>
         {activos.map((a) => (
           <a key={a.clave} href={a.href} className="chip">
+            <span className="sr-only">Quitar filtro: </span>
             {a.etiqueta} <span aria-hidden="true">✕</span>
-            <span className="sr-only">quitar filtro</span>
           </a>
         ))}
       </div>
@@ -58,30 +58,32 @@ export function FiltrosPlegables({
         onClick={(e) => {
           if (e.target === panel.current) panel.current.close();
         }}
-        className="fixed inset-x-0 top-auto bottom-0 m-0 max-h-[85dvh] w-full max-w-none overflow-y-auto rounded-t-2xl bg-superficie p-4 text-tinta backdrop:bg-tinta/35 md:hidden"
+        className="fixed inset-x-0 top-auto bottom-0 m-0 max-h-[85dvh] w-full max-w-none overflow-y-auto rounded-t-2xl bg-superficie p-0 text-tinta backdrop:bg-tinta/35"
       >
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 id="titulo-filtros" className="text-lg font-semibold">
-            Filtros
-          </h2>
-          <button
-            type="button"
-            aria-label="Cerrar filtros"
-            className="boton-texto"
-            onClick={() => panel.current?.close()}
-          >
-            <span aria-hidden="true">✕</span>
-          </button>
+        <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h2 id="titulo-filtros" className="text-lg font-semibold">
+              Filtros
+            </h2>
+            <button
+              type="button"
+              aria-label="Cerrar filtros"
+              className="boton-texto"
+              onClick={() => panel.current?.close()}
+            >
+              <span aria-hidden="true">✕</span>
+            </button>
+          </div>
+          {abierto && (
+            <form role="search" className="flex flex-col gap-3">
+              {children}
+              <div className="flex flex-wrap items-center gap-2">
+                <button className="boton-primario">Ver resultados</button>
+                {hay && limpiar}
+              </div>
+            </form>
+          )}
         </div>
-        {abierto && (
-          <form role="search" className="flex flex-col gap-3">
-            {children}
-            <div className="flex flex-wrap items-center gap-2">
-              <button className="boton-primario">Ver resultados</button>
-              {hay && limpiar}
-            </div>
-          </form>
-        )}
       </dialog>
     </>
   );

@@ -69,11 +69,11 @@ test.describe('filtros del inventario', () => {
 
     // Filtrar por categoría desde el panel.
     let panel = await abrirFiltros(page);
-    await panel.getByLabel('Categoría').fill(categoria);
+    await panel.getByLabel('Categoría', { exact: true }).fill(categoria);
     await page.keyboard.press('Tab'); // cierra la lista del combo, que cubriría el botón
     await panel.getByRole('button', { name: 'Ver resultados' }).click();
     await expect(page).toHaveURL(/categoria=/);
-    const etiqueta = page.getByRole('link', { name: new RegExp(`^${categoria} ✕`) });
+    const etiqueta = page.getByRole('link', { name: `Quitar filtro: ${categoria}` });
     await expect(etiqueta).toBeVisible();
     await expect(page.getByRole('button', { name: 'Filtros (1)' })).toBeVisible();
     await expect(page.getByRole('link', { name: con, exact: true })).toBeVisible();
@@ -87,14 +87,14 @@ test.describe('filtros del inventario', () => {
 
     // Volver a filtrar y limpiar desde el panel.
     panel = await abrirFiltros(page);
-    await panel.getByLabel('Categoría').fill(categoria);
+    await panel.getByLabel('Categoría', { exact: true }).fill(categoria);
     await page.keyboard.press('Tab');
     await panel.getByRole('button', { name: 'Ver resultados' }).click();
     await expect(etiqueta).toBeVisible();
     panel = await abrirFiltros(page);
     await panel.getByRole('link', { name: 'Limpiar filtros' }).click();
     await expect(page).not.toHaveURL(/categoria=/);
-    await expect(page.getByRole('link', { name: /✕/ })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: /^Quitar filtro:/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Filtros (0)' })).toBeVisible();
   });
 

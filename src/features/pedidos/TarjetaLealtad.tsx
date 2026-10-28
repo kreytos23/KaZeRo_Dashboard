@@ -26,17 +26,19 @@ export function TarjetaLealtad({ tarjeta }: { tarjeta: Tarjeta }) {
             key={k.posicion}
             aria-label={etiquetaCasilla(k)}
             className={`relative flex min-h-24 flex-col items-center justify-center gap-0.5 rounded-lg border px-1 py-1 text-center ${
+              k.estado === 'libre' ? 'border-dashed bg-crema' : 'bg-superficie'
+            } ${
               k.pctBps > 0
                 ? 'border-secundario'
                 : k.estado === 'libre'
-                  ? 'border-dashed border-borde-campo bg-crema'
+                  ? 'border-borde-campo'
                   : 'border-borde'
-            } ${k.estado === 'ocupada' ? 'bg-superficie' : ''}`}
+            }`}
           >
             {k.conSaldo && (
               <span
                 aria-hidden="true"
-                className="absolute right-0.5 top-0.5 rounded border border-aviso-borde bg-aviso-fondo px-1 text-meta text-aviso"
+                className="absolute -top-2 right-1 whitespace-nowrap rounded border border-aviso-borde bg-aviso-fondo px-1 text-[0.6875rem] leading-tight text-aviso"
               >
                 con saldo
               </span>

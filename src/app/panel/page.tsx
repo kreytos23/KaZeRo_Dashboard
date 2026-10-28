@@ -71,7 +71,8 @@ export default async function Panel() {
             <h2 className="text-monto font-semibold">Por cobrar</h2>
             <p className="text-destacado font-bold tabular-nums">{formatoMXN(deudas.totalCentavos)}</p>
             <p className="text-dato text-tinta-suave">
-              {deudas.numPedidos} {deudas.numPedidos === 1 ? 'pedido' : 'pedidos'} · {conAtraso} con más de 30 días
+              {deudas.numPedidos} {deudas.numPedidos === 1 ? 'pedido' : 'pedidos'} · {conAtraso} con más de 30
+              días
             </p>
             <ul className="flex flex-col gap-1">
               {deudas.grupos.map((g) => (
@@ -104,7 +105,9 @@ export default async function Panel() {
                   </span>
                   <span className="flex items-center gap-2">
                     <Saldo estado="abierto" saldo={centavosANumeric(p.saldoCentavos)} />
-                    <span className="text-dato text-tinta-suave">{p.dias} {p.dias === 1 ? 'día' : 'días'}</span>
+                    <span className="text-dato text-tinta-suave">
+                      {p.dias} {p.dias === 1 ? 'día' : 'días'}
+                    </span>
                   </span>
                 </li>
               ))}

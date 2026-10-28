@@ -75,7 +75,7 @@ export default async function LayoutPanel({ children }: { children: React.ReactN
       <main
         id="contenido"
         tabIndex={-1}
-        className="mx-auto w-full max-w-[90rem] px-4 py-6 outline-none sm:py-8 max-md:pb-(--alto-barra-inferior)"
+        className="mx-auto w-full max-w-[90rem] px-4 py-6 outline-none sm:pt-8 md:pb-8 max-md:pb-(--alto-barra-inferior)"
       >
         {children}
       </main>
