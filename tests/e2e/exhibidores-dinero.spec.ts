@@ -14,7 +14,8 @@ test('exhibidor: venta de mostrador con cobro parcial, abono, entrega parcial, c
   const m = marcaDe(info);
   const vendedora = `Lupita ${m}`;
   const nombre = `Vitrina dinero ${m}`;
-  const [a, b, c] = [`ED${m}01`, `ED${m}02`, `ED${m}03`];
+  // Prefijo propio: la base es la misma para todo el proyecto y «ED» ya lo usa pedidos.spec.ts.
+  const [a, b, c] = [`XD${m}01`, `XD${m}02`, `XD${m}03`];
   await sembrarVendedora(vendedora);
   await sembrarPiezas([a, b, c], 10000);
 

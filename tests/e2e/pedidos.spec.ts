@@ -139,7 +139,13 @@ test('cancelar regresa la pieza a su exhibidor abierto y libera la posición', a
   const { exhibidorId, codigo, folio } = await sembrarPedidoConExhibidor(m);
   await page.goto(`/panel/exhibidores/${exhibidorId}`);
   await expect(page.getByRole('heading', { name: 'Apartadas (1)' })).toBeVisible();
-  await expect(page.getByRole('link', { name: `KZR-${folio}` })).toBeVisible();
+  // Plan 4a: la nota sale en «Apartadas» (con su pieza) y en «Ventas» (pieza apartada desde este exhibidor).
+  await expect(
+    page.getByRole('region', { name: 'Apartadas (1)' }).getByRole('link', { name: `KZR-${folio}` }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('region', { name: 'Ventas (1)' }).getByRole('link', { name: `KZR-${folio}` }),
+  ).toBeVisible();
 
   await irA(page, `/panel/pedidos/${folio}`);
   await abrirAccion(page, 'Cancelar pedido');
