@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   elegirOpcion,
   irA,
+  montoSaldoFavor,
   RUTA_ESTADO,
   sembrarCliente,
   sembrarCompras,
@@ -118,7 +119,7 @@ test('devolver una pieza de un pedido liquidado da saldo a favor, que se usa en 
 
   // El saldo aparece en la ficha del cliente, con su historial.
   await page.getByRole('link', { name: nombre }).click();
-  await expect(page.getByText('Saldo a favor: $149.00')).toBeVisible();
+  await expect(montoSaldoFavor(page)).toHaveText('$149.00');
   await expect(page.getByText(`Devolución de KZR-${folio}: Broche roto`)).toBeVisible();
 
   // Usar parte del saldo en el segundo pedido.
@@ -130,7 +131,7 @@ test('devolver una pieza de un pedido liquidado da saldo a favor, que se usa en 
 
   // Retirar el resto en efectivo.
   await page.getByRole('link', { name: nombre }).click();
-  await expect(page.getByText('Saldo a favor: $49.00')).toBeVisible();
+  await expect(montoSaldoFavor(page)).toHaveText('$49.00');
   await expect(page.getByText(`Usado en KZR-${segundo.folio}`)).toBeVisible();
   await expect(page.getByLabel('Monto a devolver')).toHaveValue('49.00');
   await page.getByLabel('Nota del retiro').fill('Se entregó en mostrador');

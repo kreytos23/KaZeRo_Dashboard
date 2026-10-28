@@ -1,9 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   abrirAccion,
+  abrirFiltros,
+  type Ambito,
   elegirOpcion,
   fijarFecha,
   irA,
+  montoSaldoFavor,
   RUTA_ESTADO,
   sembrarCliente,
   sembrarCompras,
@@ -34,6 +37,20 @@ async function elegirCliente(page: Page, nombre: string) {
   await combo.fill(nombre);
   // El nombre accesible de la opción incluye el subtítulo (referencia): se ancla al inicio.
   await page.getByRole('option', { name: new RegExp(`^${nombre}`) }).click();
+}
+/**
+ * Rellena los filtros del listado y los aplica: desde `md`, en el formulario en línea con «Filtrar»; en celular,
+ * en el panel «Filtros» (sus campos solo existen con él abierto) con «Ver resultados».
+ */
+async function filtrar(page: Page, rellenar: (ambito: Ambito) => Promise<void>) {
+  if (!(await page.getByRole('button', { name: /^Filtros \(\d+\)$/ }).isVisible())) {
+    await rellenar(page);
+    await page.getByRole('button', { name: 'Filtrar' }).click();
+    return;
+  }
+  const panel = await abrirFiltros(page);
+  await rellenar(panel);
+  await panel.getByRole('button', { name: 'Ver resultados' }).click();
 }
 async function folioDeLaFicha(page: Page): Promise<number> {
   await expect(page).toHaveURL(/\/panel\/pedidos\/\d+/);
@@ -161,7 +178,7 @@ test('cancelar un pedido con abono muestra el saldo a favor del cliente y libera
   await expect(estadoCon(page, 'Pedido cancelado.')).toBeVisible();
 
   await page.goto(`/panel/clientes/${clienteId}`);
-  await expect(page.getByText('Saldo a favor: $50.00')).toBeVisible();
+  await expect(montoSaldoFavor(page)).toHaveText('$50.00');
   await page.goto(`/panel/inventario/CN${m}01`);
   await expect(estadoDePieza(page)).toHaveText('Disponible');
 });
@@ -225,35 +242,38 @@ test('el listado de pedidos filtra por estado, cliente y fechas', async ({ page 
   const folioL = page.getByRole('link', { name: `KZR-${a.folio + 1}`, exact: true });
 
   // Estado.
-  await page.getByLabel('Folio o cliente').fill(`Filtro`);
-  await elegirOpcion(page, 'Estado', 'Abierto');
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await filtrar(page, async (f) => {
+    await f.getByLabel('Folio o cliente').fill(`Filtro`);
+    await elegirOpcion(f, 'Estado', 'Abierto');
+  });
   await expect(page).toHaveURL(/estado=abierto/);
   await expect(folioA).toBeVisible();
   await expect(folioL).toHaveCount(0);
-  await elegirOpcion(page, 'Estado', 'Liquidado');
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await filtrar(page, (f) => elegirOpcion(f, 'Estado', 'Liquidado'));
   await expect(page).toHaveURL(/estado=liquidado/);
   await expect(folioL).toBeVisible();
   await expect(folioA).toHaveCount(0);
 
   // Cliente.
-  await elegirOpcion(page, 'Estado', 'Todos');
-  await elegirOpcion(page, 'Cliente', `FiltroAbierto ${m}`, true);
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await filtrar(page, async (f) => {
+    await elegirOpcion(f, 'Estado', 'Todos');
+    await elegirOpcion(f, 'Cliente', `FiltroAbierto ${m}`, true);
+  });
   await expect(page).toHaveURL(/cliente=/);
+  await expect(page).not.toHaveURL(/estado=/);
   await expect(folioA).toBeVisible();
   await expect(folioL).toHaveCount(0);
 
   // Fechas: «Hasta» en el pasado no deja nada; el rango que incluye hoy sí.
-  await fijarFecha(page, 'Hasta', '2020-01-01');
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await filtrar(page, (f) => fijarFecha(f, 'Hasta', '2020-01-01'));
   await expect(page).toHaveURL(/hasta=2020-01-01/);
   await expect(page.getByText('No hay pedidos con esos filtros.')).toBeVisible();
-  await fijarFecha(page, 'Hasta', '');
-  await fijarFecha(page, 'Desde', hoy());
-  await page.getByRole('button', { name: 'Filtrar' }).click();
+  await filtrar(page, async (f) => {
+    await fijarFecha(f, 'Hasta', '');
+    await fijarFecha(f, 'Desde', hoy());
+  });
   await expect(page).toHaveURL(/desde=/);
+  await expect(page).not.toHaveURL(/hasta=/);
   await expect(folioA).toBeVisible();
 });
 

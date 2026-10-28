@@ -1,4 +1,4 @@
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { register } from 'node:module';
@@ -48,6 +48,37 @@ export async function abrirMenuSiMovil(page: Page) {
 }
 
 /**
+ * Llegada al inicio del panel (tras el login): la ruta y el encabezado «Por cobrar», que está siempre (con o sin
+ * deudas). El h1 es la fecha del día, que no sirve como marca estable.
+ */
+export async function esperarInicioPanel(page: Page) {
+  await expect(page).toHaveURL(/\/panel$/);
+  await expect(page.getByRole('heading', { level: 2, name: 'Por cobrar', exact: true })).toBeVisible();
+}
+
+/** Monto grande de «Saldo a favor» en la ficha de un cliente (la sección con su encabezado). */
+export function montoSaldoFavor(page: Page): Locator {
+  return page.getByRole('region', { name: 'Saldo a favor', exact: true }).getByRole('paragraph').first();
+}
+
+/**
+ * Abre el panel de filtros del celular (`<dialog>` «Filtros»); hasta hidratar el clic no hace nada, así que se
+ * reintenta. Sus campos solo existen mientras está abierto.
+ */
+export async function abrirFiltros(page: Page): Promise<Locator> {
+  const panel = page.getByRole('dialog', { name: 'Filtros' });
+  await expect(async () => {
+    if (!(await panel.isVisible())) await page.getByRole('button', { name: /^Filtros \(\d+\)$/ }).click();
+    await expect(panel).toBeVisible({ timeout: 1_000 });
+  }).toPass();
+  return panel;
+}
+
+/** Dónde buscar un campo: la página entera o un contenedor (p. ej. el panel de filtros del celular). */
+export type Ambito = Page | Locator;
+const paginaDe = (a: Ambito): Page => ('goto' in a ? a : a.page());
+
+/**
  * Los formularios con `onSubmit` nacen con el botón deshabilitado y `data-hidratado="no"`; React los marca "si"
  * al hidratar. Hay que esperar antes de interactuar: un envío previo sería nativo (campos en la URL).
  */
@@ -72,8 +103,9 @@ async function enEscritorio(page: Page): Promise<boolean> {
  * Elige una opción de un select de la app por su texto. En celular es un `<select>` nativo (selectOption); en
  * escritorio, el listbox de Radix: se abre el disparador y se hace clic en la opción.
  */
-export async function elegirOpcion(page: Page, etiqueta: string, opcion: string, exacto = false) {
-  const campo = page.getByLabel(etiqueta, { exact: exacto });
+export async function elegirOpcion(ambito: Ambito, etiqueta: string, opcion: string, exacto = false) {
+  const page = paginaDe(ambito);
+  const campo = ambito.getByLabel(etiqueta, { exact: exacto });
   if (!(await enEscritorio(page))) {
     await campo.selectOption({ label: opcion });
     return;
@@ -106,9 +138,9 @@ function dmy(iso: string) {
  * Escribe una fecha (aaaa-mm-dd, o '' para vaciarla) en un campo de fecha de la app: `<input type=date>` en
  * celular, texto dd/mm/aaaa con calendario en escritorio.
  */
-export async function fijarFecha(page: Page, etiqueta: string, iso: string, exacto = false) {
-  const campo = page.getByLabel(etiqueta, { exact: exacto });
-  if (!(await enEscritorio(page))) {
+export async function fijarFecha(ambito: Ambito, etiqueta: string, iso: string, exacto = false) {
+  const campo = ambito.getByLabel(etiqueta, { exact: exacto });
+  if (!(await enEscritorio(paginaDe(ambito)))) {
     await campo.fill(iso);
     return;
   }

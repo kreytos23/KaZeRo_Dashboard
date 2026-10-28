@@ -1,8 +1,9 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import { hoyMX } from '../../src/domain/fechas';
 import { formatoFolio } from '../../src/domain/pedidos';
 import {
   RUTA_ESTADO,
+  abrirFiltros,
   irA,
   sembrarCliente,
   sembrarCompras,
@@ -21,16 +22,6 @@ const marca = (info: Info) => (info.project.name === 'movil' ? 'M' : 'E');
 const sufijoDe = (info: Info) => `${marca(info)}${info.retry ? ` r${info.retry}` : ''}`;
 /** Código de pieza único por proyecto y reintento (sin espacios). */
 const codigoDe = (base: string, info: Info) => `${base}${marca(info)}${info.retry ? `R${info.retry}` : ''}`;
-
-/** Abre el panel de filtros del celular; hasta hidratar el clic no hace nada, así que se reintenta. */
-async function abrirFiltros(page: Page) {
-  const panel = page.getByRole('dialog', { name: 'Filtros' });
-  await expect(async () => {
-    if (!(await panel.isVisible())) await page.getByRole('button', { name: /^Filtros \(\d+\)$/ }).click();
-    await expect(panel).toBeVisible({ timeout: 1_000 });
-  }).toPass();
-  return panel;
-}
 
 test.describe('barra inferior', () => {
   test('celular: está a la vista y «Inventario» navega y se marca como actual', async ({ page }, info) => {
@@ -124,8 +115,11 @@ test('escritorio: abrir «Más acciones» no mueve el encabezado de la ficha', a
   await sembrarPiezas([codigo], 14900);
 
   await irA(page, `/panel/inventario/${codigo}`);
-  const titulo = page.getByRole('heading', { level: 1, name: codigo });
-  await expect(titulo).toBeVisible();
+  // Por CSS y no por rol: con el menú abierto Radix marca con aria-hidden todo lo de fuera (menú modal), así que
+  // el h1 sale del árbol de accesibilidad y getByRole ya no lo encontraría para medirlo después.
+  const titulo = page.locator('main h1').filter({ hasText: codigo });
+  await expect(page.getByRole('heading', { level: 1, name: codigo })).toBeVisible();
+  await expect(titulo).toHaveCount(1);
   const antes = await titulo.boundingBox();
   expect(antes).not.toBeNull();
 

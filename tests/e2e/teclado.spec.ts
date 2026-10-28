@@ -1,5 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { RUTA_ESTADO, abrirMenuSiMovil, codigoTotpNoUsado, datosAdmin, irA } from './utilidades';
+import {
+  RUTA_ESTADO,
+  abrirMenuSiMovil,
+  codigoTotpNoUsado,
+  datosAdmin,
+  esperarInicioPanel,
+  irA,
+} from './utilidades';
 
 /**
  * Formularios completados SOLO con el teclado: nada de clics ni `fill`. Lo único que no es teclado es
@@ -212,16 +219,19 @@ test.describe('menú del celular con teclado', () => {
     test.skip(info.project.name !== 'movil', 'El menú solo existe en pantallas < md');
     await irA(page, '/panel');
     const boton = page.getByRole('button', { name: 'Menú' });
+    // Los enlaces se buscan dentro del panel del menú: la barra inferior tiene los suyos («Inicio», «Pedidos»,
+    // «Inventario»…), que siguen a la vista con el menú cerrado.
+    const menu = page.locator(`[id="${await boton.getAttribute('aria-controls')}"]`);
     await enfocar(page, boton);
     await expect(boton).toHaveAttribute('aria-expanded', 'false');
     // Cerrado: sus enlaces no existen para el teclado ni para el árbol de accesibilidad.
-    await expect(page.getByRole('link', { name: 'Inventario' })).toHaveCount(0);
+    await expect(menu.getByRole('link', { name: 'Inventario' })).toHaveCount(0);
 
     await expect(async () => {
       await page.keyboard.press('Enter');
       await expect(boton).toHaveAttribute('aria-expanded', 'true', { timeout: 500 });
     }).toPass();
-    await expect(page.getByRole('link', { name: 'Pedidos' })).toBeFocused();
+    await expect(menu.getByRole('link', { name: 'Pedidos' })).toBeFocused();
     await expect(page.locator('main')).toHaveAttribute('inert', '');
 
     // Escape cierra y devuelve el foco al botón.
@@ -243,7 +253,7 @@ test.describe('menú del celular con teclado', () => {
     // Elegir una sección con Enter navega, cierra el menú y devuelve el foco al botón.
     await page.keyboard.press('Tab'); // salir -> botón (vuelta completa)
     await expect(boton).toBeFocused();
-    await enfocar(page, page.getByRole('link', { name: 'Vendedores' }));
+    await enfocar(page, menu.getByRole('link', { name: 'Vendedores' }));
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/panel\/vendedores$/);
     await expect(boton).toHaveAttribute('aria-expanded', 'false');
@@ -251,7 +261,7 @@ test.describe('menú del celular con teclado', () => {
 
     // Y la sección actual se marca en el menú.
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('link', { name: 'Vendedores' })).toHaveAttribute('aria-current', 'page');
+    await expect(menu.getByRole('link', { name: 'Vendedores' })).toHaveAttribute('aria-current', 'page');
   });
 
   test('en escritorio no hay botón de menú y la navegación está a la vista', async ({ page }, info) => {
@@ -276,7 +286,7 @@ test.describe('login y verificación con teclado', () => {
     await expect(codigo).toBeFocused(); // autoFocus: se puede teclear sin tocar nada
     await page.keyboard.type(await codigoTotpNoUsado(d.secretoTotp));
     await page.keyboard.press('Enter');
-    await expect(page.getByRole('heading', { name: 'Panel Kazero' })).toBeVisible();
+    await esperarInicioPanel(page);
     await abrirMenuSiMovil(page);
   });
 });
