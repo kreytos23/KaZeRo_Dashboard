@@ -54,16 +54,18 @@ export function crearAlmacenDisco(dir: string): AlmacenImagenes {
       exigirPrefijo(prefijo);
       exigirLimite(limite);
       const rutas: string[] = [];
-      try {
-        for (const pieza of await readdir(join(base, 'piezas'))) {
-          try {
-            for (const f of await readdir(join(base, 'piezas', pieza))) rutas.push(`piezas/${pieza}/${f}`);
-          } catch (e) {
-            if (!noExiste(e) && (e as NodeJS.ErrnoException).code !== 'ENOTDIR') throw e;
+      for (const raiz of ['piezas', 'comprobantes']) {
+        try {
+          for (const carpeta of await readdir(join(base, raiz))) {
+            try {
+              for (const f of await readdir(join(base, raiz, carpeta))) rutas.push(`${raiz}/${carpeta}/${f}`);
+            } catch (e) {
+              if (!noExiste(e) && (e as NodeJS.ErrnoException).code !== 'ENOTDIR') throw e;
+            }
           }
+        } catch (e) {
+          if (!noExiste(e)) throw e;
         }
-      } catch (e) {
-        if (!noExiste(e)) throw e;
       }
       const { pagina, siguiente } = paginarRutas(rutas, prefijo, cursor, limite);
       const objetos = await Promise.all(

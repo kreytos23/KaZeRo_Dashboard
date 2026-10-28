@@ -115,7 +115,7 @@ describe('pagar con saldo a favor', () => {
     expect(await saldo()).toBe('49.00');
   });
 
-  it('rechaza más que el saldo, más que el saldo del pedido y a un pagador vendedor; no escribe nada', async () => {
+  it('rechaza más que el saldo, más que el saldo del pedido y a un pagador vendedor sin saldo; no escribe nada', async () => {
     await prepararSaldo149();
     const b = await pedidoCon('SB03', 20000);
     await expect(conSaldo(b.id, 15000)).rejects.toMatchObject({
@@ -124,10 +124,11 @@ describe('pagar con saldo a favor', () => {
       message: 'El saldo a favor ($149.00) no alcanza para $150.00.',
     });
     await expect(conSaldo(b.id, 30000)).rejects.toMatchObject({ codigo: 'pago_excede' });
+    // Plan 4b (P-2): la vendedora también paga con su saldo; sin sobrante suyo no alcanza (no usa el de la clienta).
     await expect(conSaldo(b.id, 1000, { pagador: 'vendedor' })).rejects.toMatchObject({
-      codigo: 'pagador_invalido',
-      campo: 'pagador',
-      message: 'El saldo a favor es de la clienta: elige «cliente».',
+      codigo: 'saldo_insuficiente',
+      campo: 'monto',
+      message: 'El saldo a favor ($0.00) no alcanza para $10.00.',
     });
     expect(await saldo()).toBe('149.00');
     expect(await ficha(b.id)).toMatchObject({ pagado: '0.00', saldo: '200.00' });

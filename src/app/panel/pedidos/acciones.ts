@@ -2,17 +2,31 @@
 
 import { redirect } from 'next/navigation';
 import { conDb } from '@/db/client';
+import { formatoMXN, pesosACentavos } from '@/domain/dinero';
 import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
 import { partirCodigos } from '@/features/exhibidores/codigos';
 import type { EstadoAccion } from '@/features/ui/estado';
-import { centavosDe, ejecutarAccion, texto, uuidDe, uuidOpcionalDe, versionDe } from '@/server/acciones';
+import {
+  bytesDeArchivo,
+  centavosDe,
+  ejecutarAccion,
+  texto,
+  uuidDe,
+  uuidOpcional,
+  uuidOpcionalDe,
+  versionDe,
+} from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { crearCliente } from '@/server/clientes/servicio';
 import { ErrorNegocio } from '@/server/errores';
+import { almacenImagenes } from '@/server/imagenes/almacen';
+import { registrarPagoAgrupado } from '@/server/pagos/agrupado';
+import { agregarComprobante, type Comprobante } from '@/server/pagos/comprobante';
 import { registrarPagoDePedido, type MetodoPago } from '@/server/pagos/servicio';
+import { subirComprobante } from '@/server/pagos/subida';
 import { devolverPiezaDefectuosa } from '@/server/pedidos/devolucion';
 import { cancelarPedido, crearPedido, editarPedido } from '@/server/pedidos/servicio';
-import { revalidarPedido } from './revalidar';
+import { revalidarPedido, revalidarPedidos } from './revalidar';
 
 function folioDe(fd: FormData): number {
   const f = parsearFolio(texto(fd, 'folio'));
@@ -65,11 +79,18 @@ export async function accionClienteRapido(
   return { id: r.ok, nombre: String(nombre).trim().replace(/\s+/g, ' ') };
 }
 
+/** Captura opcional del pago: se sube ANTES del servicio; si este falla, el barrido recoge el blob huérfano. */
+async function comprobanteDe(fd: FormData): Promise<Comprobante | null> {
+  const bytes = await bytesDeArchivo(fd, 'comprobante', { opcional: true });
+  return bytes ? subirComprobante(almacenImagenes(), bytes) : null;
+}
+
 export async function accionRegistrarPago(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   const { adminId } = await requerirSesion();
   return ejecutarAccion(async () => {
     const folio = folioDe(fd);
     const pagador = texto(fd, 'pagador') === 'vendedor' ? 'vendedor' : 'cliente';
+    const comprobante = await comprobanteDe(fd);
     const r = await conDb((db) =>
       registrarPagoDePedido(db, {
         key: uuidDe(fd, 'key'),
@@ -81,10 +102,72 @@ export async function accionRegistrarPago(_: EstadoAccion, fd: FormData): Promis
         pagador,
         nota: texto(fd, 'nota').slice(0, 400),
         exhibidorId: uuidOpcionalDe(fd, 'exhibidorId'),
+        referencia: texto(fd, 'referencia').slice(0, 100),
+        comprobante,
+        confirmarDuplicado: texto(fd, 'confirmarDuplicado') === 'on',
       }),
     );
     revalidarPedido(folio);
     return r.estado === 'liquidado' ? 'Pago registrado. El pedido quedó liquidado.' : 'Pago registrado.';
+  });
+}
+
+/** P-1: la vendedora paga varios de sus pedidos de una vez (`pedidoId` y `montoPedido` van en pares; vacío = no aplica). */
+export async function accionPagoAgrupado(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const montos = fd.getAll('montoPedido');
+    const aplicaciones = fd.getAll('pedidoId').flatMap((id, i) => {
+      const pesos = String(montos[i] ?? '').trim();
+      if (!pesos) return [];
+      const pedidoId = typeof id === 'string' ? uuidOpcional(id) : null;
+      const montoCentavos = pesosACentavos(pesos);
+      if (!pedidoId || montoCentavos === null)
+        throw new ErrorNegocio(
+          'monto_invalido',
+          'Escribe montos válidos, por ejemplo 149 o 149.50.',
+          'aplicaciones',
+        );
+      return [{ pedidoId, montoCentavos }];
+    });
+    const comprobante = await comprobanteDe(fd);
+    const r = await conDb((db) =>
+      registrarPagoAgrupado(db, {
+        key: uuidDe(fd, 'key'),
+        adminId,
+        vendedorId: uuidDe(fd, 'vendedorId'),
+        fecha: texto(fd, 'fecha').slice(0, 20),
+        montoCentavos: centavosDe(fd, 'monto', { vacioEsCero: true }),
+        metodo: texto(fd, 'metodo') as MetodoPago,
+        referencia: texto(fd, 'referencia').slice(0, 100),
+        aplicaciones,
+        comprobante,
+        confirmarDuplicado: texto(fd, 'confirmarDuplicado') === 'on',
+      }),
+    );
+    revalidarPedidos();
+    return r.sobranteCentavos > 0
+      ? `Pago registrado. Sobraron ${formatoMXN(r.sobranteCentavos)}: quedan como saldo a favor de la vendedora.`
+      : 'Pago registrado.';
+  });
+}
+
+/** P-3: agrega la captura a un pago que no la tiene. */
+export async function accionAgregarComprobante(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
+  const { adminId } = await requerirSesion();
+  return ejecutarAccion(async () => {
+    const comprobante = await comprobanteDe(fd);
+    if (!comprobante) throw new ErrorNegocio('imagen', 'Elige la captura del pago.', 'comprobante');
+    await conDb((db) =>
+      agregarComprobante(db, {
+        key: uuidDe(fd, 'key'),
+        adminId,
+        pagoId: uuidDe(fd, 'pagoId'),
+        ...comprobante,
+      }),
+    );
+    revalidarPedidos();
+    return 'Comprobante guardado.';
   });
 }
 

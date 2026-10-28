@@ -9,6 +9,7 @@ import {
   esRutaImagen,
   esVariante,
   rechazoPorMetadatos,
+  rutaComprobante,
   rutaImagen,
   urlImagenPieza,
   validarSubida,
@@ -134,5 +135,18 @@ describe('claveDeRuta', () => {
     expect(claveDeRuta(`capturas/${PIEZA}/${CLAVE}-mini.webp`)).toBeNull();
     expect(claveDeRuta(`piezas/${PIEZA}/../${CLAVE}-mini.webp`)).toBeNull();
     expect(claveDeRuta('')).toBeNull();
+  });
+});
+
+describe('comprobantes de pago (Plan 4b)', () => {
+  const clave = '11111111-1111-4111-8111-111111111111';
+  it('su ruta es una ruta de imagen válida y la clave se recupera de ella', () => {
+    const ruta = rutaComprobante(clave);
+    expect(ruta).toBe(`comprobantes/${clave}/${clave}-grande.webp`);
+    expect(esRutaImagen(ruta)).toBe(true);
+    expect(claveDeRuta(ruta)).toBe(clave);
+  });
+  it('rechaza una clave que no es uuid', () => {
+    expect(() => rutaComprobante('../x')).toThrow(RangeError);
   });
 });

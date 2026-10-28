@@ -8,6 +8,12 @@ import {
   mensajeCierreConDinero,
   mensajeEntregaExcede,
 } from '@/server/exhibidores/mensajes';
+import {
+  MSG_COMPROBANTE_REPETIDO,
+  MSG_OTRA_VENDEDORA,
+  MSG_PAGO_ANULADO,
+  MSG_REFERENCIA_LARGA,
+} from '@/server/pagos/mensajes';
 
 export class ErrorNegocio extends Error {
   override name = 'ErrorNegocio';
@@ -15,6 +21,8 @@ export class ErrorNegocio extends Error {
     readonly codigo: string,
     mensaje: string,
     readonly campo?: string,
+    /** Datos para quien llama (p. ej. la lista del aviso de duplicado); no se muestran. */
+    readonly detalle?: unknown,
   ) {
     super(mensaje);
   }
@@ -70,6 +78,9 @@ const CAMPOS: Record<string, string> = {
   entrega_exhibidor_fecha: 'fecha',
   entrega_exhibidor_nota: 'nota',
   entrega_exhibidor_ajuste_motivo: 'motivo',
+  // Plan 4b: referencia y comprobante.
+  pago_referencia_largo: 'referencia',
+  pago_comprobante_sha256_uq: 'comprobante',
 };
 
 /** CHECK de coherencia interna de pedidos y pagos: la app nunca debería violarlos (son la última barrera). */
@@ -182,6 +193,16 @@ const MENSAJES: Record<string, string> = {
   exhibidor_cierre_con_dinero: mensajeCierreConDinero(),
   pago_exhibidor_coherente: 'El exhibidor que cobró debe estar abierto y ser de la vendedora del pedido.',
   pago_exhibidor_sin_saldo: MSG_COBRO_SIN_SALDO_FAVOR,
+  // Plan 4b (0024/0025): el servicio valida antes; estos son la última barrera.
+  pago_referencia_largo: MSG_REFERENCIA_LARGA,
+  pago_comprobante_sha256_uq: MSG_COMPROBANTE_REPETIDO,
+  pago_comprobante_coherente: PEDIDO_INCONSISTENTE,
+  pago_solo_anular_o_comprobante: PEDIDO_INCONSISTENTE,
+  aplicacion_pago_otra_vendedora: MSG_OTRA_VENDEDORA,
+  aplicacion_pago_pago_anulado: MSG_PAGO_ANULADO,
+  saldo_favor_sobrante_sin_pago: PEDIDO_INCONSISTENTE,
+  saldo_favor_sobrante_incoherente: PEDIDO_INCONSISTENTE,
+  saldo_favor_pago_origen: PEDIDO_INCONSISTENTE,
   pedido_mostrador_sin_tarjeta: 'Las notas de venta de mostrador no cuentan en tarjeta.',
 };
 

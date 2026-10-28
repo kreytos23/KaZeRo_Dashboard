@@ -7,8 +7,8 @@ export function exigirRuta(ruta: string): string {
   return ruta;
 }
 
-// Prefijo parcial de una ruta de foto: `piezas/`, `piezas/<uuid>/`, `piezas/<uuid>/<medio uuid>`…
-const PREFIJO = /^piezas\/[0-9a-f-]*(\/[0-9a-f-]*)?$/;
+// Prefijo parcial de una ruta de foto: `piezas/`, `comprobantes/`, `piezas/<uuid>/`, `piezas/<uuid>/<medio uuid>`…
+const PREFIJO = /^(piezas|comprobantes)\/[0-9a-f-]*(\/[0-9a-f-]*)?$/;
 
 export function exigirPrefijo(prefijo: string): string {
   if (!PREFIJO.test(prefijo)) throw new RangeError('Prefijo de imagen inválido');

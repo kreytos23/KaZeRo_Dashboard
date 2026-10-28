@@ -14,7 +14,10 @@ import {
   pagadoCentavos,
 } from '@/server/pedidos/comun';
 import { validarFecha } from '@/server/pedidos/servicio';
-import { noAlcanza, saldoFavorDeCliente } from '@/server/saldo-favor/servicio';
+import { noAlcanza, saldoFavorDeCliente, saldoFavorDeVendedor } from '@/server/saldo-favor/servicio';
+import { validarComprobante, type Comprobante } from './comprobante';
+import { exigirSinDuplicados } from './duplicados';
+import { MSG_REFERENCIA_LARGA } from './mensajes';
 
 export const METODOS_PAGO = ['transferencia', 'efectivo', 'otro', 'saldo_favor'] as const;
 export type MetodoPago = (typeof METODOS_PAGO)[number];
@@ -30,11 +33,27 @@ export interface DatosPagoPedido {
   nota?: string;
   /** Plan 4a (E-4): el exhibidor que recibió el dinero. Con él, el método no puede ser saldo a favor. */
   exhibidorId?: string | null;
+  /** Plan 4b (P-4): referencia bancaria. */
+  referencia?: string | null;
+  /** Plan 4b (P-3): captura ya subida al almacén (la acción la sube antes). */
+  comprobante?: Comprobante | null;
+  /**
+   * Plan 4b (P-4): `false` avisa si hay un pago parecido (lo hacen las acciones); `true` confirma que es otro pago;
+   * ausente no verifica (servicios internos: cobros de exhibidor, migración).
+   */
+  confirmarDuplicado?: boolean;
 }
 export interface PagoRegistrado {
   pagoId: string;
   estado: 'abierto' | 'liquidado';
   saldo: string;
+}
+
+/** Referencia opcional (P-4): sin espacios sobrantes, hasta 60 caracteres; vacía → null. */
+export function validarReferencia(r: string | null | undefined): string | null {
+  const t = r?.trim().replace(/\s+/g, ' ') || null;
+  if (t && t.length > 60) throw new ErrorNegocio('referencia_invalida', MSG_REFERENCIA_LARGA, 'referencia');
+  return t;
 }
 
 function validar(d: Omit<DatosPagoPedido, 'key'>) {
@@ -44,13 +63,6 @@ function validar(d: Omit<DatosPagoPedido, 'key'>) {
     throw new ErrorNegocio('metodo_invalido', 'Elige un método de pago válido.', 'metodo');
   if (d.pagador !== 'cliente' && d.pagador !== 'vendedor')
     throw new ErrorNegocio('pagador_invalido', 'Elige quién paga.', 'pagador');
-  // Plan 3.1 (D-20): el saldo a favor es de la clienta; con pagador vendedor no hay de dónde descontarlo.
-  if (d.metodo === 'saldo_favor' && d.pagador !== 'cliente')
-    throw new ErrorNegocio(
-      'pagador_invalido',
-      'El saldo a favor es de la clienta: elige «cliente».',
-      'pagador',
-    );
   if (d.exhibidorId && d.pagador !== 'cliente')
     throw new ErrorNegocio(
       'pagador_invalido',
@@ -71,6 +83,9 @@ function validar(d: Omit<DatosPagoPedido, 'key'>) {
     pagador: d.pagador,
     nota,
     exhibidorId: d.exhibidorId || undefined, // ausente: el hash de idempotencia de pagos sin exhibidor no cambia
+    referencia: validarReferencia(d.referencia) ?? undefined,
+    comprobante: validarComprobante(d.comprobante) ?? undefined,
+    confirmarDuplicado: d.confirmarDuplicado,
   };
 }
 
@@ -134,10 +149,26 @@ export async function registrarPagoEnTx(
       'monto',
     );
   // D-20: el saldo se lee con cliente y pedido ya bloqueados, así que nadie más lo cambia en medio.
+  // P-2: con pagador vendedora paga con el saldo de la vendedora (su sobrante); la BD ata el uso a su titular.
   if (v.metodo === 'saldo_favor') {
-    const disponible = numericACentavos(await saldoFavorDeCliente(tx, p.clienteId));
+    const disponible = numericACentavos(
+      v.pagador === 'cliente'
+        ? await saldoFavorDeCliente(tx, p.clienteId)
+        : await saldoFavorDeVendedor(tx, p.vendedorId),
+    );
     if (v.monto > disponible) throw noAlcanza(disponible, v.monto);
   }
+  if (v.confirmarDuplicado === false)
+    await exigirSinDuplicados(
+      tx,
+      {
+        referencia: v.referencia,
+        montoCentavos: v.monto,
+        fecha,
+        pagador: v.pagador === 'cliente' ? { clienteId: p.clienteId } : { vendedorId: p.vendedorId },
+      },
+      false,
+    );
   // Si el pago liquida, exhibidores → piezas ANTES de tocar `pago` (D-10).
   if (v.monto === saldo) await bloquearPiezasDelPedido(tx, p.id);
   const monto = centavosANumeric(v.monto);
@@ -153,6 +184,9 @@ export async function registrarPagoEnTx(
       nota: v.nota,
       adminId: d.adminId, // D-21: quién lo registró
       exhibidorId: v.exhibidorId ?? null,
+      referencia: v.referencia,
+      comprobanteClave: v.comprobante?.clave ?? null,
+      comprobanteSha256: v.comprobante?.sha256 ?? null,
     })
     .returning({ id: pago.id });
   // R-35: la fecha de cobro de la aplicación es la fecha del pago.
@@ -163,7 +197,8 @@ export async function registrarPagoEnTx(
   // El `uso` va al final (D-24): toma el candado consultivo del libro con todo lo demás ya bloqueado.
   if (v.metodo === 'saldo_favor')
     await tx.insert(saldoFavorMov).values({
-      clienteId: p.clienteId,
+      clienteId: v.pagador === 'cliente' ? p.clienteId : null,
+      vendedorId: v.pagador === 'vendedor' ? p.vendedorId : null,
       tipo: 'uso',
       monto: `-${monto}`,
       pedidoId: p.id,

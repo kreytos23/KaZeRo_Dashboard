@@ -107,8 +107,8 @@ describe('barrerImagenesHuerfanas', () => {
       borrar: async (rutas) => {
         borradas.push(...rutas);
       },
-      listar: async () => ({
-        objetos: [{ ruta: 'piezas/leeme.txt', subidoEn: hace(1000), bytes: 1 }],
+      listar: async (prefijo) => ({
+        objetos: prefijo === 'piezas/' ? [{ ruta: 'piezas/leeme.txt', subidoEn: hace(1000), bytes: 1 }] : [],
         siguiente: null,
       }),
     };
@@ -121,7 +121,7 @@ describe('barrerImagenesHuerfanas', () => {
     expect(borradas).toEqual([]);
   });
 
-  it('solo lista bajo piezas/ (nada más se toca)', async () => {
+  it('solo lista bajo piezas/ y comprobantes/ (nada más se toca)', async () => {
     const prefijos: string[] = [];
     const almacen: AlmacenImagenes = {
       guardar: async () => undefined,
@@ -133,7 +133,7 @@ describe('barrerImagenesHuerfanas', () => {
       },
     };
     await barrer(almacen, []);
-    expect(prefijos).toEqual(['piezas/']);
+    expect(prefijos).toEqual(['piezas/', 'comprobantes/']);
   });
 
   it('lee las claves vigentes DESPUÉS de listar (una foto adoptada durante el listado queda protegida)', async () => {
@@ -154,7 +154,7 @@ describe('barrerImagenesHuerfanas', () => {
       },
       ahora: AHORA,
     });
-    expect(orden).toEqual(['listar', 'claves']);
+    expect(orden).toEqual(['listar', 'listar', 'claves']);
   });
 
   it('si la BD falla, no borra nada (falla cerrado)', async () => {

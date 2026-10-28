@@ -18,6 +18,15 @@ export async function saldoFavorDeCliente(db: Ejecutor, clienteId: string): Prom
   return r?.saldo ?? '0.00';
 }
 
+/** Saldo a favor vigente de la vendedora (Plan 4b: su sobrante); '0.00' si nunca tuvo movimientos. */
+export async function saldoFavorDeVendedor(db: Ejecutor, vendedorId: string): Promise<string> {
+  const [r] = await db
+    .select({ saldo: vSaldoFavor.saldo })
+    .from(vSaldoFavor)
+    .where(eq(vSaldoFavor.vendedorId, vendedorId));
+  return r?.saldo ?? '0.00';
+}
+
 /**
  * Historial del libro de la clienta, el más reciente primero (D-23: es la auditoría del dinero).
  * `created_at` es el inicio de la transacción, así que las filas de una misma transacción empatan y el libro no
