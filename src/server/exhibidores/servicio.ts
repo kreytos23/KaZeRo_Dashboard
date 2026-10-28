@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { exhibidor, movimientoPieza, pieza, vExhibidor, vPieza, vendedor } from '@/db/schema';
+import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { normalizarCodigo } from '@/domain/codigos';
 import { calcularCambios } from '@/domain/auditoria';
 import { parsearFechaISO } from '@/domain/fechas';
@@ -299,6 +300,16 @@ export async function cerrarExhibidor(
           );
         throw new ErrorNegocio('exhibidor_con_piezas', partes.join(' '));
       }
+      // E-8: el dinero que el exhibidor cobró y no ha entregado. Bajo el bloqueo del exhibidor nadie lo cambia.
+      const [din] = await tx
+        .select({ porEntregar: vExhibidor.porEntregar })
+        .from(vExhibidor)
+        .where(eq(vExhibidor.id, d.exhibidorId));
+      if (numericACentavos(din!.porEntregar) !== 0)
+        throw new ErrorNegocio(
+          'dinero_pendiente',
+          `Antes de cerrar, registra la entrega de ${formatoMXN(numericACentavos(din!.porEntregar))} que tiene por entregar.`,
+        );
       const filas = await tx
         .update(exhibidor)
         .set({ estado: 'cerrado', cerradoAt: new Date(), version: sql`${exhibidor.version} + 1` })
