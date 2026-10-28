@@ -3,10 +3,9 @@
 import { revalidatePath } from 'next/cache';
 import { conDb } from '@/db/client';
 import { mensajeCorreccion } from '@/domain/correccion';
-import { pesosACentavos } from '@/domain/dinero';
 import { parsearLote } from '@/domain/lote';
 import type { EstadoAccion } from '@/features/ui/estado';
-import { bytesDeArchivo, ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
+import { bytesDeArchivo, centavosDe, ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { ErrorNegocio } from '@/server/errores';
 import { almacenImagenes } from '@/server/imagenes/almacen';
@@ -37,15 +36,6 @@ export async function accionSugerirCodigo(prefijo: string): Promise<{ codigo?: s
   return r.error ? { error: r.error } : { codigo: r.ok };
 }
 
-function monto(fd: FormData, campo: string, etiqueta: string, opcional = false): number {
-  const t = texto(fd, campo).trim();
-  if (!t && opcional) return 0;
-  const c = pesosACentavos(t);
-  if (c === null)
-    throw new ErrorNegocio('monto', `${etiqueta}: escribe un monto válido (ej. 149 o 1,299.50).`, campo);
-  return c;
-}
-
 function largoMax(fd: FormData, campo: string, etiqueta: string, max: number): string {
   const t = texto(fd, campo);
   if (t.length > max) throw new ErrorNegocio('largo', `${etiqueta}: máximo ${max} caracteres.`, campo);
@@ -67,8 +57,8 @@ export async function accionAltaPieza(_: EstadoAccion, fd: FormData): Promise<Es
       material: largoMax(fd, 'material', 'Material', 80),
       proveedor: largoMax(fd, 'proveedor', 'Proveedor', 80),
       descripcion: largoMax(fd, 'descripcion', 'Descripción', 300),
-      costoCentavos: monto(fd, 'costo', 'Costo', true),
-      precioCentavos: monto(fd, 'precio', 'Precio'),
+      costoCentavos: centavosDe(fd, 'costo', { etiqueta: 'Costo', vacioEsCero: true }),
+      precioCentavos: centavosDe(fd, 'precio', { etiqueta: 'Precio' }),
     };
     // La foto se procesa ANTES de abrir la BD (CPU fuera de la conexión) y antes de subir nada.
     const bytes = await bytesDeArchivo(fd, 'imagen', { opcional: true });
@@ -180,8 +170,8 @@ export async function accionEditarPieza(_: EstadoAccion, fd: FormData): Promise<
         material: largoMax(fd, 'material', 'Material', 80),
         proveedor: largoMax(fd, 'proveedor', 'Proveedor', 80),
         descripcion: largoMax(fd, 'descripcion', 'Descripción', 300),
-        costoCentavos: monto(fd, 'costo', 'Costo', true),
-        precioCentavos: monto(fd, 'precio', 'Precio'),
+        costoCentavos: centavosDe(fd, 'costo', { etiqueta: 'Costo', vacioEsCero: true }),
+        precioCentavos: centavosDe(fd, 'precio', { etiqueta: 'Precio' }),
       }),
     );
     if (cambios === 0) return 'Sin cambios.';

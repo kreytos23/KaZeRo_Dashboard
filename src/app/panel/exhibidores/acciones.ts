@@ -4,8 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { conDb } from '@/db/client';
 import type { EstadoAccion } from '@/features/ui/estado';
 import { formatoFolio } from '@/domain/pedidos';
-import { pesosACentavos } from '@/domain/dinero';
-import { ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
+import { centavosDe, ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
 import { partirCodigos } from '@/features/exhibidores/codigos';
 import { montoAjusteCentavos } from '@/features/exhibidores/dinero-ui';
 import { revalidarPedido } from '../pedidos/revalidar';
@@ -13,6 +12,7 @@ import {
   registrarAjusteExhibidor,
   registrarEntregaExhibidor,
   registrarVentaExhibidor,
+  type MetodoEntrega,
 } from '@/server/exhibidores/dinero';
 import { registrarPagoDePedido, type MetodoPago } from '@/server/pagos/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
@@ -120,16 +120,6 @@ export async function accionEditarExhibidor(_: EstadoAccion, fd: FormData): Prom
   });
 }
 
-/** Monto en pesos del formulario; vacío cuenta como 0 solo si `vacioEsCero`. */
-function centavosDe(fd: FormData, campo: string, vacioEsCero = false): number {
-  const t = texto(fd, campo).trim();
-  if (!t && vacioEsCero) return 0;
-  const c = pesosACentavos(t);
-  if (c === null)
-    throw new ErrorNegocio('monto_invalido', 'Escribe un monto válido, por ejemplo 149 o 149.50.', campo);
-  return c;
-}
-
 /** El dinero del exhibidor toca su ficha y lista, las notas, las clientas, el inicio y el inventario. */
 function revalidarDinero(exhibidorId: string, folio?: number) {
   if (folio !== undefined) revalidarPedido(folio);
@@ -158,7 +148,7 @@ export async function accionRegistrarVenta(_: EstadoAccion, fd: FormData): Promi
         codigos: codigosDe(fd),
         clienteId: mostrador ? null : uuidDe(fd, 'clienteId'),
         fecha: texto(fd, 'fecha').slice(0, 20),
-        cobradoCentavos: centavosDe(fd, 'cobrado', true),
+        cobradoCentavos: centavosDe(fd, 'cobrado', { vacioEsCero: true }),
         metodo: texto(fd, 'metodo') as MetodoPago, // el servicio valida contra METODOS_PAGO
       }),
     );
@@ -202,7 +192,7 @@ export async function accionRegistrarEntrega(_: EstadoAccion, fd: FormData): Pro
         exhibidorId,
         montoCentavos: centavosDe(fd, 'monto'),
         fecha: texto(fd, 'fecha').slice(0, 20),
-        metodo: texto(fd, 'metodo') as 'efectivo' | 'transferencia' | 'otro',
+        metodo: texto(fd, 'metodo') as MetodoEntrega,
         nota: texto(fd, 'nota').slice(0, 400),
       }),
     );
