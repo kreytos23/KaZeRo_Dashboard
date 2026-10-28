@@ -15,7 +15,12 @@ export async function ejecutarAccion(fn: () => Promise<string | void>): Promise<
     // redirect() y notFound() lanzan errores especiales que Next debe recibir.
     unstable_rethrow(e);
     if (e instanceof ErrorNegocio)
-      return e.campo ? { error: e.message, campos: { [e.campo]: e.message } } : { error: e.message };
+      return {
+        error: e.message,
+        codigo: e.codigo,
+        ...(e.campo ? { campos: { [e.campo]: e.message } } : {}),
+        ...(e.detalle !== undefined ? { detalle: e.detalle } : {}),
+      };
     // Solo el código: el mensaje de un error de BD puede incluir valores (datos personales).
     console.error('[accion] error inesperado', pgCode(e) ?? (e instanceof Error ? e.name : typeof e));
     return { error: 'No se pudo guardar. Intenta de nuevo.' };

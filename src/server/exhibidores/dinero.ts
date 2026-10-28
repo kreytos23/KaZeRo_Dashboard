@@ -117,6 +117,7 @@ export async function registrarVentaExhibidor(
                 metodo: d.metodo,
                 pagador: 'cliente',
                 exhibidorId: d.exhibidorId,
+                omitirAvisoDuplicado: true, // cobro en el momento de la venta: no es un pago capturado aparte
               })
             ).estado;
           }

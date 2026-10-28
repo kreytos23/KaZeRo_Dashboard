@@ -37,11 +37,10 @@ export interface DatosPagoPedido {
   referencia?: string | null;
   /** Plan 4b (P-3): captura ya subida al almacén (la acción la sube antes). */
   comprobante?: Comprobante | null;
-  /**
-   * Plan 4b (P-4): `false` avisa si hay un pago parecido (lo hacen las acciones); `true` confirma que es otro pago;
-   * ausente no verifica (servicios internos: cobros de exhibidor, migración).
-   */
+  /** Plan 4b (P-4): si hay un pago parecido se avisa siempre; `true` confirma que es otro pago y lo guarda. */
   confirmarDuplicado?: boolean;
+  /** Solo servicios internos (cobro de una venta de exhibidor, migración): no verifica duplicados. */
+  omitirAvisoDuplicado?: boolean;
 }
 export interface PagoRegistrado {
   pagoId: string;
@@ -85,8 +84,16 @@ function validar(d: Omit<DatosPagoPedido, 'key'>) {
     exhibidorId: d.exhibidorId || undefined, // ausente: el hash de idempotencia de pagos sin exhibidor no cambia
     referencia: validarReferencia(d.referencia) ?? undefined,
     comprobante: validarComprobante(d.comprobante) ?? undefined,
-    confirmarDuplicado: d.confirmarDuplicado,
+    confirmarDuplicado: d.confirmarDuplicado || undefined, // ausente y `false` dan el mismo hash
   };
+}
+
+/**
+ * Payload de idempotencia: el comprobante cuenta por su huella, no por la clave aleatoria con que se subió (I-2):
+ * reenviar la misma captura con la misma `key` devuelve el resultado original (el blob repetido lo recoge el barrido).
+ */
+export function payloadIdempotente<T extends { comprobante?: { sha256: string } }>(v: T) {
+  return { ...v, comprobante: v.comprobante?.sha256 };
 }
 
 /**
@@ -102,7 +109,12 @@ export async function registrarPagoDePedido(db: Ejecutor, d: DatosPagoPedido): P
     db.transaction((tx) =>
       conIdempotencia(
         tx,
-        { key: d.key, adminId: d.adminId, operacion: 'registrarPagoDePedido', payload: v },
+        {
+          key: d.key,
+          adminId: d.adminId,
+          operacion: 'registrarPagoDePedido',
+          payload: payloadIdempotente(v),
+        },
         () => registrarPagoEnTx(tx, d, d.key),
       ),
     ),
@@ -158,7 +170,8 @@ export async function registrarPagoEnTx(
     );
     if (v.monto > disponible) throw noAlcanza(disponible, v.monto);
   }
-  if (v.confirmarDuplicado === false)
+  // P-4: avisa siempre, salvo confirmación o servicio interno; el saldo a favor es dinero interno (sin banco).
+  if (!d.omitirAvisoDuplicado && v.metodo !== 'saldo_favor')
     await exigirSinDuplicados(
       tx,
       {
@@ -167,7 +180,7 @@ export async function registrarPagoEnTx(
         fecha,
         pagador: v.pagador === 'cliente' ? { clienteId: p.clienteId } : { vendedorId: p.vendedorId },
       },
-      false,
+      Boolean(v.confirmarDuplicado),
     );
   // Si el pago liquida, exhibidores → piezas ANTES de tocar `pago` (D-10).
   if (v.monto === saldo) await bloquearPiezasDelPedido(tx, p.id);

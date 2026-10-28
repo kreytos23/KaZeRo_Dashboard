@@ -148,7 +148,7 @@ describe('comisiones', () => {
   it('% congelado: cambiar el % después del cierre no toca el mes cerrado; el mes en curso estima con el nuevo', async () => {
     await liquidado(100000, '2026-11-05');
     await cerrar('2026-11-01', '2026-12-01');
-    await liquidado(100000, '2026-12-03');
+    await liquidado(120000, '2026-12-03'); // otro monto: el mismo día no parece un pago duplicado
     await app((db) =>
       actualizarVendedor(db, {
         id: perlaId,
@@ -162,7 +162,7 @@ describe('comisiones', () => {
       }),
     );
     expect(perla(await reporte('2026-11-01', '2026-12-05')).comisionCentavos).toBe(18000);
-    expect(perla(await reporte('2026-12-01', '2026-12-05')).comisionCentavos).toBe(20000);
+    expect(perla(await reporte('2026-12-01', '2026-12-05')).comisionCentavos).toBe(24000);
   });
 
   it('C-4: un pago atrasado de un pedido liquidado después del cierre entra en el mes siguiente', async () => {

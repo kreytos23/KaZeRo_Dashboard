@@ -224,16 +224,16 @@ describe('devolverPiezaDefectuosa', () => {
   });
 
   it('pagado con saldo a favor y efectivo: regresa el monto completo de la línea a saldo', async () => {
-    // Saldo previo de $50: pedido abierto con $50 abonados y cancelado.
-    const previo = await pedidoCon([['DV60', 6000]], 0, false);
-    await pagar(previo.id, 5000);
+    // Saldo previo de $60: pedido abierto con $60 abonados y cancelado.
+    const previo = await pedidoCon([['DV60', 7000]], 0, false);
+    await pagar(previo.id, 6000);
     await app((db) =>
       cancelarPedido(db, { key: randomUUID(), adminId, pedidoId: previo.id, version: 1, motivo: 'Prueba' }),
     );
-    expect(await saldo()).toBe('50.00');
+    expect(await saldo()).toBe('60.00');
     const p = await pedidoCon([['DV62', 10000]], 0, false);
-    await pagar(p.id, 5000, 'saldo_favor');
-    await pagar(p.id, 5000);
+    await pagar(p.id, 6000, 'saldo_favor');
+    await pagar(p.id, 4000); // otro monto que el abono previo: no es un posible duplicado
     expect(await saldo()).toBe('0.00');
     expect(await devolver(p.id, (await itemDe(p.id, 'DV62')).id)).toEqual({
       montoAFavor: '100.00',

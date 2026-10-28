@@ -3,7 +3,7 @@ import { eq, sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
 import { vPedido } from '@/db/schema';
-import { rutaComprobante } from '@/domain/imagenes';
+import { rutaComprobante, rutaImagen } from '@/domain/imagenes';
 import { crearCliente } from '@/server/clientes/servicio';
 import { barrerImagenesHuerfanas } from '@/server/imagenes/barrido';
 import { registrarPagoAgrupado, type DatosPagoAgrupado } from '@/server/pagos/agrupado';
@@ -12,8 +12,9 @@ import { posiblesDuplicados } from '@/server/pagos/duplicados';
 import { registrarPagoDePedido, type DatosPagoPedido } from '@/server/pagos/servicio';
 import { subirComprobante } from '@/server/pagos/subida';
 import { crearPedido } from '@/server/pedidos/servicio';
-import { clavesDeImagenReferenciadas } from '@/server/piezas/imagen';
-import { altaPieza } from '@/server/piezas/servicio';
+import { procesarImagen } from '@/server/imagenes/procesar';
+import { cambiarImagenPieza, clavesDeImagenReferenciadas } from '@/server/piezas/imagen';
+import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { saldoFavorDeVendedor } from '@/server/saldo-favor/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { crearAlmacenMemoria } from '../apoyo/almacen-memoria';
@@ -174,6 +175,27 @@ describe('P-1: pago agrupado de una vendedora', () => {
     expect(await cuenta('pago')).toBe(1);
     expect(await ficha(a.id)).toMatchObject({ pagado: '40.00' });
   });
+
+  it('liquida varios pedidos con un solo pago (bloqueo global: exhibidores y luego piezas)', async () => {
+    const a = await pedidoCon('AG08', 10000);
+    const b = await pedidoCon('AG09', 20000);
+    const c = await pedidoCon('AG10', 5000);
+    const r = await agrupado({
+      montoCentavos: 35000,
+      aplicaciones: [
+        { pedidoId: a.id, montoCentavos: 10000 },
+        { pedidoId: b.id, montoCentavos: 20000 },
+        { pedidoId: c.id, montoCentavos: 5000 },
+      ],
+    });
+    expect([...r.liquidados].sort()).toEqual([a.folio, b.folio, c.folio].sort());
+    for (const p of [a, b, c])
+      expect(await ficha(p.id)).toMatchObject({ estado: 'liquidado', saldo: '0.00' });
+    const vendidas = await app((db) =>
+      db.execute(sql`SELECT count(*)::int AS n FROM pieza WHERE estado = 'vendida'`),
+    );
+    expect(vendidas.rows[0]!['n']).toBe(3);
+  });
 });
 
 describe('P-2: sobrante y saldo a favor de la vendedora', () => {
@@ -275,7 +297,10 @@ describe('P-3: comprobante', () => {
     const c3 = await subirComprobante(almacen, await jpegDePrueba({ ancho: 800 }));
     const k = randomUUID();
     await app((db) => agregarComprobante(db, { key: k, adminId, pagoId: p.pagoId, ...c3 }));
-    await app((db) => agregarComprobante(db, { key: k, adminId, pagoId: p.pagoId, ...c3 })); // reintento idempotente
+    // Reintento real: la acción vuelve a subir la misma imagen con otra clave; la huella es la misma.
+    const c3b = await subirComprobante(almacen, await jpegDePrueba({ ancho: 800 }));
+    expect(c3b.clave).not.toBe(c3.clave);
+    await app((db) => agregarComprobante(db, { key: k, adminId, pagoId: p.pagoId, ...c3b }));
     await expect(
       app((db) => agregarComprobante(db, { key: randomUUID(), adminId, pagoId: p.pagoId, ...c3 })),
     ).rejects.toMatchObject({ codigo: 'comprobante_existente' });
@@ -284,9 +309,56 @@ describe('P-3: comprobante', () => {
     ).rejects.toMatchObject({ codigo: 'no_encontrado' });
   });
 
-  it('el barrido recorre comprobantes/: conserva el referenciado y borra el huérfano viejo', async () => {
+  it('reintentar con la misma key y la misma captura (otra clave al subir) devuelve el mismo pago', async () => {
+    const almacen = crearAlmacenMemoria();
+    const a = await pedidoCon('CO04', 10000);
+    const b = await pedidoCon('CO05', 10000);
+    const bytes = await jpegDePrueba();
+    const key = randomUUID();
+    const datos = { key, montoCentavos: 4000, aplicaciones: [{ pedidoId: a.id, montoCentavos: 4000 }] };
+    const c1 = await subirComprobante(almacen, bytes);
+    const r1 = await agrupado({ ...datos, comprobante: c1 });
+    const c2 = await subirComprobante(almacen, bytes);
+    expect(c2.clave).not.toBe(c1.clave);
+    expect(await agrupado({ ...datos, comprobante: c2 })).toEqual(r1);
+
+    const otra = await jpegDePrueba({ ancho: 700 });
+    const keyPedido = randomUUID();
+    const p1 = await pagarPedido(b.id, 3000, {
+      key: keyPedido,
+      comprobante: await subirComprobante(almacen, otra),
+    });
+    const p2 = await pagarPedido(b.id, 3000, {
+      key: keyPedido,
+      comprobante: await subirComprobante(almacen, otra),
+    });
+    expect(p2).toEqual(p1);
+    expect(await cuenta('pago')).toBe(2);
+    const claves = (
+      await app((db) => db.execute(sql`SELECT comprobante_clave::text AS c FROM pago ORDER BY created_at`))
+    ).rows.map((x) => x['c']);
+    expect(claves[0]).toBe(c1.clave); // se queda la primera; las repetidas son huérfanas para el barrido
+  });
+
+  it('el barrido recorre comprobantes/: conserva el referenciado (y la foto de pieza) y borra el huérfano viejo', async () => {
     const ayer = new Date(Date.now() - 25 * 3_600_000);
     const almacen = crearAlmacenMemoria({ ahora: () => ayer });
+    // Una pieza con foto vieja y vigente: el barrido generalizado no debe tocarla.
+    await app((db) =>
+      altaPieza(db, {
+        codigo: 'CO09',
+        categoria: 'Aretes',
+        descripcion: 'Con foto',
+        costoCentavos: 0,
+        precioCentavos: 100,
+      }),
+    );
+    const pz = (await app((db) => obtenerPiezaPorCodigo(db, 'CO09')))!;
+    const foto = await procesarImagen(await jpegDePrueba({ ancho: 600 }));
+    await app((db) =>
+      cambiarImagenPieza(db, almacen, { piezaId: pz.id, version: pz.version, adminId, imagen: foto }),
+    );
+    const clavePieza = (await app((db) => obtenerPiezaPorCodigo(db, 'CO09')))!.imagenClave!;
     const a = await pedidoCon('CO03', 10000);
     const vigente = await subirComprobante(almacen, await jpegDePrueba());
     await agrupado({
@@ -299,8 +371,14 @@ describe('P-3: comprobante', () => {
       almacen,
       clavesReferenciadas: () => app(clavesDeImagenReferenciadas),
     });
-    expect(r).toMatchObject({ referenciados: 1, borrados: 1 });
-    expect(almacen.rutas()).toEqual([rutaComprobante(vigente.clave)]);
+    expect(r).toMatchObject({ referenciados: 3, borrados: 1 });
+    expect(almacen.rutas()).toEqual(
+      [
+        rutaComprobante(vigente.clave),
+        rutaImagen(pz.id, clavePieza, 'grande'),
+        rutaImagen(pz.id, clavePieza, 'mini'),
+      ].sort(),
+    );
     expect(almacen.rutas()).not.toContain(rutaComprobante(huerfano.clave));
   });
 });
@@ -348,15 +426,35 @@ describe('P-4: aviso de duplicado', () => {
     expect(await cuenta('pago')).toBe(3);
   });
 
-  it('el pago de un solo pedido avisa si se le pide verificar; sin pedirlo no cambia nada', async () => {
+  it('el pago de un solo pedido avisa siempre; confirmar guarda y solo los servicios internos lo omiten', async () => {
     const a = await pedidoCon('DU02', 30000, '2026-01-10');
     await pagarPedido(a.id, 5000, { fecha: '2026-02-01' });
-    await pagarPedido(a.id, 5000, { fecha: '2026-02-01' }); // servicios internos: sin verificar
-    await expect(
-      pagarPedido(a.id, 5000, { fecha: '2026-02-01', confirmarDuplicado: false }),
-    ).rejects.toMatchObject({ codigo: 'posible_duplicado' });
+    await expect(pagarPedido(a.id, 5000, { fecha: '2026-02-01' })).rejects.toMatchObject({
+      codigo: 'posible_duplicado',
+    });
+    expect(await cuenta('pago')).toBe(1);
     await pagarPedido(a.id, 5000, { fecha: '2026-02-01', confirmarDuplicado: true });
+    await pagarPedido(a.id, 5000, { fecha: '2026-02-01', omitirAvisoDuplicado: true });
     expect(await cuenta('pago')).toBe(3);
+  });
+
+  it('los pagos con saldo a favor no avisan ni cuentan como parecidos', async () => {
+    const a = await pedidoCon('DU04', 30000, '2026-01-10');
+    await agrupado({ montoCentavos: 10000, fecha: '2026-02-01', aplicaciones: [] }); // sobrante de $100
+    const conSaldo = () =>
+      pagarPedido(a.id, 2000, { fecha: '2026-02-01', metodo: 'saldo_favor', pagador: 'vendedor' });
+    await conSaldo();
+    await conSaldo();
+    expect(await cuenta('pago')).toBe(3);
+    expect(
+      await app((db) =>
+        posiblesDuplicados(db, {
+          montoCentavos: 2000,
+          fecha: '2026-02-01',
+          pagador: { vendedorId: ctx.vendedorId },
+        }),
+      ),
+    ).toEqual([]);
   });
 
   it('posiblesDuplicados no mezcla pagadores distintos por monto y fecha', async () => {
@@ -368,5 +466,6 @@ describe('P-4: aviso de duplicado', () => {
       { pagoId: p.pagoId, folio: a.folio, fecha: '2026-02-01', montoCentavos: 5000 },
     ]);
     expect(await consulta({ vendedorId: ctx.vendedorId })).toEqual([]);
+    await expect(consulta({})).rejects.toMatchObject({ codigo: 'pagador_invalido' });
   });
 });

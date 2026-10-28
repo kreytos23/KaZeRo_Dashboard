@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, or, sql } from 'drizzle-orm';
+import { and, desc, eq, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { pago } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
@@ -14,7 +14,7 @@ export interface PagoParecido {
 
 /**
  * P-4: pagos vigentes con la misma referencia, o con el mismo monto y fecha del mismo pagador. Solo informa:
- * quien guarda decide (`exigirSinDuplicados`). Los anulados no cuentan.
+ * quien guarda decide (`exigirSinDuplicados`). Los anulados y los pagos con saldo a favor (dinero interno) no cuentan.
  */
 export async function posiblesDuplicados(
   db: Ejecutor,
@@ -26,9 +26,11 @@ export async function posiblesDuplicados(
   },
 ): Promise<PagoParecido[]> {
   const referencia = d.referencia?.trim().toLowerCase();
+  if (!d.pagador.clienteId && !d.pagador.vendedorId)
+    throw new ErrorNegocio('pagador_invalido', 'Elige quién paga.', 'pagador');
   const pagador = d.pagador.clienteId
     ? eq(pago.pagadorClienteId, d.pagador.clienteId)
-    : eq(pago.pagadorVendedorId, d.pagador.vendedorId ?? '');
+    : eq(pago.pagadorVendedorId, d.pagador.vendedorId!);
   const filas = await db
     .select({
       pagoId: pago.id,
@@ -43,6 +45,7 @@ export async function posiblesDuplicados(
     .where(
       and(
         isNull(pago.anuladoAt),
+        ne(pago.metodo, 'saldo_favor'),
         or(
           and(eq(pago.monto, centavosANumeric(d.montoCentavos)), eq(pago.fecha, d.fecha), pagador),
           referencia ? sql`lower(btrim(${pago.referencia})) = ${referencia}` : undefined,

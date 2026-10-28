@@ -1,14 +1,15 @@
-import { inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { aplicacionPago, pago, pedido, saldoFavorMov } from '@/db/schema';
+import { aplicacionPago, pago, pedido, pedidoItem, saldoFavorMov } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
 import { conIdempotencia } from '@/server/idempotencia';
 import {
   bloquearCliente,
+  bloquearExhibidoresDe,
   bloquearPedido,
-  bloquearPiezasDelPedido,
+  bloquearPiezasPorId,
   liquidarSiSaldoCero,
   pagadoCentavos,
 } from '@/server/pedidos/comun';
@@ -16,7 +17,7 @@ import { validarFecha } from '@/server/pedidos/servicio';
 import { noAlcanza, saldoFavorDeVendedor } from '@/server/saldo-favor/servicio';
 import { validarComprobante, type Comprobante } from './comprobante';
 import { exigirSinDuplicados } from './duplicados';
-import { METODOS_PAGO, validarReferencia, type MetodoPago } from './servicio';
+import { METODOS_PAGO, payloadIdempotente, validarReferencia, type MetodoPago } from './servicio';
 
 export interface DatosPagoAgrupado {
   key: string;
@@ -42,7 +43,7 @@ function validar(d: DatosPagoAgrupado) {
     if (!Number.isSafeInteger(a.montoCentavos) || a.montoCentavos <= 0)
       throw new ErrorNegocio(
         'monto_invalido',
-        'Cada monto aplicado debe ser mayor que cero.',
+        'El monto aplicado a cada pedido debe ser mayor que cero; deja vacío el pedido que no se paga.',
         'aplicaciones',
       );
     if (ids.has(a.pedidoId))
@@ -90,7 +91,12 @@ export async function registrarPagoAgrupado(
     db.transaction((tx) =>
       conIdempotencia(
         tx,
-        { key: d.key, adminId: d.adminId, operacion: 'registrarPagoAgrupado', payload: v },
+        {
+          key: d.key,
+          adminId: d.adminId,
+          operacion: 'registrarPagoAgrupado',
+          payload: payloadIdempotente(v),
+        },
         async () => {
           await fijarContextoAuditoria(tx, { adminId: d.adminId, motivo: null }); // la liquidación cambia `estado`
           const fecha = validarFecha(v.fecha ?? undefined);
@@ -137,18 +143,31 @@ export async function registrarPagoAgrupado(
             const disponible = numericACentavos(await saldoFavorDeVendedor(tx, v.vendedorId));
             if (v.monto > disponible) throw noAlcanza(disponible, v.monto);
           }
-          await exigirSinDuplicados(
-            tx,
-            {
-              referencia: v.referencia,
-              montoCentavos: v.monto,
-              fecha,
-              pagador: { vendedorId: v.vendedorId },
-            },
-            v.confirmarDuplicado,
-          );
-          // Los que se liquidan: exhibidores → piezas ANTES de tocar `pago` (D-10).
-          for (const f of filas) if (f.saldo === 0) await bloquearPiezasDelPedido(tx, f.id);
+          // P-4: el saldo a favor es dinero interno (sin banco): no hay duplicado que avisar.
+          if (v.metodo !== 'saldo_favor')
+            await exigirSinDuplicados(
+              tx,
+              {
+                referencia: v.referencia,
+                montoCentavos: v.monto,
+                fecha,
+                pagador: { vendedorId: v.vendedorId },
+              },
+              v.confirmarDuplicado,
+            );
+          // Los que se liquidan: los exhibidores de TODAS sus piezas y luego todas las piezas, ANTES de `pago`
+          // (D-10, orden global; liquidarSiSaldoCero los vuelve a pedir ya tomados).
+          const aLiquidar = filas.filter((f) => f.saldo === 0).map((f) => f.id);
+          if (aLiquidar.length) {
+            const piezaIds = (
+              await tx
+                .select({ piezaId: pedidoItem.piezaId })
+                .from(pedidoItem)
+                .where(and(inArray(pedidoItem.pedidoId, aLiquidar), eq(pedidoItem.vigente, true)))
+            ).map((i) => i.piezaId);
+            await bloquearExhibidoresDe(tx, piezaIds);
+            await bloquearPiezasPorId(tx, piezaIds);
+          }
           const [pg] = await tx
             .insert(pago)
             .values({

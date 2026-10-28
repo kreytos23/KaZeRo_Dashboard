@@ -38,7 +38,7 @@ export function agregarComprobante(
           key: d.key,
           adminId: d.adminId,
           operacion: 'agregarComprobante',
-          payload: { pagoId: d.pagoId, ...c },
+          payload: { pagoId: d.pagoId, sha256: c.sha256 }, // la huella, no la clave aleatoria (I-2)
         },
         async (): Promise<{ ok: true }> => {
           const [p] = await tx

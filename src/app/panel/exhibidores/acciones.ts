@@ -174,6 +174,7 @@ export async function accionAbonoExhibidor(_: EstadoAccion, fd: FormData): Promi
         metodo: texto(fd, 'metodo') as MetodoPago,
         pagador: 'cliente',
         exhibidorId,
+        confirmarDuplicado: texto(fd, 'confirmarDuplicado') === 'on',
       }),
     );
     revalidarDinero(exhibidorId, Number.isInteger(folio) ? folio : undefined);
