@@ -26,12 +26,14 @@ export const motivoSinLealtad = pgEnum('motivo_sin_lealtad', ['saldo_pendiente']
 // Plan 3.1 (D-20): 'saldo_favor' = la clienta paga con su saldo a favor.
 export const metodoPago = pgEnum('metodo_pago', ['transferencia', 'efectivo', 'otro', 'saldo_favor']);
 // 'sobrante' lo usa el Plan 4. Plan 3.1: 'uso' (D-20), 'devolucion' (D-16) y 'retiro' en efectivo (D-21).
+// Plan 4b (P-5): 'anulacion' = deshacer un pago (−su sobrante, o +lo usado si pagó con saldo a favor).
 export const tipoSaldoFavor = pgEnum('tipo_saldo_favor', [
   'cancelacion',
   'sobrante',
   'uso',
   'devolucion',
   'retiro',
+  'anulacion',
 ]);
 
 export const pedido = pgTable(
@@ -161,9 +163,23 @@ export const pago = pgTable(
     // Plan 4a (E-4): lo cobró este exhibidor (queda «por entregar»). El trigger de 0023 exige, al aplicarlo, un
     // exhibidor abierto de la vendedora del pedido.
     exhibidorId: uuid('exhibidor_id').references(() => exhibidor.id),
+    // Plan 4b (P-3, P-4): referencia bancaria y comprobante (foto privada en el almacén de imágenes, R-36).
+    referencia: text('referencia'),
+    comprobanteClave: uuid('comprobante_clave'),
+    comprobanteSha256: text('comprobante_sha256'),
+    // Plan 4b (P-5): deshacer el pago. Nada se borra; el trigger de 0025 solo deja pasar NULL → valor.
+    anuladoAt: ts('anulado_at'),
+    anulacionMotivo: text('anulacion_motivo'),
+    anuladoPor: uuid('anulado_por').references(() => admin.id),
   },
   (t) => [
     uniqueIndex('pago_idempotency_key_uq').on(t.idempotencyKey),
+    // R-36 / P-4: la misma imagen no se registra en dos pagos vigentes (NULL no choca). Un pago anulado sale del
+    // índice: corregir un pago es anularlo y volver a registrarlo con la misma captura.
+    uniqueIndex('pago_comprobante_sha256_uq')
+      .on(t.comprobanteSha256)
+      .where(sql`${t.comprobanteSha256} IS NOT NULL AND ${t.anuladoAt} IS NULL`),
+    index('pago_anulado_por_idx').on(t.anuladoPor),
     index('pago_exhibidor_idx').on(t.exhibidorId),
     index('pago_pagador_cliente_idx').on(t.pagadorClienteId),
     index('pago_pagador_vendedor_idx').on(t.pagadorVendedorId),
@@ -171,13 +187,25 @@ export const pago = pgTable(
     check('pago_monto_positivo', sql`${t.monto} > 0`),
     check('pago_un_pagador', sql`num_nonnulls(${t.pagadorClienteId}, ${t.pagadorVendedorId}) = 1`),
     check('pago_nota_largo', sql`${t.nota} IS NULL OR char_length(${t.nota}) <= 200`),
-    // D-20. `::text`: 'saldo_favor' se agrega en esta misma tanda de migraciones (55P04).
-    check(
-      'pago_saldo_favor_cliente',
-      sql`${t.metodo}::text <> 'saldo_favor' OR ${t.pagadorClienteId} IS NOT NULL`,
-    ),
+    // D-20: pago_saldo_favor_cliente (solo clientas) se quitó en 0024: la vendedora usa su saldo (P-2).
     // Plan 4a: usar saldo a favor no es dinero que el exhibidor cobró (no se le pide entregarlo).
     check('pago_exhibidor_sin_saldo', sql`${t.exhibidorId} IS NULL OR ${t.metodo}::text <> 'saldo_favor'`),
+    check(
+      'pago_referencia_largo',
+      sql`${t.referencia} IS NULL OR char_length(btrim(${t.referencia})) BETWEEN 1 AND 60`,
+    ),
+    check(
+      'pago_comprobante_coherente',
+      sql`(${t.comprobanteClave} IS NULL) = (${t.comprobanteSha256} IS NULL)
+        AND (${t.comprobanteSha256} IS NULL OR ${t.comprobanteSha256} ~ '^[0-9a-f]{64}$')`,
+    ),
+    // `IS NOT NULL` explícito: con motivo NULL, char_length(...) BETWEEN da NULL y un CHECK con NULL pasa.
+    check(
+      'pago_anulacion_coherente',
+      sql`(${t.anuladoAt} IS NULL AND ${t.anulacionMotivo} IS NULL AND ${t.anuladoPor} IS NULL)
+        OR (${t.anuladoAt} IS NOT NULL AND ${t.anuladoPor} IS NOT NULL AND ${t.anulacionMotivo} IS NOT NULL
+            AND char_length(btrim(${t.anulacionMotivo})) BETWEEN 1 AND 200)`,
+    ),
   ],
 );
 
@@ -248,9 +276,13 @@ export const saldoFavorMov = pgTable(
     // Anulable: los movimientos anteriores al Plan 3.1 no lo tienen (D-22).
     adminId: uuid('admin_id').references(() => admin.id),
     nota: text('nota'),
+    // Plan 4b: el pago de un 'sobrante' (opcional: los anteriores no lo tienen) o de una 'anulacion' (obligatorio).
+    pagoId: uuid('pago_id').references(() => pago.id),
   },
   (t) => [
     index('saldo_favor_mov_cliente_idx').on(t.clienteId),
+    // Un sobrante y una anulación por pago (NULL no choca).
+    uniqueIndex('saldo_favor_mov_pago_uq').on(t.pagoId, t.tipo),
     index('saldo_favor_mov_vendedor_idx').on(t.vendedorId),
     index('saldo_favor_mov_pedido_idx').on(t.pedidoId),
     uniqueIndex('saldo_favor_mov_aplicacion_uq').on(t.aplicacionPagoId),
@@ -260,14 +292,21 @@ export const saldoFavorMov = pgTable(
     // El trigger saldo_favor_libro (0013; v2 en 0017) valida el origen y que el saldo nunca quede negativo.
     // D-22: versiones _v2 más permisivas que saldo_favor_signo (0012) y saldo_favor_pedido_requerido (0013),
     // que 0016/0017 eliminan. `tipo::text`: 'devolucion' y 'retiro' se agregan en esta misma tanda (55P04).
-    // Entradas positivas (cancelación, sobrante, devolución), salidas negativas (uso, retiro).
+    // Entradas positivas (cancelación, sobrante, devolución), salidas negativas (uso, retiro). Plan 4b (0024): mismo
+    // nombre con la anulación (≠ 0, de cualquier signo) y sin pedido; estrictamente más amplios que antes.
     check(
       'saldo_favor_signo_v2',
-      sql`(${t.tipo}::text IN ('uso', 'retiro') AND ${t.monto} < 0) OR (${t.tipo}::text NOT IN ('uso', 'retiro') AND ${t.monto} > 0)`,
+      sql`(${t.tipo}::text IN ('uso', 'retiro') AND ${t.monto} < 0) OR (${t.tipo}::text = 'anulacion' AND ${t.monto} <> 0)
+        OR (${t.tipo}::text NOT IN ('uso', 'retiro', 'anulacion') AND ${t.monto} > 0)`,
     ),
     check(
       'saldo_favor_pedido_requerido_v2',
-      sql`${t.tipo}::text IN ('sobrante', 'retiro') OR ${t.pedidoId} IS NOT NULL`,
+      sql`${t.tipo}::text IN ('sobrante', 'retiro', 'anulacion') OR ${t.pedidoId} IS NOT NULL`,
+    ),
+    check(
+      'saldo_favor_pago_origen',
+      sql`(${t.tipo}::text = 'anulacion' AND ${t.pagoId} IS NOT NULL)
+        OR (${t.tipo}::text <> 'anulacion' AND (${t.pagoId} IS NULL OR ${t.tipo}::text = 'sobrante'))`,
     ),
     check(
       'saldo_favor_origen',

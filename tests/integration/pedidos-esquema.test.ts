@@ -347,10 +347,11 @@ describe('reglas de pedidos en la BD', () => {
       );
     expect(await codigoAl(() => mov({ vendedorId: b.vendedorId }))).toBe('saldo_favor_un_titular');
     expect(await codigoAl(() => mov({ monto: '-5.00' }))).toBe('saldo_favor_signo_v2');
-    // cancelacion y uso nacen de un pedido; sobrante (Plan 4) no necesariamente.
+    // cancelacion y uso nacen de un pedido; sobrante (Plan 4) no necesariamente, pero sí de su pago (Plan 4b).
     expect(await codigoAl(() => mov({ pedidoId: null }))).toBe('saldo_favor_pedido_requerido_v2');
     await mov({});
-    await mov({ tipo: 'sobrante', monto: '20.00', pedidoId: null });
+    const [pg] = await nuevoPago(b, '20.00');
+    await mov({ tipo: 'sobrante', monto: '20.00', pedidoId: null, pagoId: pg!.id });
     const r = await app((db) => db.execute(sql`SELECT cliente_id, vendedor_id, saldo FROM v_saldo_favor`));
     expect(r.rows).toEqual([{ cliente_id: b.clienteId, vendedor_id: null, saldo: '70.00' }]);
   });

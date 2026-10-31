@@ -16,10 +16,15 @@ export const CALIDADES_SUBIDA = [0.9, 0.8, 0.7] as const;
 export const MENSAJE_FOTO_GRANDE = 'La foto es demasiado grande (máximo 30 megapíxeles).';
 export const MENSAJE_FOTO_ILEGIBLE = 'No se pudo leer la foto. Intenta con otra.';
 
+/** Carpetas del almacén: fotos de pieza y (Plan 4b) comprobantes de pago. Comparten esquema de ruta y barrido. */
+export const RAICES_IMAGEN = ['piezas', 'comprobantes'] as const;
+/** `(piezas|comprobantes)` para las expresiones de rutas y prefijos. */
+export const GRUPO_RAICES = `(${RAICES_IMAGEN.join('|')})`;
+
 const VARIANTES: readonly Variante[] = ['grande', 'mini'];
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
-const RUTA =
-  /^piezas\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-(grande|mini)\.webp$/;
+const UUID_RE = '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}';
+const UUID = new RegExp(`^${UUID_RE}$`);
+const RUTA = new RegExp(`^${GRUPO_RAICES}/${UUID_RE}/${UUID_RE}-(grande|mini)\\.webp$`);
 // Marcas ISO-BMFF (ftyp) de HEIF/HEIC; 'avif'/'avis' son AVIF.
 const MARCAS_HEIC = new Set(['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1']);
 const MARCAS_AVIF = new Set(['avif', 'avis']);
@@ -77,7 +82,7 @@ export const esUuid = (v: string) => UUID.test(v);
 export const esVariante = (v: string): v is Variante => (VARIANTES as readonly string[]).includes(v);
 export const esRutaImagen = (ruta: string) => RUTA.test(ruta);
 
-/** Clave de una ruta de foto de pieza; null si la ruta no es exactamente una de las nuestras. */
+/** Clave de una ruta de foto de pieza o de comprobante; null si la ruta no es exactamente una de las nuestras. */
 export function claveDeRuta(ruta: string): string | null {
   if (!esRutaImagen(ruta)) return null;
   return ruta.split('/')[2]!.slice(0, 36);
@@ -93,4 +98,15 @@ export function rutaImagen(piezaId: string, clave: string, variante: Variante): 
 /** URL servida por la app. `v` = clave: cambia con cada foto, así la caché de un día nunca sirve una foto vieja. */
 export function urlImagenPieza(piezaId: string, clave: string, variante: Variante): string {
   return `/api/piezas/${piezaId}/imagen?v=${clave}&t=${variante}`;
+}
+
+/** Comprobante de pago (Plan 4b): mismo esquema de ruta que las fotos, con la clave como carpeta (solo `grande`). */
+export function rutaComprobante(clave: string): string {
+  if (!esUuid(clave)) throw new RangeError('Ruta de imagen inválida');
+  return `comprobantes/${clave}/${clave}-grande.webp`;
+}
+
+/** URL servida por la app para el comprobante de un pago; `v` = clave, igual que en las fotos de pieza. */
+export function urlComprobante(pagoId: string, clave: string): string {
+  return `/api/pagos/${pagoId}/comprobante?v=${clave}`;
 }

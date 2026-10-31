@@ -1,5 +1,5 @@
 import 'server-only';
-import { claveDeRuta } from '@/domain/imagenes';
+import { RAICES_IMAGEN, claveDeRuta } from '@/domain/imagenes';
 import type { AlmacenImagenes } from './almacen';
 
 /** Solo conteos: es lo único que se registra (nunca rutas, claves ni tokens). */
@@ -49,17 +49,20 @@ export async function barrerImagenesHuerfanas(o: {
 
   // 1. Listar (páginas con tope). 2. Leer las claves vigentes DESPUÉS de listar (una consulta).
   const objetos: { ruta: string; subidoEn: Date }[] = [];
-  let cursor: string | undefined;
-  for (let pagina = 0; ; pagina++) {
-    if (pagina === maxPaginas) {
-      r.truncado = true;
-      break;
+  // Fotos de pieza y comprobantes de pago comparten almacén y claves vigentes (clavesDeImagenReferenciadas).
+  paginas: for (const prefijo of RAICES_IMAGEN.map((r) => `${r}/`)) {
+    let cursor: string | undefined;
+    for (let pagina = 0; ; pagina++) {
+      if (pagina === maxPaginas) {
+        r.truncado = true;
+        break paginas;
+      }
+      // Secuencial por diseño: cada página necesita el cursor de la anterior (no es N+1 por fila).
+      const p = await o.almacen.listar(prefijo, cursor);
+      objetos.push(...p.objetos);
+      if (!p.siguiente) break;
+      cursor = p.siguiente;
     }
-    // Secuencial por diseño: cada página necesita el cursor de la anterior (no es N+1 por fila).
-    const p = await o.almacen.listar('piezas/', cursor);
-    objetos.push(...p.objetos);
-    if (!p.siguiente) break;
-    cursor = p.siguiente;
   }
   const vigentes = await o.clavesReferenciadas();
 

@@ -5,7 +5,10 @@ import { z } from 'zod';
 import { conDbLectura } from '@/db/client';
 import { formatoFolio } from '@/domain/pedidos';
 import { formatoMXN, numericACentavos, porcentajeLegible } from '@/domain/dinero';
+import { hoyMX } from '@/domain/fechas';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
+import { FormRetiroSaldo } from '@/features/saldo-favor/FormRetiroSaldo';
+import { HistorialSaldo } from '@/features/saldo-favor/HistorialSaldo';
 import { Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
@@ -17,13 +20,17 @@ import { requerirSesion } from '@/server/auth/sesion-actual';
 import { ErrorNegocio } from '@/server/errores';
 import { listarExhibidores } from '@/server/exhibidores/servicio';
 import { piezasDeVendedora } from '@/server/piezas/custodia';
-import { saldoFavorDeVendedor } from '@/server/pedidos/lecturas';
+import { pedidosAbiertosDeVendedora } from '@/server/pagos/lecturas';
+import { saldoFavorDe } from '@/server/saldo-favor/servicio';
+import { movimientosSaldoFavor } from '@/server/saldo-favor/servicio';
 import { resumenDeVendedora } from '@/server/vendedores/resumen';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
 import { accionEditarVendedor } from '../acciones';
 import { TIPOS } from '../tipos';
 import { ETIQUETA_ESTADO } from '../../inventario/etiquetas';
 import { FormsCustodia } from './FormsCustodia';
+import { FormPagoAgrupado } from './FormPagoAgrupado';
+import { FormUsarSaldo } from './FormUsarSaldo';
 
 export const metadata = { title: 'Vendedor' };
 
@@ -31,14 +38,16 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [v, exhibidores, cambios, saldoFavor, enPoder, resumen] = await conDbLectura((db) =>
+  const [v, exhibidores, cambios, saldoFavor, enPoder, resumen, abiertos, libro] = await conDbLectura((db) =>
     Promise.all([
       obtenerVendedor(db, id.data),
       listarExhibidores(db, { vendedorId: id.data }),
       historialDeCambios(db, 'vendedor', id.data),
-      saldoFavorDeVendedor(db, id.data),
+      saldoFavorDe(db, { vendedorId: id.data }),
       piezasDeVendedora(db, id.data),
       resumenDeVendedora(db, id.data),
+      pedidosAbiertosDeVendedora(db, id.data),
+      movimientosSaldoFavor(db, { vendedorId: id.data, limite: 100 }),
     ]),
   ).catch((e: unknown) => {
     if (e instanceof ErrorNegocio && e.codigo === 'no_encontrado') notFound();
@@ -52,11 +61,6 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
       {/* En pantallas anchas, dos columnas (piezas y exhibidores | datos e historial); en celular, una con `order-*`. */}
       <div className="ficha-cols">
         <div className="ficha-col">
-          {numericACentavos(saldoFavor) > 0 && (
-            <p className="order-1 text-monto font-semibold tabular-nums">
-              Saldo a favor: {formatoMXN(numericACentavos(saldoFavor))}
-            </p>
-          )}
           {v.tipo !== 'casa' && (
             <section aria-labelledby="piezas-en-poder" className="order-1 flex flex-col gap-3">
               <h2 id="piezas-en-poder" className="text-lg font-semibold">
@@ -154,7 +158,30 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
               )}
             </div>
           </section>
-          <div className="order-3 flex max-w-2xl flex-col gap-3">
+          <section aria-labelledby="pago-agrupado" className="order-3 flex max-w-2xl flex-col gap-3">
+            <h2 id="pago-agrupado" className="text-lg font-semibold">
+              Registrar pago agrupado
+            </h2>
+            <FormPagoAgrupado
+              vendedorId={v.id}
+              nombre={v.nombre}
+              pedidos={abiertos}
+              hoy={hoyMX()}
+              saldo={saldoFavor}
+            />
+          </section>
+          <section aria-labelledby="saldo-favor" className="order-4 flex max-w-2xl flex-col gap-3">
+            <h2 id="saldo-favor" className="text-lg font-semibold">
+              Saldo a favor
+            </h2>
+            <p className="tarjeta p-4 text-3xl font-semibold tabular-nums">
+              {formatoMXN(numericACentavos(saldoFavor))}
+            </p>
+            <FormUsarSaldo saldo={saldoFavor} pedidos={abiertos} hoy={hoyMX()} />
+            <FormRetiroSaldo titular={{ vendedorId: v.id }} saldo={saldoFavor} />
+            <HistorialSaldo libro={libro} />
+          </section>
+          <div className="order-5 flex max-w-2xl flex-col gap-3">
             <FormAccion accion={accionEditarVendedor} textoBoton="Guardar cambios">
               {/* key por versión en los campos (no en el formulario): refresca los defaultValue sin perder el estado de la acción. */}
               <Fragment key={v.version}>
@@ -176,7 +203,7 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
               </Fragment>
             </FormAccion>
           </div>
-          <div className="order-4">
+          <div className="order-6">
             <HistorialCambios entradas={cambios} />
           </div>
         </div>

@@ -70,7 +70,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
           SELECT table_name || '.' || column_name AS p FROM information_schema.column_privileges
           WHERE grantee = 'kazero_app' AND table_schema = 'public' AND privilege_type = 'UPDATE'
             AND table_name IN ('auditoria', 'auditoria_campo', 'movimiento_pieza', 'pieza', 'pedido', 'pedido_item', 'aplicacion_pago',
-              'corte_comision', 'comision_linea', 'pago_comision', 'cliente', 'entrega_exhibidor')`),
+              'corte_comision', 'comision_linea', 'pago_comision', 'cliente', 'entrega_exhibidor', 'pago')`),
       ]),
     );
     const orden = (f: { rows: { p: string }[] }) => f.rows.map((x) => x.p).sort();
@@ -156,6 +156,10 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
         'aplicacion_pago.anulada_at',
         // Plan 5a: un pago de comisión solo se anula; cortes y líneas no se actualizan.
         ...['anulado_at', 'anulacion_motivo', 'anulado_por'].map((c) => `pago_comision.${c}`),
+        // Plan 4b: un pago solo recibe su comprobante o se anula (lo demás no se edita).
+        ...['comprobante_clave', 'comprobante_sha256', 'anulado_at', 'anulacion_motivo', 'anulado_por'].map(
+          (c) => `pago.${c}`,
+        ),
       ].sort(),
     );
   });
@@ -186,7 +190,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       ...t('material', 'INSERT', 'SELECT', 'UPDATE'),
       ...t('movimiento_pieza', 'INSERT', 'SELECT'),
       ...t('origen_excel', 'SELECT'), // Plan 7a: solo la escribe el script de migración (dueño)
-      ...t('pago', 'INSERT', 'SELECT'),
+      ...t('pago', 'INSERT', 'SELECT'), // Plan 4b: UPDATE solo de comprobante y anulación (por columna)
       ...t('pago_comision', 'INSERT', 'SELECT'), // UPDATE solo de las columnas de anulación
       ...t('pedido', 'INSERT', 'SELECT'),
       ...t('pedido_item', 'INSERT', 'SELECT'),

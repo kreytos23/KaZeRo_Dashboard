@@ -206,6 +206,9 @@ export const vAplicacionPago = pgView('v_aplicacion_pago', {
   pagadorTipo: text('pagador_tipo').$type<'cliente' | 'vendedor'>().notNull(),
   pagadorNombre: text('pagador_nombre').notNull(),
   createdAt: ts('created_at').notNull(),
+  // Plan 4b (0025), al final: el pago está anulado (sus aplicaciones también) y su referencia.
+  pagoAnuladoAt: ts('pago_anulado_at'),
+  referencia: text('referencia'),
 }).existing();
 
 export const vSaldoFavor = pgView('v_saldo_favor', {
@@ -231,4 +234,6 @@ export const vSaldoFavorMov = pgView('v_saldo_favor_mov', {
   adminId: uuid('admin_id'),
   adminEmail: text('admin_email'),
   createdAt: ts('created_at').notNull(),
+  // Plan 4b (0025), al final: el pago de un sobrante o de una anulación.
+  pagoId: uuid('pago_id'),
 }).existing();

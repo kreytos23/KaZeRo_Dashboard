@@ -16,14 +16,22 @@ describe('ejecutarAccion', () => {
       await ejecutarAccion(async () => {
         throw new ErrorNegocio('x', 'Ya existe.');
       }),
-    ).toEqual({ error: 'Ya existe.' });
+    ).toEqual({ error: 'Ya existe.', codigo: 'x' });
   });
   it('un ErrorNegocio con campo se devuelve también por campo', async () => {
     expect(
       await ejecutarAccion(async () => {
         throw new ErrorNegocio('x', 'Ya existe.', 'nombre');
       }),
-    ).toEqual({ error: 'Ya existe.', campos: { nombre: 'Ya existe.' } });
+    ).toEqual({ error: 'Ya existe.', codigo: 'x', campos: { nombre: 'Ya existe.' } });
+  });
+  it('entrega el código y el detalle del ErrorNegocio (aviso de duplicado)', async () => {
+    const lista = [{ pagoId: 'p1', folio: 7, fecha: '2026-02-01', montoCentavos: 5000 }];
+    expect(
+      await ejecutarAccion(async () => {
+        throw new ErrorNegocio('posible_duplicado', 'Ya hay un pago parecido.', undefined, lista);
+      }),
+    ).toEqual({ error: 'Ya hay un pago parecido.', codigo: 'posible_duplicado', detalle: lista });
   });
   it('un error inesperado da un mensaje genérico y no loguea su texto (podría traer datos)', async () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});

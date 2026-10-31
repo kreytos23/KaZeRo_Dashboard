@@ -2,7 +2,7 @@ import { formatoMXN, numericACentavos } from '@/domain/dinero';
 import { formatoFolio } from '@/domain/pedidos';
 
 export interface MovimientoTexto {
-  tipo: 'cancelacion' | 'sobrante' | 'uso' | 'devolucion' | 'retiro';
+  tipo: 'cancelacion' | 'sobrante' | 'uso' | 'devolucion' | 'retiro' | 'anulacion';
   pedidoFolio: number | null;
   devolucionMotivo: string | null;
   nota: string | null;
@@ -23,6 +23,8 @@ export function textoMovimientoSaldo(m: MovimientoTexto): string {
       return con('Retiro en efectivo', m.nota);
     case 'sobrante':
       return folio ? `Sobrante de pago en ${folio}` : 'Sobrante de pago';
+    case 'anulacion':
+      return 'Pago deshecho';
   }
 }
 

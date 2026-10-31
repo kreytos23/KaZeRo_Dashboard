@@ -30,6 +30,8 @@ async function abrirBuscadorConAtajo(page: Page) {
 }
 
 test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => {
+  // Flujo largo (vendedor, pieza, búsqueda, exhibidor y su cierre): en CI lento rozaba los 30 s por defecto.
+  test.setTimeout(60_000);
   const m = marcaDe(info);
   const prefijo = `Z${m}`;
   const codigo = `${prefijo}01`;

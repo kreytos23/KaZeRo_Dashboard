@@ -122,13 +122,14 @@ type Sfm = {
   adminId?: string | null;
   nota?: string;
   vendedorId?: string;
+  pagoId?: string;
 };
 const saldoMov = (ej: Ejecutor, v: Sfm) =>
   ej.execute(sql`INSERT INTO saldo_favor_mov (cliente_id, vendedor_id, tipo, monto, pedido_id, aplicacion_pago_id,
-      devolucion_id, admin_id, nota, fecha)
+      devolucion_id, admin_id, nota, fecha, pago_id)
     VALUES (${v.vendedorId ? null : b.clienteId}, ${v.vendedorId ?? null}, ${v.tipo}, ${v.monto}, ${v.pedidoId ?? null},
             ${v.aplicacionPagoId ?? null}, ${v.devolucionId ?? null},
-            ${v.adminId === undefined ? adminId : v.adminId}, ${v.nota ?? null}, '2026-10-15')`);
+            ${v.adminId === undefined ? adminId : v.adminId}, ${v.nota ?? null}, '2026-10-15', ${v.pagoId ?? null})`);
 
 /** Flujo completo de una devolución (Task 6): devolución + saldo + línea fuera + pieza a defecto + movimiento. */
 const devolver = (itemId: string, piezaId: string, pedidoId: string, monto = '149.00') =>
@@ -605,10 +606,11 @@ describe('libro de saldo a favor v2 (D-20..D-22)', () => {
     ).toBe('saldo_favor_origen');
   });
 
-  it('pago_saldo_favor_cliente: solo una clienta paga con su saldo (el de vendedor llega en el Plan 4)', async () => {
+  it('Plan 4b (0024): la vendedora también paga con su saldo (sin pago_saldo_favor_cliente)', async () => {
+    // Sin su aplicación completa lo rechaza el diferido pago_saldo_sin_aplicacion, no el CHECK que se quitó.
     expect(
       await resultado(() => app((db) => nuevoPago(db, 'saldo_favor', '10.00', { vendedor: true }))),
-    ).toBe('pago_saldo_favor_cliente');
+    ).toBe('pago_saldo_sin_aplicacion');
   });
 
   it('compatibilidad: los movimientos de 0012/0013 siguen siendo válidos (sin admin ni nota)', async () => {
@@ -618,8 +620,12 @@ describe('libro de saldo a favor v2 (D-20..D-22)', () => {
         app((db) => saldoMov(db, { tipo: 'cancelacion', monto: '10.00', pedidoId: ped, adminId: null })),
       ),
     ).toBe('ok');
+    // Plan 4b (0025): el sobrante nace de su pago (saldo_favor_sobrante_sin_pago).
+    const pagoId = await app((db) => nuevoPago(db, 'efectivo', '5.00'));
     expect(
-      await resultado(() => app((db) => saldoMov(db, { tipo: 'sobrante', monto: '5.00', adminId: null }))),
+      await resultado(() =>
+        app((db) => saldoMov(db, { tipo: 'sobrante', monto: '5.00', adminId: null, pagoId })),
+      ),
     ).toBe('ok');
     expect(
       await resultado(() =>

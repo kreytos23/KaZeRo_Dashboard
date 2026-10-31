@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, isNotNull, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { pieza, vPieza } from '@/db/schema';
+import { pago, pieza, vPieza } from '@/db/schema';
 import { rutaImagen } from '@/domain/imagenes';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
@@ -153,9 +153,11 @@ export async function claveImagenDePieza(db: Ejecutor, piezaId: string): Promise
 
 /** Claves de foto vigentes: una sola consulta a la vista (sin N+1). Las usa el barrido de huérfanas. */
 export async function clavesDeImagenReferenciadas(db: Ejecutor): Promise<Set<string>> {
+  // Plan 4b: también los comprobantes de pago (mismo almacén). Una sola consulta.
   const filas = await db
     .select({ clave: vPieza.imagenClave })
     .from(vPieza)
-    .where(isNotNull(vPieza.imagenClave));
+    .where(isNotNull(vPieza.imagenClave))
+    .union(db.select({ clave: pago.comprobanteClave }).from(pago).where(isNotNull(pago.comprobanteClave)));
   return new Set(filas.map((f) => f.clave!));
 }

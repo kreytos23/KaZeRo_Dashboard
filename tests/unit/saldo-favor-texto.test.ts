@@ -22,6 +22,8 @@ describe('textoMovimientoSaldo', () => {
     expect(textoMovimientoSaldo({ ...base, tipo: 'sobrante', pedidoFolio: 2 })).toBe(
       'Sobrante de pago en KZR-2',
     ));
+  it('anulación: un pago deshecho (Plan 4b)', () =>
+    expect(textoMovimientoSaldo({ ...base, tipo: 'anulacion' })).toBe('Pago deshecho'));
   it('sin folio ni motivo no deja huecos', () => {
     expect(textoMovimientoSaldo({ ...base, tipo: 'devolucion' })).toBe('Devolución');
     expect(textoMovimientoSaldo({ ...base, tipo: 'retiro' })).toBe('Retiro en efectivo');

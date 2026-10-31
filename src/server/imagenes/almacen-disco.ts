@@ -4,6 +4,7 @@ import { createReadStream } from 'node:fs';
 import { link, mkdir, readdir, rm, stat, unlink, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { Readable } from 'node:stream';
+import { RAICES_IMAGEN } from '@/domain/imagenes';
 import type { AlmacenImagenes } from './almacen';
 import { exigirLimite, exigirPrefijo, exigirRuta, LIMITE_LISTA, paginarRutas } from './ruta';
 
@@ -54,16 +55,18 @@ export function crearAlmacenDisco(dir: string): AlmacenImagenes {
       exigirPrefijo(prefijo);
       exigirLimite(limite);
       const rutas: string[] = [];
-      try {
-        for (const pieza of await readdir(join(base, 'piezas'))) {
-          try {
-            for (const f of await readdir(join(base, 'piezas', pieza))) rutas.push(`piezas/${pieza}/${f}`);
-          } catch (e) {
-            if (!noExiste(e) && (e as NodeJS.ErrnoException).code !== 'ENOTDIR') throw e;
+      for (const raiz of RAICES_IMAGEN) {
+        try {
+          for (const carpeta of await readdir(join(base, raiz))) {
+            try {
+              for (const f of await readdir(join(base, raiz, carpeta))) rutas.push(`${raiz}/${carpeta}/${f}`);
+            } catch (e) {
+              if (!noExiste(e) && (e as NodeJS.ErrnoException).code !== 'ENOTDIR') throw e;
+            }
           }
+        } catch (e) {
+          if (!noExiste(e)) throw e;
         }
-      } catch (e) {
-        if (!noExiste(e)) throw e;
       }
       const { pagina, siguiente } = paginarRutas(rutas, prefijo, cursor, limite);
       const objetos = await Promise.all(

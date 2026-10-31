@@ -65,7 +65,7 @@ export async function bloquearPiezasPorCodigo(
 }
 
 /** Exhibidores por id ascendente con NO KEY UPDATE (no choca con el KEY SHARE de las FK). Devuelve los abiertos. */
-async function bloquearExhibidores(tx: Ejecutor, ids: string[]): Promise<Set<string>> {
+export async function bloquearExhibidores(tx: Ejecutor, ids: string[]): Promise<Set<string>> {
   if (!ids.length) return new Set();
   const ex = await tx
     .select({ id: exhibidor.id, estado: exhibidor.estado })
@@ -262,6 +262,22 @@ function inconsistente(piezas: PiezaBloqueada[]): ErrorNegocio {
   );
 }
 
+/** Lo pagado (aplicaciones vigentes) de varios pedidos en una sola agregación; el que no tiene pagos queda en 0. */
+export async function pagadoPorPedido(tx: Ejecutor, pedidoIds: string[]): Promise<Map<string, number>> {
+  const r = new Map(pedidoIds.map((id) => [id, 0]));
+  if (!pedidoIds.length) return r;
+  const filas = await tx
+    .select({
+      pedidoId: aplicacionPago.pedidoId,
+      pagado: sql<string>`sum(${aplicacionPago.monto})::numeric(12,2)::text`,
+    })
+    .from(aplicacionPago)
+    .where(and(inArray(aplicacionPago.pedidoId, pedidoIds), isNull(aplicacionPago.anuladaAt)))
+    .groupBy(aplicacionPago.pedidoId);
+  for (const f of filas) r.set(f.pedidoId, numericACentavos(f.pagado));
+  return r;
+}
+
 export async function pagadoCentavos(tx: Ejecutor, pedidoId: string): Promise<number> {
   const [f] = await tx
     .select({ pagado: sql<string>`coalesce(sum(${aplicacionPago.monto}), 0)::numeric(12,2)::text` })
@@ -293,32 +309,48 @@ export async function bloquearExhibidorAbierto(tx: Ejecutor, exhibidorId: string
   return e;
 }
 
+const columnasPedido = {
+  id: pedido.id,
+  folio: pedido.folio,
+  estado: pedido.estado,
+  version: pedido.version,
+  clienteId: pedido.clienteId,
+  vendedorId: pedido.vendedorId,
+  fecha: pedido.fecha,
+  total: pedido.total,
+  descuentoLealtadPct: pedido.descuentoLealtadPct,
+  descuentoManualMonto: pedido.descuentoManualMonto,
+  descuentoManualMotivo: pedido.descuentoManualMotivo,
+  notas: pedido.notas,
+};
+
 /** D-10: cliente → pedido, ambos FOR NO KEY UPDATE. cliente_id no es actualizable (R-27), leerlo antes es seguro. */
 export async function bloquearPedido(tx: Ejecutor, pedidoId: string) {
   const [ref] = await tx.select({ clienteId: pedido.clienteId }).from(pedido).where(eq(pedido.id, pedidoId));
   if (!ref) throw new ErrorNegocio('no_encontrado', 'El pedido no existe.');
   await bloquearCliente(tx, ref.clienteId);
   const [p] = await tx
-    .select({
-      id: pedido.id,
-      folio: pedido.folio,
-      estado: pedido.estado,
-      version: pedido.version,
-      clienteId: pedido.clienteId,
-      vendedorId: pedido.vendedorId,
-      fecha: pedido.fecha,
-      total: pedido.total,
-      descuentoLealtadPct: pedido.descuentoLealtadPct,
-      descuentoManualMonto: pedido.descuentoManualMonto,
-      descuentoManualMotivo: pedido.descuentoManualMotivo,
-      notas: pedido.notas,
-    })
+    .select(columnasPedido)
     .from(pedido)
     .where(eq(pedido.id, pedidoId))
     .for('no key update');
   return p!;
 }
 export type PedidoBloqueado = Awaited<ReturnType<typeof bloquearPedido>>;
+
+/**
+ * Varios pedidos por id ascendente, FOR NO KEY UPDATE, en una consulta (D-10). Quien llama YA bloqueó sus clientas
+ * (por id, antes). Los que no existen simplemente no vienen: quien llama decide el error.
+ */
+export function bloquearPedidos(tx: Ejecutor, ids: string[]): Promise<PedidoBloqueado[]> {
+  if (!ids.length) return Promise.resolve([]);
+  return tx
+    .select(columnasPedido)
+    .from(pedido)
+    .where(inArray(pedido.id, ids))
+    .orderBy(asc(pedido.id))
+    .for('no key update');
+}
 
 /**
  * Piezas vigentes del pedido, bloqueadas en el orden D-10 (exhibidores NO KEY UPDATE por id → piezas FOR UPDATE por id).

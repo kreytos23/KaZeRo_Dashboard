@@ -3,7 +3,7 @@
 import { startTransition, useActionState, useEffect, useRef } from 'react';
 import { marcarIndiceSucio } from '@/search/eventos';
 import { useHidratado } from './hidratado';
-import { ErroresCampo, useEnfocarPrimerInvalido } from './errores-campo';
+import { ErroresCampo, EstadoDeAccion, useEnfocarPrimerInvalido } from './errores-campo';
 import type { EstadoAccion } from './estado';
 
 type Accion = (prev: EstadoAccion, fd: FormData) => Promise<EstadoAccion>;
@@ -98,7 +98,9 @@ export function FormAccion({
         startTransition(() => despachar(datos));
       }}
     >
-      <ErroresCampo.Provider value={estado.campos ?? {}}>{children}</ErroresCampo.Provider>
+      <EstadoDeAccion.Provider value={estado}>
+        <ErroresCampo.Provider value={estado.campos ?? {}}>{children}</ErroresCampo.Provider>
+      </EstadoDeAccion.Provider>
       {estado.error && (
         <p role="alert" className="aviso-error whitespace-pre-line">
           {/* Con errores por campo, el detalle lo anuncia cada campo (aria-describedby): aquí solo un resumen. */}

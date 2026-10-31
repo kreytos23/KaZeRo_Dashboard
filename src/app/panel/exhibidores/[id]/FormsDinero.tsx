@@ -6,6 +6,7 @@ import { normalizarCodigo } from '@/domain/codigos';
 import { centavosANumeric, formatoMXN, numericACentavos, pesosACentavos } from '@/domain/dinero';
 import { calcularTotales } from '@/domain/pedidos';
 import { MAX_CARACTERES_CODIGOS } from '@/features/exhibidores/codigos';
+import { AvisoDuplicado } from '@/features/pagos/AvisoDuplicado';
 import { CampoKey } from '@/features/pedidos/CampoKey';
 import { urlConsultaPrevia } from '@/features/pedidos/consulta-previa';
 import { SelectorCliente, type ClienteElegido } from '@/features/pedidos/SelectorCliente';
@@ -219,6 +220,7 @@ export function FormAbono({
             <input type="hidden" name="exhibidorId" value={exhibidorId} />
             <CampoKey />
             <CamposAbono notas={notas} hoy={hoy} />
+            <AvisoDuplicado />
           </Fragment>
         ) : (
           <p className="text-dato text-tinta-suave">Ninguna nota de este exhibidor tiene saldo.</p>

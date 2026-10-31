@@ -6,6 +6,9 @@ import type { EstadoAccion } from './estado';
 /** Errores de validación por nombre de campo; los provee el formulario y los lee cada `<Campo>`. */
 export const ErroresCampo = createContext<Record<string, string>>({});
 
+/** Resultado completo de la última acción del formulario (código y detalle del error); lo provee `FormAccion`. */
+export const EstadoDeAccion = createContext<EstadoAccion>({});
+
 /**
  * Sacudida breve del control con error (receta 12-error-state-shake de transitions.dev). Se reinicia la
  * animación quitando la clase, forzando un reflujo y volviéndola a poner; con «menos movimiento» el CSS la anula.

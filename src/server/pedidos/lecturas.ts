@@ -252,14 +252,6 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
   };
 }
 
-export async function saldoFavorDeVendedor(db: Ejecutor, vendedorId: string): Promise<string> {
-  const [f] = await db
-    .select({ saldo: vSaldoFavor.saldo })
-    .from(vSaldoFavor)
-    .where(eq(vSaldoFavor.vendedorId, vendedorId));
-  return f?.saldo ?? '0.00';
-}
-
 export function apartadasDeExhibidor(db: Ejecutor, exhibidorId: string) {
   return db
     .select({

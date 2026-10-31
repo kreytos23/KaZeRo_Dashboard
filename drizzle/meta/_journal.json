@@ -169,6 +169,20 @@
       "when": 1793178526742,
       "tag": "0023_exhibidores_dinero_reglas",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793210119922,
+      "tag": "0024_parched_lilandra",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1793210125912,
+      "tag": "0025_pagos_reglas",
+      "breakpoints": true
     }
   ]
 }
