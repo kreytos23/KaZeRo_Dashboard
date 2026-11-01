@@ -64,7 +64,7 @@
     "tailwindcss": "4.3.3",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vercel": "63.1.0",
+    "vercel": "65.7.0",
     "vitest": "5.0.5"
   }
 }
