@@ -10,6 +10,7 @@ import {
 } from '@/server/exhibidores/mensajes';
 import {
   MSG_APLICACION_PREVIA,
+  MSG_CANCELAR_CON_COMISION,
   MSG_CANCELAR_CON_DEVOLUCIONES,
   MSG_COMPROBANTE_REPETIDO,
   MSG_EXHIBIDOR_NEGATIVO,
@@ -17,6 +18,7 @@ import {
   MSG_OTRA_VENDEDORA,
   MSG_PAGO_ANULADO,
   MSG_REFERENCIA_LARGA,
+  MSG_VENDEDOR_CON_PAGOS,
 } from '@/server/pagos/mensajes';
 
 export class ErrorNegocio extends Error {
@@ -214,6 +216,8 @@ const MENSAJES: Record<string, string> = {
   pago_anulado_incompleto: PEDIDO_INCONSISTENTE,
   saldo_favor_anulacion_incoherente: PEDIDO_INCONSISTENTE,
   pedido_cancelado_con_devoluciones: MSG_CANCELAR_CON_DEVOLUCIONES,
+  pedido_cancelado_con_comision: MSG_CANCELAR_CON_COMISION,
+  pedido_vendedor_con_pagos: MSG_VENDEDOR_CON_PAGOS,
   pedido_mostrador_sin_tarjeta: 'Las notas de venta de mostrador no cuentan en tarjeta.',
 };
 

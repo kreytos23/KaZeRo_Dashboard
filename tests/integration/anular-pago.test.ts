@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
+import { traducirErrorPg } from '@/server/errores';
 import { pago, vPedido } from '@/db/schema';
 import { crearCliente } from '@/server/clientes/servicio';
 import { consultaElegibles } from '@/server/comisiones/lecturas';
@@ -13,7 +14,7 @@ import { registrarPagoAgrupado, type DatosPagoAgrupado } from '@/server/pagos/ag
 import { anularPago } from '@/server/pagos/anular';
 import { registrarPagoDePedido, type DatosPagoPedido } from '@/server/pagos/servicio';
 import { devolverPiezaDefectuosa } from '@/server/pedidos/devolucion';
-import { cancelarPedido, crearPedido } from '@/server/pedidos/servicio';
+import { cancelarPedido, crearPedido, editarPedido, type DatosEdicion } from '@/server/pedidos/servicio';
 import { altaPieza, obtenerPiezaPorCodigo } from '@/server/piezas/servicio';
 import { saldoFavorDe } from '@/server/saldo-favor/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
@@ -91,6 +92,24 @@ const cancelar = async (pedidoId: string, reembolso?: { nota: string }) => {
 };
 const ficha = (id: string) =>
   app(async (db) => (await db.select().from(vPedido).where(eq(vPedido.id, id)))[0]!);
+const editar = async (id: string, cambios: Partial<DatosEdicion>) => {
+  const f = await ficha(id);
+  return app((db) =>
+    editarPedido(db, {
+      key: randomUUID(),
+      adminId,
+      pedidoId: id,
+      version: f.version,
+      vendedorId: f.vendedorId,
+      fecha: f.fecha,
+      descuentoManualCentavos: 0,
+      notas: f.notas,
+      agregar: [],
+      quitar: [],
+      ...cambios,
+    }),
+  );
+};
 const estadoPieza = async (codigo: string) => (await app((db) => obtenerPiezaPorCodigo(db, codigo)))!.estado;
 const saldoClienta = (id = clienteId) => app((db) => saldoFavorDe(db, { clienteId: id }));
 const saldoVendedora = () => app((db) => saldoFavorDe(db, { vendedorId }));
@@ -505,5 +524,144 @@ describe('P-6: cancelar con reembolso en efectivo', () => {
     expect(await ficha(p.id)).toMatchObject({ estado: 'abierto' });
     expect(await cancelar(p.id)).toMatchObject({ saldoFavor: '30.00', reembolsado: '0.00' });
     expect(await saldoClienta()).toBe('30.00');
+  });
+});
+
+describe('auditoría: un pedido reabierto no rompe lo que ya pasó', () => {
+  const devolver = async (pedidoId: string, codigo: string) => {
+    const [linea] = await filas<{ id: string }>(
+      sql`SELECT i.id::text FROM pedido_item i JOIN pieza z ON z.id = i.pieza_id
+          WHERE i.pedido_id = ${pedidoId} AND z.codigo = ${codigo}`,
+    );
+    return app((db) =>
+      devolverPiezaDefectuosa(db, {
+        key: randomUUID(),
+        adminId,
+        pedidoId,
+        itemId: linea!.id,
+        motivo: 'Se rompió el broche',
+      }),
+    );
+  };
+  const altaAU = (codigo: string) =>
+    app((db) =>
+      altaPieza(db, {
+        codigo,
+        categoria: 'Aretes',
+        descripcion: `Arete ${codigo}`,
+        costoCentavos: 0,
+        precioCentavos: 10000,
+      }),
+    );
+
+  it('editar conserva la línea devuelta en el total: el crédito de la devolución no se duplica', async () => {
+    const p = await pedidoCon(['AU01', 'AU02']);
+    const pg = await pagar(p.id, 20000);
+    await devolver(p.id, 'AU02');
+    await anular(pg.pagoId);
+    expect(await ficha(p.id)).toMatchObject({ estado: 'abierto', total: '200.00', saldo: '200.00' });
+
+    await editar(p.id, { notas: 'Solo una nota' });
+    expect(await ficha(p.id)).toMatchObject({ estado: 'abierto', total: '200.00', saldo: '200.00' });
+
+    await altaAU('AU03');
+    await editar(p.id, { agregar: ['AU03'], motivo: 'Se lleva otra' });
+    expect(await ficha(p.id)).toMatchObject({ total: '300.00', saldo: '300.00' });
+    expect(await saldoClienta()).toBe('100.00');
+  });
+
+  const comisionado = async (codigo: string) => {
+    const p = await pedidoCon([codigo], { fecha: '2026-01-10' });
+    const pg = await pagar(p.id, 10000, { fecha: '2026-01-10' });
+    await app((db) =>
+      cerrarMesComisiones(db, { key: randomUUID(), adminId, mes: '2026-01-01', hoy: '2026-10-28' }),
+    );
+    await anular(pg.pagoId);
+    return p;
+  };
+
+  it('un pedido con comisión cerrada no se cancela', async () => {
+    const p = await comisionado('AU04');
+    expect(await falla(cancelar(p.id))).toMatchObject({ codigo: 'pedido_cancelado_con_comision' });
+    expect(await ficha(p.id)).toMatchObject({ estado: 'abierto' });
+    expect(await estadoPieza('AU04')).toBe('apartada');
+  });
+
+  it('la BD también rechaza cancelar un pedido con comisión cerrada', async () => {
+    const p = await comisionado('AU05');
+    const e = await filas(
+      sql`UPDATE pedido SET estado = 'cancelado', cancelado_at = now(), cancelacion_motivo = 'x'
+          WHERE id = ${p.id}`,
+    ).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(traducirErrorPg(e)?.codigo).toBe('pedido_cancelado_con_comision');
+  });
+
+  describe('cambiar la vendedora de un pedido con pagos', () => {
+    let otraId = '';
+    beforeEach(async () => {
+      otraId = await app((db) =>
+        crearVendedor(db, { nombre: 'Rosa', tipo: 'revendedora', comisionPct: '10.00' }),
+      );
+    });
+    const rechazado = { codigo: 'pedido_vendedor_con_pagos', campo: 'vendedorId' };
+
+    it('rechaza si la vendedora pagó parte del pedido', async () => {
+      const p = await pedidoCon(['AU06']);
+      await pagar(p.id, 5000, { pagador: 'vendedor' });
+      expect(await falla(editar(p.id, { vendedorId: otraId }))).toMatchObject(rechazado);
+      expect(await ficha(p.id)).toMatchObject({ vendedorId });
+    });
+
+    it('rechaza si hay un pago agrupado de la vendedora', async () => {
+      const p = await pedidoCon(['AU07']);
+      await agrupado({ montoCentavos: 5000, aplicaciones: [{ pedidoId: p.id, montoCentavos: 5000 }] });
+      expect(await falla(editar(p.id, { vendedorId: otraId }))).toMatchObject(rechazado);
+    });
+
+    it('rechaza si lo cobró el exhibidor de la vendedora', async () => {
+      const exhibidorId = await app((db) =>
+        crearExhibidor(db, { vendedorId, nombre: 'Salón', fechaEnvio: '2026-10-01' }),
+      );
+      await altaAU('AU08');
+      await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['AU08'] }));
+      const v = await app((db) =>
+        registrarVentaExhibidor(db, {
+          key: randomUUID(),
+          adminId,
+          exhibidorId,
+          codigos: ['AU08'],
+          clienteId,
+          cobradoCentavos: 5000,
+          metodo: 'efectivo',
+        }),
+      );
+      expect(await falla(editar(v.pedidoId, { vendedorId: otraId }))).toMatchObject(rechazado);
+    });
+
+    it('la BD también lo rechaza', async () => {
+      const p = await pedidoCon(['AU09']);
+      await pagar(p.id, 5000, { pagador: 'vendedor' });
+      const e = await filas(sql`UPDATE pedido SET vendedor_id = ${otraId} WHERE id = ${p.id}`).then(
+        () => null,
+        (err: unknown) => err,
+      );
+      expect(traducirErrorPg(e)?.codigo).toBe('pedido_vendedor_con_pagos');
+    });
+
+    it('lo permite si solo pagó la clienta, o si el pago de la vendedora se deshizo', async () => {
+      const a = await pedidoCon(['AU10']);
+      await pagar(a.id, 5000);
+      await editar(a.id, { vendedorId: otraId });
+      expect(await ficha(a.id)).toMatchObject({ vendedorId: otraId });
+
+      const b = await pedidoCon(['AU11']);
+      const pg = await pagar(b.id, 5000, { pagador: 'vendedor' });
+      await anular(pg.pagoId);
+      await editar(b.id, { vendedorId: otraId });
+      expect(await ficha(b.id)).toMatchObject({ vendedorId: otraId });
+    });
   });
 });

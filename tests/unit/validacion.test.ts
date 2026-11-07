@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { EMAIL_ADMIN_MIGRACION } from '@/server/auth/admin-migracion';
 import { esquemaCorreo, validarAltaAdmin, validarNombre } from '@/server/auth/validacion';
 
 const BUENA = 'contraseña-suficientemente-larga';
@@ -14,6 +15,11 @@ describe('esquemaCorreo (el mismo del login)', () => {
 describe('validarAltaAdmin', () => {
   it('acepta datos válidos', () => {
     expect(validarAltaAdmin({ email: 'a@kazero.mx', password: BUENA, confirmacion: BUENA })).toBeNull();
+  });
+  it('rechaza el correo reservado del admin de migración', () => {
+    expect(validarAltaAdmin({ email: EMAIL_ADMIN_MIGRACION, password: BUENA, confirmacion: BUENA })).toMatch(
+      /reservado/i,
+    );
   });
   it('rechaza un correo inválido', () => {
     expect(validarAltaAdmin({ email: 'a@', password: BUENA, confirmacion: BUENA })).toMatch(/correo/i);

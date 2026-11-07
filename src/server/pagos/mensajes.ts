@@ -25,3 +25,11 @@ export function mensajePiezasNoVendidas(piezas: string[]): string {
 // Al reabrir, una devolución ya está en el saldo a favor: cancelar dejaría ese crédito sin respaldo.
 export const MSG_CANCELAR_CON_DEVOLUCIONES =
   'Este pedido tiene piezas devueltas: no se puede cancelar. Registra el pago de lo que se queda.';
+
+// Cancelar dejaría pagable una comisión sobre un pedido sin ingreso, y sus líneas no se editan.
+export const MSG_CANCELAR_CON_COMISION =
+  'La comisión de este pedido ya se cerró: no se puede cancelar. Registra de nuevo su pago.';
+
+// R-32/P-1 y E-4: un pago de la vendedora o de su exhibidor solo vive en pedidos de esa vendedora.
+export const MSG_VENDEDOR_CON_PAGOS =
+  'Este pedido tiene pagos de su vendedora o de su exhibidor. Deshazlos para cambiar la vendedora.';

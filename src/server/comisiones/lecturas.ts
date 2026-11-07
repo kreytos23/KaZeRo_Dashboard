@@ -16,6 +16,16 @@ import { numericACentavos } from '@/domain/dinero';
 import { fechaCorta, hoyMX } from '@/domain/fechas';
 import { ErrorNegocio } from '@/server/errores';
 
+/** Una línea de comisión solo nace al cerrar el mes y no se borra. */
+export async function tieneComisionCerrada(db: Ejecutor, pedidoId: string) {
+  const [l] = await db
+    .select({ id: comisionLinea.id })
+    .from(comisionLinea)
+    .where(eq(comisionLinea.pedidoId, pedidoId))
+    .limit(1);
+  return Boolean(l);
+}
+
 export interface PedidoComisionable {
   pedidoId: string;
   folio: number;
