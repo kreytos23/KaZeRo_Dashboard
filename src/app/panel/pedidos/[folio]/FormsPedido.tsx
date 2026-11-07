@@ -8,7 +8,7 @@ import { avisoSinCaptura } from '@/features/pagos/formato';
 import { CampoKey } from '@/features/pedidos/CampoKey';
 import { AreaTexto, Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { FormAccion } from '@/features/ui/FormAccion';
-import { MSG_CANCELAR_CON_DEVOLUCIONES } from '@/server/pagos/mensajes';
+import { MSG_CANCELAR_CON_COMISION, MSG_CANCELAR_CON_DEVOLUCIONES } from '@/server/pagos/mensajes';
 import { accionCancelarPedido, accionRegistrarPago } from '../acciones';
 import { ETIQUETA_METODO } from '../etiquetas';
 
@@ -32,6 +32,7 @@ interface Props {
   saldoFavorTexto: string;
   /** Hay piezas devueltas (su crédito ya está en el saldo a favor): el pedido no se puede cancelar. */
   conDevoluciones: boolean;
+  conComision: boolean;
   /** Plan 4a: exhibidor abierto de la vendedora del que salió alguna pieza; null si no aplica. */
   exhibidor: { id: string; nombre: string } | null;
 }
@@ -160,14 +161,19 @@ export function FormRegistrarPago(p: Props) {
 export function FormCancelarPedido(p: Props) {
   const marca = `${p.version}-${p.saldo}`;
   const [efectivo, setEfectivo] = useState(false);
-  const bloqueado = p.conDevoluciones;
+  const motivoBloqueo = p.conDevoluciones
+    ? MSG_CANCELAR_CON_DEVOLUCIONES
+    : p.conComision
+      ? MSG_CANCELAR_CON_COMISION
+      : null;
+  const bloqueado = motivoBloqueo !== null;
   return (
     <FormAccion
       accion={accionCancelarPedido}
       textoBoton="Cancelar pedido"
       sinControles={!p.abierto || bloqueado}
     >
-      {p.abierto && bloqueado && <p className="aviso-atencion">{MSG_CANCELAR_CON_DEVOLUCIONES}</p>}
+      {p.abierto && bloqueado && <p className="aviso-atencion">{motivoBloqueo}</p>}
       {p.abierto && !bloqueado && (
         <Fragment key={marca}>
           <input type="hidden" name="pedidoId" value={p.pedidoId} />

@@ -16,6 +16,7 @@ import { Saldo } from '@/features/ui/Saldo';
 import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
+import { tieneComisionCerrada } from '@/server/comisiones/lecturas';
 import { exhibidorCobradorDelPedido } from '@/server/exhibidores/lecturas-dinero';
 import { obtenerPedidoPorFolio } from '@/server/pedidos/lecturas';
 import { saldoFavorDe } from '@/server/saldo-favor/servicio';
@@ -46,15 +47,16 @@ export default async function FichaPedido({
   const resultado = await conDbLectura(async (db) => {
     const p = await obtenerPedidoPorFolio(db, folio);
     if (!p) return null;
-    const [historial, saldoFavor, exhibidor] = await Promise.all([
+    const [historial, saldoFavor, exhibidor, conComision] = await Promise.all([
       historialDeCambios(db, 'pedido', p.id),
       saldoFavorDe(db, { clienteId: p.clienteId }),
       p.estado === 'abierto' ? exhibidorCobradorDelPedido(db, p.id, p.vendedorId) : null,
+      p.estado === 'abierto' ? tieneComisionCerrada(db, p.id) : false,
     ]);
-    return { p, historial, saldoFavor, exhibidor };
+    return { p, historial, saldoFavor, exhibidor, conComision };
   });
   if (!resultado) notFound();
-  const { p, historial, saldoFavor, exhibidor } = resultado;
+  const { p, historial, saldoFavor, exhibidor, conComision } = resultado;
   const vigentes = p.items.filter((i) => i.vigente);
   // Una línea devuelta (Plan 3.1) deja de ser vigente pero sigue en el subtotal: no es una pieza «quitada».
   const devueltas = p.items.filter((i) => !i.vigente && i.devolucionId);
@@ -80,6 +82,7 @@ export default async function FichaPedido({
     pagadoTexto: mxn(p.pagado),
     hayPagado: pagadoCentavos > 0,
     conDevoluciones: numericACentavos(p.devuelto) > 0,
+    conComision,
     piezas: p.piezas,
     hoy: hoyMX(),
     saldoFavor,

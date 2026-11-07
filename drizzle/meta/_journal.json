@@ -183,6 +183,13 @@
       "when": 1793210125912,
       "tag": "0025_pagos_reglas",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1794009524307,
+      "tag": "0026_auditoria_pedidos",
+      "breakpoints": true
     }
   ]
 }

@@ -1,5 +1,6 @@
 // Sin 'server-only': lo usan también los scripts de configuración (tsx), no solo el servidor.
 import { z } from 'zod';
+import { EMAIL_ADMIN_MIGRACION } from './admin-migracion';
 import { validarFortaleza } from './password';
 
 /** El mismo criterio de correo en el login y al dar de alta un admin. */
@@ -20,6 +21,7 @@ export function validarAltaAdmin(d: {
   confirmacion: string;
 }): string | null {
   if (!esquemaCorreo.safeParse(d.email).success) return 'El correo no es válido (máx. 200 caracteres).';
+  if (d.email.trim().toLowerCase() === EMAIL_ADMIN_MIGRACION) return 'Ese correo está reservado.';
   if (d.password !== d.confirmacion) return 'Las contraseñas no coinciden.';
   return validarFortaleza(d.password);
 }

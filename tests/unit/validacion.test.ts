@@ -17,9 +17,9 @@ describe('validarAltaAdmin', () => {
     expect(validarAltaAdmin({ email: 'a@kazero.mx', password: BUENA, confirmacion: BUENA })).toBeNull();
   });
   it('rechaza el correo reservado del admin de migración', () => {
-    expect(
-      validarAltaAdmin({ email: EMAIL_ADMIN_MIGRACION, password: BUENA, confirmacion: BUENA }),
-    ).toMatch(/reservado/i);
+    expect(validarAltaAdmin({ email: EMAIL_ADMIN_MIGRACION, password: BUENA, confirmacion: BUENA })).toMatch(
+      /reservado/i,
+    );
   });
   it('rechaza un correo inválido', () => {
     expect(validarAltaAdmin({ email: 'a@', password: BUENA, confirmacion: BUENA })).toMatch(/correo/i);

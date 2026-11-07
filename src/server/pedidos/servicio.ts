@@ -1,9 +1,10 @@
-import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import {
   aplicacionPago,
   cliente,
   devolucion,
+  exhibidor,
   pago,
   pedido,
   pedidoItem,
@@ -22,9 +23,14 @@ import {
   pctBpsANumeric,
 } from '@/domain/pedidos';
 import { fijarContextoAuditoria } from '@/server/auditoria/servicio';
+import { tieneComisionCerrada } from '@/server/comisiones/lecturas';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 import { MSG_FECHA_FUTURA } from '@/server/exhibidores/mensajes';
-import { MSG_CANCELAR_CON_DEVOLUCIONES } from '@/server/pagos/mensajes';
+import {
+  MSG_CANCELAR_CON_COMISION,
+  MSG_CANCELAR_CON_DEVOLUCIONES,
+  MSG_VENDEDOR_CON_PAGOS,
+} from '@/server/pagos/mensajes';
 import { conIdempotencia } from '@/server/idempotencia';
 import { exigirCustodiaDe } from '@/server/piezas/custodia';
 import { retirarEnTx, validarNotaRetiro, type Titular } from '@/server/saldo-favor/servicio';
@@ -311,6 +317,8 @@ export async function cancelarPedido(
             .limit(1);
           if (devuelta)
             throw new ErrorNegocio('pedido_cancelado_con_devoluciones', MSG_CANCELAR_CON_DEVOLUCIONES);
+          if (await tieneComisionCerrada(tx, p.id))
+            throw new ErrorNegocio('pedido_cancelado_con_comision', MSG_CANCELAR_CON_COMISION);
           const { piezas, abiertos, itemIds } = await bloquearPiezasDelPedido(tx, p.id);
           const r = await liberarPiezas(tx, {
             pedidoId: p.id,
@@ -468,7 +476,24 @@ export async function editarPedido(
             throw new ErrorNegocio('pedido_no_abierto', 'Solo se edita un pedido abierto.');
           if (p.version !== v.version) throw conflictoVersion();
           const fecha = v.fecha ?? p.fecha;
-          if (v.vendedorId !== p.vendedorId) await exigirVendedorActivo(tx, v.vendedorId);
+          if (v.vendedorId !== p.vendedorId) {
+            await exigirVendedorActivo(tx, v.vendedorId);
+            const [ligado] = await tx
+              .select({ id: aplicacionPago.id })
+              .from(aplicacionPago)
+              .innerJoin(pago, eq(pago.id, aplicacionPago.pagoId))
+              .leftJoin(exhibidor, eq(exhibidor.id, pago.exhibidorId))
+              .where(
+                and(
+                  eq(aplicacionPago.pedidoId, p.id),
+                  isNull(aplicacionPago.anuladaAt),
+                  or(ne(pago.pagadorVendedorId, v.vendedorId), ne(exhibidor.vendedorId, v.vendedorId)),
+                ),
+              )
+              .limit(1);
+            if (ligado)
+              throw new ErrorNegocio('pedido_vendedor_con_pagos', MSG_VENDEDOR_CON_PAGOS, 'vendedorId');
+          }
           const items = await tx
             .select({
               piezaId: pedidoItem.piezaId,
@@ -537,11 +562,19 @@ export async function editarPedido(
               );
             await enCampo('vendedorId', () => exigirCustodiaDe(tx, enPoder, v.vendedorId));
           }
+          // Una línea devuelta ya no es vigente pero sigue en el total: su crédito ya está en el saldo a favor.
+          const devueltas = await tx
+            .select({ precioLista: pedidoItem.precioLista })
+            .from(pedidoItem)
+            .innerJoin(devolucion, eq(devolucion.pedidoItemId, pedidoItem.id))
+            .where(eq(pedidoItem.pedidoId, p.id));
           // R-27: el % guardado no cambia y se aplica a las nuevas. R-11: las que quedan conservan sus precios.
+          // Las devueltas van al final: `preciosFinales` de las nuevas se lee por posición.
           const t = calcularTotales(
             [
               ...quedan.map((i) => numericACentavos(i.precioLista)),
               ...nuevas.map((x) => numericACentavos(x.precio)),
+              ...devueltas.map((i) => numericACentavos(i.precioLista)),
             ],
             numericAPctBps(p.descuentoLealtadPct),
             v.descuentoManual,
