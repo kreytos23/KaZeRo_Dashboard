@@ -115,7 +115,7 @@ describe('compras previas', () => {
   });
 
   it('L-5: la corrección exige motivo, queda en el historial y se bloquea con notas', async () => {
-    expect(await falla(corregir(2, null))).toBe('motivo');
+    expect(await falla(corregir(2, null))).toBe('cliente_previas_sin_motivo');
     expect(await falla(corregir(10))).toBe('cliente_invalido');
     await corregir(2, 'Tarjeta en papel');
     const h = await app((db) => historialDeCambios(db, 'cliente', clienteId));

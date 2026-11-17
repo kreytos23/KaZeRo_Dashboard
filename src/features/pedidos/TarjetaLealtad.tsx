@@ -5,14 +5,10 @@ import { Anillo, Collar, Flor } from './iconos-lealtad';
 import { etiquetaCasilla, pieTarjeta } from './texto-lealtad';
 
 function Icono({ k }: { k: Casilla }) {
-  const color =
-    k.pctBps > 0
-      ? 'text-secundario'
-      : k.estado === 'ocupada'
-        ? 'text-primario'
-        : k.estado === 'previa'
-          ? 'text-tinta-suave'
-          : 'text-borde-campo';
+  let color = 'text-borde-campo';
+  if (k.pctBps > 0) color = 'text-secundario';
+  else if (k.estado === 'ocupada') color = 'text-primario';
+  else if (k.estado === 'previa') color = 'text-tinta-suave';
   const clase = `size-8 ${color}`;
   if (k.pctBps === 1000) return <Anillo className={clase} />;
   if (k.pctBps === 2000) return <Collar className={clase} />;

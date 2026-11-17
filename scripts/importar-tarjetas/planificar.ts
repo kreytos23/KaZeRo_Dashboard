@@ -40,8 +40,10 @@ export function planificarTarjetas(
     { excel: string; vendedorId: string; nombre: string; clientas: number }
   >();
   const clientesPorNombre = new Map<string, ClienteBd[]>();
-  for (const c of bd.clientes)
-    clientesPorNombre.set(normalizar(c.nombre), [...(clientesPorNombre.get(normalizar(c.nombre)) ?? []), c]);
+  for (const c of bd.clientes) {
+    const nombreNormalizado = normalizar(c.nombre);
+    clientesPorNombre.set(nombreNormalizado, [...(clientesPorNombre.get(nombreNormalizado) ?? []), c]);
+  }
   const activas = bd.vendedoras.filter((v) => v.activo);
 
   for (const f of filas) {

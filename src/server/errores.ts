@@ -1,6 +1,7 @@
 import { pgCode, pgConstraint } from '@/db/errors';
 import {
   MSG_LUGAR_PREVIO,
+  MSG_MOSTRADOR_SIN_PREVIAS,
   MSG_PREVIAS_CON_NOTAS,
   MSG_PREVIAS_RANGO,
   MSG_PREVIAS_SIN_MOTIVO,
@@ -230,7 +231,7 @@ const MENSAJES: Record<string, string> = {
   pedido_vendedor_con_pagos: MSG_VENDEDOR_CON_PAGOS,
   pedido_mostrador_sin_tarjeta: 'Las notas de venta de mostrador no cuentan en tarjeta.',
   cliente_compras_previas_rango: MSG_PREVIAS_RANGO,
-  cliente_mostrador_sin_previas: MSG_PREVIAS_RANGO,
+  cliente_mostrador_sin_previas: MSG_MOSTRADOR_SIN_PREVIAS,
   cliente_previas_sin_motivo: MSG_PREVIAS_SIN_MOTIVO,
   cliente_previas_con_notas: MSG_PREVIAS_CON_NOTAS,
   pedido_lugar_previo: MSG_LUGAR_PREVIO,

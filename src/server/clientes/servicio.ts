@@ -1,12 +1,12 @@
-import { and, asc, eq, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { cliente, pedido, vCliente } from '@/db/schema';
+import { cliente, vCliente } from '@/db/schema';
 import { calcularCambios } from '@/domain/auditoria';
 import { parsearFechaISO } from '@/domain/fechas';
 import { escaparLike, normalizar } from '@/domain/texto';
 import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
-import { MSG_PREVIAS_CON_NOTAS, MSG_PREVIAS_RANGO, MSG_PREVIAS_SIN_MOTIVO } from './mensajes';
+import { MSG_PREVIAS_RANGO } from './mensajes';
 
 export interface DatosCliente {
   nombre: string;
@@ -99,26 +99,9 @@ export function actualizarCliente(
       });
       const cambios = calcularCambios(fila(actual), fila(nuevo));
       if (cambios.length === 0) return { cambios: 0 };
-      if (nuevo.comprasPrevias !== actual.comprasPrevias) {
-        if (!d.motivo?.trim()) throw new ErrorNegocio('motivo', MSG_PREVIAS_SIN_MOTIVO, 'motivo');
-        const [conNota] = await tx
-          .select({ id: pedido.id })
-          .from(pedido)
-          .where(
-            and(
-              eq(pedido.clienteId, d.id),
-              eq(pedido.cuentaTarjeta, true),
-              eq(pedido.cicloTarjeta, 1),
-              ne(pedido.estado, 'cancelado'),
-            ),
-          )
-          .limit(1);
-        if (conNota)
-          throw new ErrorNegocio('cliente_previas_con_notas', MSG_PREVIAS_CON_NOTAS, 'comprasPrevias');
-      }
       await fijarContextoAuditoria(tx, {
         adminId: d.adminId,
-        motivo: motivoPara('cliente', cambios, d.motivo) ?? d.motivo?.trim() ?? null,
+        motivo: motivoPara('cliente', cambios, d.motivo),
       });
       const filas = await tx
         .update(cliente)
