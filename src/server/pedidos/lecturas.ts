@@ -3,7 +3,7 @@ import type { Ejecutor } from '@/db/pool';
 import { vAplicacionPago, vCliente, vPedido, vPedidoItem, vPieza, vSaldoFavor } from '@/db/schema';
 import { normalizarCodigo } from '@/domain/codigos';
 import { numericACentavos } from '@/domain/dinero';
-import { armarTarjeta, descuentoLealtad, siguientePosicion } from '@/domain/lealtad';
+import { armarTarjeta, conPrevias, descuentoLealtad, siguientePosicion } from '@/domain/lealtad';
 import { parsearFechaISO } from '@/domain/fechas';
 import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
 import { escaparLike, normalizar } from '@/domain/texto';
@@ -71,6 +71,7 @@ export async function previsualizarPedido(
             id: vCliente.id,
             nombre: vCliente.nombre,
             vendedorHabitualId: vCliente.vendedorHabitualId,
+            comprasPrevias: vCliente.comprasPrevias,
           })
           .from(vCliente)
           .where(eq(vCliente.id, o.clienteId))
@@ -91,10 +92,18 @@ export async function previsualizarPedido(
   ]);
   const porCodigo = new Map(piezas.map((p) => [p.codigo, p]));
   const folioDe = new Map(apartadas.map((a) => [a.codigo, a.folio]));
-  const cliente = clientes[0] ?? null;
+  const fila = clientes[0] ?? null;
+  const cliente = fila
+    ? { id: fila.id, nombre: fila.nombre, vendedorHabitualId: fila.vendedorHabitualId }
+    : null;
   let tarjeta: PreviaPedido['tarjeta'] = null;
-  if (cliente && o.cuentaTarjeta) {
-    const pos = siguientePosicion(ocupadas.map((x) => ({ ciclo: x.ciclo!, posicion: x.posicion! })));
+  if (fila && o.cuentaTarjeta) {
+    const pos = siguientePosicion(
+      conPrevias(
+        ocupadas.map((x) => ({ ciclo: x.ciclo!, posicion: x.posicion! })),
+        fila.comprasPrevias,
+      ),
+    );
     const l = descuentoLealtad({ cuentaTarjeta: true, posicion: pos.posicion });
     tarjeta = { ciclo: pos.ciclo, posicion: pos.posicion, pctBps: l.pctBps };
   }
@@ -210,9 +219,9 @@ export async function listarPedidos(db: Ejecutor, f: FiltrosPedidos = {}): Promi
     .offset(Math.max(Math.trunc(f.offset ?? 0), 0));
 }
 
-/** Cuatro consultas en paralelo, sin importar cuántos pedidos tenga el cliente. */
+/** Cinco consultas en paralelo, sin importar cuántos pedidos tenga el cliente. */
 export async function resumenCliente(db: Ejecutor, clienteId: string) {
-  const [pedidos, pendiente, favor, tarjeta] = await Promise.all([
+  const [pedidos, pendiente, favor, tarjeta, datos] = await Promise.all([
     listarPedidos(db, { clienteId, limite: 50 }),
     db
       .select({ s: sql<string>`coalesce(sum(${vPedido.saldo}), 0)::numeric(12,2)::text` })
@@ -235,11 +244,16 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
           ne(vPedido.estado, 'cancelado'),
         ),
       ),
+    db.select({ previas: vCliente.comprasPrevias }).from(vCliente).where(eq(vCliente.id, clienteId)),
   ]);
+  const comprasPrevias = datos[0]?.previas ?? 0;
   return {
     pedidos,
     saldoPendiente: pendiente[0]!.s,
     saldoFavor: favor[0]?.saldo ?? '0.00',
+    comprasPrevias,
+    // L-5: `tarjeta` ya son las notas vigentes que cuentan; ninguna en el ciclo 1 → se pueden corregir.
+    previasEditables: !tarjeta.some((t) => t.ciclo === 1),
     tarjeta: armarTarjeta(
       tarjeta.map((t) => ({
         ciclo: t.ciclo!,
@@ -248,6 +262,7 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
         folio: t.folio,
         conSaldo: numericACentavos(t.saldo) > 0,
       })),
+      comprasPrevias,
     ),
   };
 }

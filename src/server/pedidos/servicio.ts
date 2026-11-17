@@ -14,7 +14,7 @@ import {
 } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
-import { descuentoLealtad, siguientePosicion, type Posicion } from '@/domain/lealtad';
+import { conPrevias, descuentoLealtad, siguientePosicion, type Posicion } from '@/domain/lealtad';
 import {
   MAX_PIEZAS_PEDIDO,
   calcularTotales,
@@ -189,6 +189,11 @@ export async function crearPedidoEnTx(tx: Ejecutor, d: Omit<DatosPedido, 'key'>)
   let posicion: Posicion | null = null;
   let pctBps = 0;
   if (v.cuentaTarjeta) {
+    // L-1: la clienta ya está bloqueada (paso 1), así que sus compras previas no cambian a mitad de la nota.
+    const [c] = await tx
+      .select({ previas: cliente.comprasPrevias })
+      .from(cliente)
+      .where(eq(cliente.id, v.clienteId));
     const ocupadas = await tx
       .select({ ciclo: pedido.cicloTarjeta, posicion: pedido.posicionTarjeta })
       .from(pedido)
@@ -199,7 +204,12 @@ export async function crearPedidoEnTx(tx: Ejecutor, d: Omit<DatosPedido, 'key'>)
           ne(pedido.estado, 'cancelado'),
         ),
       );
-    posicion = siguientePosicion(ocupadas.map((o) => ({ ciclo: o.ciclo!, posicion: o.posicion! })));
+    posicion = siguientePosicion(
+      conPrevias(
+        ocupadas.map((o) => ({ ciclo: o.ciclo!, posicion: o.posicion! })),
+        c?.previas ?? 0,
+      ),
+    );
     pctBps = descuentoLealtad({ cuentaTarjeta: true, posicion: posicion.posicion }).pctBps;
   }
   // 4) Totales (R-11, R-12, D-6, D-7).

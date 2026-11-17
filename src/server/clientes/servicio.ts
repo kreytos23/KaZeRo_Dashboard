@@ -1,11 +1,12 @@
-import { and, asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { cliente, vCliente } from '@/db/schema';
+import { cliente, pedido, vCliente } from '@/db/schema';
 import { calcularCambios } from '@/domain/auditoria';
 import { parsearFechaISO } from '@/domain/fechas';
 import { escaparLike, normalizar } from '@/domain/texto';
 import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
+import { MSG_PREVIAS_CON_NOTAS, MSG_PREVIAS_RANGO, MSG_PREVIAS_SIN_MOTIVO } from './mensajes';
 
 export interface DatosCliente {
   nombre: string;
@@ -16,6 +17,8 @@ export interface DatosCliente {
   usuarioRed?: string | null;
   vendedorHabitualId?: string | null;
   notas?: string;
+  /** L-1: 0–9. Sin valor = no se cambia (en el alta, 0). */
+  comprasPrevias?: number;
 }
 
 const opcional = (v: string | null | undefined) => {
@@ -33,6 +36,9 @@ function validar(d: DatosCliente) {
     if (!cumpleanos)
       throw new ErrorNegocio('cliente_invalido', 'La fecha de cumpleaños no es válida.', 'cumpleanos');
   }
+  const previas = d.comprasPrevias;
+  if (previas !== undefined && !(Number.isInteger(previas) && previas >= 0 && previas <= 9))
+    throw new ErrorNegocio('cliente_invalido', MSG_PREVIAS_RANGO, 'comprasPrevias');
   return {
     nombre,
     referencia: opcional(d.referencia),
@@ -42,6 +48,7 @@ function validar(d: DatosCliente) {
     usuarioRed: opcional(d.usuarioRed),
     vendedorHabitualId: opcional(d.vendedorHabitualId),
     notas: (d.notas ?? '').trim(),
+    comprasPrevias: previas,
   };
 }
 
@@ -71,13 +78,15 @@ export function actualizarCliente(
           usuarioRed: cliente.usuarioRed,
           vendedorHabitualId: cliente.vendedorHabitualId,
           notas: cliente.notas,
+          comprasPrevias: cliente.comprasPrevias,
         })
         .from(cliente)
         .where(eq(cliente.id, d.id))
         .for('no key update');
       if (!actual) throw new ErrorNegocio('no_encontrado', 'El cliente no existe.');
       if (actual.version !== d.version) throw conflictoVersion();
-      const fila = (x: typeof actual | typeof v) => ({
+      const nuevo = { ...v, comprasPrevias: v.comprasPrevias ?? actual.comprasPrevias };
+      const fila = (x: typeof actual | typeof nuevo) => ({
         nombre: x.nombre,
         referencia: x.referencia,
         telefono: x.telefono,
@@ -86,16 +95,34 @@ export function actualizarCliente(
         usuario_red: x.usuarioRed,
         vendedor_habitual_id: x.vendedorHabitualId,
         notas: x.notas,
+        compras_previas: String(x.comprasPrevias),
       });
-      const cambios = calcularCambios(fila(actual), fila(v));
+      const cambios = calcularCambios(fila(actual), fila(nuevo));
       if (cambios.length === 0) return { cambios: 0 };
+      if (nuevo.comprasPrevias !== actual.comprasPrevias) {
+        if (!d.motivo?.trim()) throw new ErrorNegocio('motivo', MSG_PREVIAS_SIN_MOTIVO, 'motivo');
+        const [conNota] = await tx
+          .select({ id: pedido.id })
+          .from(pedido)
+          .where(
+            and(
+              eq(pedido.clienteId, d.id),
+              eq(pedido.cuentaTarjeta, true),
+              eq(pedido.cicloTarjeta, 1),
+              ne(pedido.estado, 'cancelado'),
+            ),
+          )
+          .limit(1);
+        if (conNota)
+          throw new ErrorNegocio('cliente_previas_con_notas', MSG_PREVIAS_CON_NOTAS, 'comprasPrevias');
+      }
       await fijarContextoAuditoria(tx, {
         adminId: d.adminId,
-        motivo: motivoPara('cliente', cambios, d.motivo),
+        motivo: motivoPara('cliente', cambios, d.motivo) ?? d.motivo?.trim() ?? null,
       });
       const filas = await tx
         .update(cliente)
-        .set({ ...v, version: sql`${cliente.version} + 1` })
+        .set({ ...nuevo, version: sql`${cliente.version} + 1` })
         .where(and(eq(cliente.id, d.id), eq(cliente.version, d.version)))
         .returning({ id: cliente.id });
       if (filas.length === 0) throw conflictoVersion();
