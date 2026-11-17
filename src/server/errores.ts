@@ -1,5 +1,11 @@
 import { pgCode, pgConstraint } from '@/db/errors';
 import {
+  MSG_LUGAR_PREVIO,
+  MSG_PREVIAS_CON_NOTAS,
+  MSG_PREVIAS_RANGO,
+  MSG_PREVIAS_SIN_MOTIVO,
+} from '@/server/clientes/mensajes';
+import {
   MSG_COBRO_SIN_SALDO_FAVOR,
   MSG_EXHIBIDOR_CERRADO,
   MSG_FECHA_FUTURA,
@@ -36,6 +42,10 @@ export class ErrorNegocio extends Error {
 
 /** Restricción de la BD → nombre del campo en el formulario, para mostrar el error junto a él. */
 const CAMPOS: Record<string, string> = {
+  cliente_compras_previas_rango: 'comprasPrevias',
+  cliente_mostrador_sin_previas: 'comprasPrevias',
+  cliente_previas_con_notas: 'comprasPrevias',
+  cliente_previas_sin_motivo: 'motivo',
   pieza_codigo_uq: 'codigo',
   pieza_imagen_clave_uq: 'imagen',
   pieza_codigo_formato: 'codigo',
@@ -219,6 +229,11 @@ const MENSAJES: Record<string, string> = {
   pedido_cancelado_con_comision: MSG_CANCELAR_CON_COMISION,
   pedido_vendedor_con_pagos: MSG_VENDEDOR_CON_PAGOS,
   pedido_mostrador_sin_tarjeta: 'Las notas de venta de mostrador no cuentan en tarjeta.',
+  cliente_compras_previas_rango: MSG_PREVIAS_RANGO,
+  cliente_mostrador_sin_previas: MSG_PREVIAS_RANGO,
+  cliente_previas_sin_motivo: MSG_PREVIAS_SIN_MOTIVO,
+  cliente_previas_con_notas: MSG_PREVIAS_CON_NOTAS,
+  pedido_lugar_previo: MSG_LUGAR_PREVIO,
 };
 
 function mensajesPg(err: unknown): string[] {

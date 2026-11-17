@@ -49,6 +49,8 @@ export const vCliente = pgView('v_cliente', {
   version: integer('version').notNull(),
   // Plan 4a (0023), al final: la clienta especial «Venta de mostrador».
   esMostrador: boolean('es_mostrador').notNull(),
+  // 2026-11-16 (0028), al final: compras de la tarjeta de papel.
+  comprasPrevias: integer('compras_previas').notNull(),
 }).existing();
 
 export const vPieza = pgView('v_pieza', {
