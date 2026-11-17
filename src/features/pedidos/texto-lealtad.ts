@@ -34,6 +34,7 @@ export function etiquetaCasilla(c: Casilla): string {
   const partes = [`Lugar ${c.posicion}`];
   const detalle: string[] = [];
   if (c.estado === 'libre') detalle.push('libre');
+  if (c.estado === 'previa') detalle.push('compra anterior');
   if (c.folio !== null) detalle.push(formatoFolio(c.folio));
   if (c.conSaldo) detalle.push('con saldo');
   if (c.pctBps > 0) detalle.push(`${formatoPct(c.pctBps)} de descuento`);

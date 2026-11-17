@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { REGLAS_LEALTAD, armarTarjeta, descuentoLealtad, siguientePosicion } from '@/domain/lealtad';
+import {
+  REGLAS_LEALTAD,
+  armarTarjeta,
+  conPrevias,
+  descuentoLealtad,
+  siguientePosicion,
+} from '@/domain/lealtad';
 
 const pos = (ciclo: number, ...posiciones: number[]) => posiciones.map((posicion) => ({ ciclo, posicion }));
 const diez = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -95,5 +101,47 @@ describe('armarTarjeta (R-25, D-4)', () => {
     expect(() =>
       armarTarjeta([{ ciclo: 1, posicion: 11, estado: 'liquidado', folio: 1, conSaldo: false }]),
     ).not.toThrow();
+  });
+});
+
+describe('compras previas (L-1 a L-3)', () => {
+  const siguiente = (previas: number, ...ocupadas: number[]) =>
+    siguientePosicion(conPrevias(pos(1, ...ocupadas), previas));
+  it('L-2: con 4 previas la primera nota va al 5 (10 %)', () => {
+    expect(siguiente(4)).toEqual({ ciclo: 1, posicion: 5 });
+    expect(descuentoLealtad({ cuentaTarjeta: true, posicion: 5 })).toEqual({ pctBps: 1000 });
+  });
+  it('L-2: con 9 previas va al 10, y después empieza la tarjeta 2', () => {
+    expect(siguiente(9)).toEqual({ ciclo: 1, posicion: 10 });
+    expect(siguiente(9, 10)).toEqual({ ciclo: 2, posicion: 1 });
+  });
+  it('L-3: cancelar una nota nueva libera solo su lugar', () => {
+    expect(siguiente(4, 6)).toEqual({ ciclo: 1, posicion: 5 });
+  });
+  it('los previos no cuentan en la tarjeta 2', () => {
+    expect(siguientePosicion(conPrevias([...pos(1, 5, 6, 7, 8, 9, 10), ...pos(2, 1)], 4))).toEqual({
+      ciclo: 2,
+      posicion: 2,
+    });
+  });
+  it('sin previas no cambia nada', () => {
+    expect(conPrevias(pos(1, 1, 2), 0)).toEqual(pos(1, 1, 2));
+  });
+});
+
+describe('armarTarjeta con compras previas', () => {
+  it('los previos se ven como «previa» en la primera tarjeta y cuentan como ocupados', () => {
+    const t = armarTarjeta([{ ciclo: 1, posicion: 5, estado: 'abierto', folio: 100, conSaldo: true }], 4);
+    expect(t.casillas.slice(0, 4).every((c) => c.estado === 'previa' && c.folio === null)).toBe(true);
+    expect(t.casillas[4]).toMatchObject({ estado: 'ocupada', folio: 100, pctBps: 1000 });
+    expect(t.ocupadas).toBe(5);
+  });
+  it('en la tarjeta 2 ya no aparecen', () => {
+    const t = armarTarjeta([{ ciclo: 2, posicion: 1, estado: 'abierto', folio: 110, conSaldo: false }], 4);
+    expect(t.casillas.some((c) => c.estado === 'previa')).toBe(false);
+    expect(t.ocupadas).toBe(1);
+  });
+  it('sin notas: la tarjeta 1 con los previos', () => {
+    expect(armarTarjeta([], 3).ocupadas).toBe(3);
   });
 });

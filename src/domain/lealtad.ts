@@ -1,7 +1,6 @@
 /**
  * Tarjeta de lealtad (R-20 a R-28; R-29 derogada 2026-10-23). Lógica pura: la usa el servicio (autoridad) y la UI (vista previa).
- * Las reglas "Config" (R-21, R-22) llegan como parámetro; hasta que exista config_regla (Plan 5) valen
- * REGLAS_LEALTAD. El % aplicado se guarda en cada pedido (R-27), así que cambiarlas no toca pedidos viejos.
+ * Las compras previas de la tarjeta de papel (L-1, 2026-11-16) ocupan los lugares 1..n de la primera tarjeta.
  */
 export interface ReglasLealtad {
   /** R-21: posiciones por ciclo. */
@@ -31,6 +30,11 @@ export function siguientePosicion(ocupadas: readonly Posicion[], reglas = REGLAS
   return { ciclo: actual + 1, posicion: 1 };
 }
 
+/** L-1: las compras previas son los lugares 1..n del ciclo 1, ocupados sin nota. */
+export function conPrevias(ocupadas: readonly Posicion[], previas: number): Posicion[] {
+  return [...ocupadas, ...Array.from({ length: previas }, (_, i) => ({ ciclo: 1, posicion: i + 1 }))];
+}
+
 /** R-22 / R-28. R-29 derogada (reunión 2026-10-23): el descuento no depende de otras notas con saldo. */
 export function descuentoLealtad(
   d: { cuentaTarjeta: boolean; posicion: number | null },
@@ -42,7 +46,8 @@ export function descuentoLealtad(
 
 export interface Casilla {
   posicion: number;
-  estado: 'ocupada' | 'libre';
+  /** 'previa' = compra de la tarjeta de papel (L-1): ocupada, sin folio. */
+  estado: 'ocupada' | 'libre' | 'previa';
   folio: number | null;
   pctBps: number;
   conSaldo: boolean;
@@ -61,12 +66,13 @@ export function armarTarjeta(
     folio: number;
     conSaldo: boolean;
   }[],
+  previas = 0,
   reglas = REGLAS_LEALTAD,
 ): Tarjeta {
   const actual = pedidos.reduce((m, p) => Math.max(m, p.ciclo), 1);
   const casillas: Casilla[] = Array.from({ length: reglas.tamanoCiclo }, (_, i) => ({
     posicion: i + 1,
-    estado: 'libre',
+    estado: actual === 1 && i < previas ? 'previa' : 'libre',
     folio: null,
     pctBps: reglas.descuentosBps[i + 1] ?? 0,
     conSaldo: false,
@@ -75,5 +81,5 @@ export function armarTarjeta(
     const c = p.ciclo === actual ? casillas[p.posicion - 1] : undefined;
     if (c) Object.assign(c, { estado: 'ocupada', folio: p.folio, conSaldo: p.conSaldo });
   }
-  return { casillas, ocupadas: casillas.filter((c) => c.estado === 'ocupada').length };
+  return { casillas, ocupadas: casillas.filter((c) => c.estado !== 'libre').length };
 }
