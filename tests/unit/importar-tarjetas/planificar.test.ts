@@ -94,6 +94,23 @@ describe('planificar la importación de tarjetas', () => {
     expect(p.errores).toEqual([expect.stringMatching(/más de una vendedora/)]);
   });
 
+  it('con notas en la primera tarjeta, cambiar solo la vendedora se actualiza sin error', () => {
+    const clientes: ClienteBd[] = [
+      { id: 'c1', nombre: 'Ana Uno', comprasPrevias: 4, vendedorHabitualId: 'v-casa', conNotasCiclo1: true },
+    ];
+    const p = plan([fila('Ana', 'Uno', 4)], clientes);
+    expect(p.errores).toEqual([]);
+    expect(p.actualizar).toEqual([{ clienteId: 'c1', comprasPrevias: 4, vendedorId: 'v-perla' }]);
+  });
+
+  it('el hash cambia si solo cambia la vendedora de una actualización', () => {
+    const clientes: ClienteBd[] = [
+      { id: 'c1', nombre: 'Ana Uno', comprasPrevias: 0, vendedorHabitualId: null, conNotasCiclo1: false },
+    ];
+    const a = plan([fila('Ana', 'Uno', 4, 'Perla')], clientes).hash;
+    expect(plan([fila('Ana', 'Uno', 4, 'Kazero')], clientes).hash).not.toBe(a);
+  });
+
   it('el hash cambia si cambia el plan y no depende del orden de las filas', () => {
     const a = plan([fila('Ana', 'Uno', 4), fila('Bea', 'Dos', 1)]).hash;
     expect(plan([fila('Bea', 'Dos', 1), fila('Ana', 'Uno', 4)]).hash).toBe(a);

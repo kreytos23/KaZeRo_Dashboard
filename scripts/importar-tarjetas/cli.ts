@@ -1,7 +1,7 @@
 /**
  * CLI de la importación de tarjetas. Uso:
  *   pnpm excel:tarjetas simular <archivo.xlsx>
- *   pnpm excel:tarjetas ensayo  <archivo.xlsx>
+ *   pnpm excel:tarjetas ensayo  <archivo.xlsx> [--plan=<hash>]
  *   pnpm excel:tarjetas aplicar <archivo.xlsx> --plan=<hash> [--confirmo-produccion --respaldo=<rama>]
  * Salida: 0 bien · 2 argumentos/guarda · 4 producción sin llaves · 6 plan con errores o cambiado.
  */

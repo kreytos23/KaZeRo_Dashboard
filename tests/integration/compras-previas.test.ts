@@ -124,6 +124,11 @@ describe('compras previas', () => {
     expect(await falla(corregir(5))).toBe('cliente_previas_con_notas');
   });
 
+  it('el alta ignora comprasPrevias: la clienta empieza en 0', async () => {
+    const id = await app((db) => crearCliente(db, { nombre: 'Otra Clienta', comprasPrevias: 4 }));
+    expect((await app((db) => resumenCliente(db, id))).comprasPrevias).toBe(0);
+  });
+
   it('editar otros datos sin tocar las compras previas no pide motivo ni las cambia', async () => {
     await corregir(4);
     await app(async (db) =>

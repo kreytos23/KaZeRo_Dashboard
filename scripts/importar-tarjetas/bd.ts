@@ -50,11 +50,13 @@ export async function aplicarTarjetas(
   try {
     return await conDbUrl(url, (db) =>
       db.transaction(async (tx) => {
+        await tx.execute(sql`SET LOCAL lock_timeout = '5s'`);
+        await tx.execute(sql`SET LOCAL statement_timeout = '120s'`);
         // Bloquea todas las clientas: nadie crea notas ni las edita mientras se importa (clienta primero, D-10).
         const plan = planificarTarjetas(filas, await leerBd(tx, true));
         if (plan.errores.length)
           throw new ErrorPlanTarjetas(`El plan tiene ${plan.errores.length} errores.`, plan);
-        if (o.modo === 'aplicar' && plan.hash !== o.hashEsperado)
+        if (o.hashEsperado !== undefined && plan.hash !== o.hashEsperado)
           throw new ErrorPlanTarjetas(
             `El plan cambió (esperado ${o.hashEsperado ?? '—'}, calculado ${plan.hash}).`,
             plan,

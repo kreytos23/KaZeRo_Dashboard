@@ -61,6 +61,13 @@ describe('importación de tarjetas', () => {
     expect(await leer()).toHaveLength(1);
   });
 
+  it('ensayo con otro hash no escribe', async () => {
+    await expect(
+      aplicarTarjetas(urlOwner(), filas, { modo: 'ensayo', hashEsperado: 'otro' }),
+    ).rejects.toThrow(/plan cambió/);
+    expect(await leer()).toEqual([{ nombre: 'Ána UNO', previas: 0, con_vendedora: false }]);
+  });
+
   it('con errores no escribe nada', async () => {
     await expect(
       aplicarTarjetas(

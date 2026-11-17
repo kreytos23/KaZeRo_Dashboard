@@ -53,7 +53,8 @@ function validar(d: DatosCliente) {
 }
 
 export function crearCliente(db: Ejecutor, d: DatosCliente): Promise<string> {
-  const valores = validar(d);
+  // El alta siempre empieza en 0 compras previas: corregirlas exige motivo y queda auditado (solo en UPDATE).
+  const valores = { ...validar(d), comprasPrevias: undefined };
   return conErroresDeNegocio(async () => {
     const [c] = await db.insert(cliente).values(valores).returning({ id: cliente.id });
     return c!.id;

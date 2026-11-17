@@ -104,7 +104,12 @@ export function planificarTarjetas(
     actualizar.push({ clienteId: c.id, comprasPrevias: compras, vendedorId: v.id });
   }
 
-  const orden = <T>(xs: T[], k: (x: T) => string) => [...xs].sort((a, b) => k(a).localeCompare(k(b)));
+  const orden = <T>(xs: T[], k: (x: T) => string) =>
+    [...xs].sort((a, b) => {
+      const x = k(a);
+      const y = k(b);
+      return x < y ? -1 : x > y ? 1 : 0;
+    });
   const hash = createHash('sha256')
     .update(
       JSON.stringify({
