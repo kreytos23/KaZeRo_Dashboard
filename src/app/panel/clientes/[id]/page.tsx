@@ -167,6 +167,26 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
                   opciones={opciones}
                   defaultValue={c.vendedorHabitualId ?? ''}
                 />
+                {!c.esMostrador && (
+                  <div className="flex flex-col gap-1">
+                    <Campo
+                      etiqueta="Compras previas"
+                      name="comprasPrevias"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      max={9}
+                      step={1}
+                      defaultValue={String(resumen.comprasPrevias)}
+                      disabled={!resumen.previasEditables}
+                    />
+                    <p className="text-meta text-tinta-suave">
+                      {resumen.previasEditables
+                        ? 'Compras de su tarjeta de papel. Ocupan los primeros lugares; cambiarlas pide motivo.'
+                        : 'Ya tiene notas en su primera tarjeta: no se pueden cambiar.'}
+                    </p>
+                  </div>
+                )}
                 <AreaTexto etiqueta="Notas" name="notas" defaultValue={c.notas} rows={3} maxLength={2000} />
                 <CampoMotivo />
               </Fragment>
