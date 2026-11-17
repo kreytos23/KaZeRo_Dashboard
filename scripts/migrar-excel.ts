@@ -11,17 +11,10 @@
  * La consola solo imprime destino, conteos, el hash y rutas: los nombres y montos por persona van únicamente al
  * reporte local (carpeta ignorada por git). Detalle y códigos de salida en scripts/migrar-excel/cli.ts.
  */
-import { etiquetaErrorBd } from '../src/db/reintento';
+import { describirError } from './lib/describir-error';
 import { ejecutar } from './migrar-excel/cli';
 
 /** Un error de BD trae la consulta y sus parámetros (datos del Excel): solo se muestran SQLSTATE y restricción. */
-function describirError(e: unknown): string {
-  const causa = (e as { cause?: { code?: unknown; constraint?: unknown } } | null)?.cause;
-  if (causa && typeof causa.code === 'string')
-    return `Error de BD ${etiquetaErrorBd(causa)}${typeof causa.constraint === 'string' ? ` (${causa.constraint})` : ''}. ROLLBACK: no quedó nada.`;
-  return e instanceof Error ? `${e.name}: ${e.message}` : 'Error desconocido';
-}
-
 ejecutar(process.argv.slice(2))
   .then((codigo) => process.exit(codigo))
   .catch((e: unknown) => {

@@ -129,6 +129,8 @@ export const cliente = pgTable(
     ...tiempos,
     // Plan 4a (E-3): la única clienta «Venta de mostrador» (la crea 0023; kazero_app no cambia esta columna).
     esMostrador: boolean('es_mostrador').notNull().default(false),
+    // Compras de la tarjeta de papel (2026-11-16, L-1): ocupan los lugares 1..n de la primera tarjeta, sin nota.
+    comprasPrevias: integer('compras_previas').notNull().default(0),
   },
   (t) => [
     largo('cliente_nombre_largo', t.nombre, 1, 120),
@@ -141,6 +143,8 @@ export const cliente = pgTable(
     maxLargo('cliente_red_social_largo', t.redSocial, 40),
     maxLargo('cliente_usuario_red_largo', t.usuarioRed, 80),
     check('cliente_notas_largo', sql`char_length(${t.notas}) <= 2000`),
+    check('cliente_compras_previas_rango', sql`${t.comprasPrevias} BETWEEN 0 AND 9`),
+    check('cliente_mostrador_sin_previas', sql`NOT ${t.esMostrador} OR ${t.comprasPrevias} = 0`),
   ],
 );
 

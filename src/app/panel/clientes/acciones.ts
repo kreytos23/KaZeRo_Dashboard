@@ -24,6 +24,7 @@ export async function accionEditarCliente(_: EstadoAccion, fd: FormData): Promis
     const id = uuidDe(fd, 'id');
     const version = versionDe(fd);
     const vendedorHabitualId = uuidOpcionalDe(fd, 'vendedorHabitualId');
+    const previas = texto(fd, 'comprasPrevias');
     const { cambios } = await conDb((db) =>
       actualizarCliente(db, {
         id,
@@ -38,6 +39,7 @@ export async function accionEditarCliente(_: EstadoAccion, fd: FormData): Promis
         usuarioRed: texto(fd, 'usuarioRed'),
         vendedorHabitualId,
         notas: texto(fd, 'notas'),
+        comprasPrevias: previas === '' ? undefined : Number(previas),
       }),
     );
     if (cambios === 0) return 'Sin cambios.';

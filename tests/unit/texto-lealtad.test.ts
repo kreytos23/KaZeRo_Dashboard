@@ -78,6 +78,11 @@ describe('etiquetaCasilla (nombre accesible de ●◐○)', () => {
       { posicion: 10, estado: 'libre', folio: null, pctBps: 2000, conSaldo: false },
       'Lugar 10: libre, 20 % de descuento',
     ],
+    [{ posicion: 3, estado: 'previa', folio: null, pctBps: 0, conSaldo: false }, 'Lugar 3: compra anterior'],
+    [
+      { posicion: 5, estado: 'previa', folio: null, pctBps: 1000, conSaldo: false },
+      'Lugar 5: compra anterior, 10 % de descuento',
+    ],
   ] as const)('%j', (c, texto) => expect(etiquetaCasilla(c)).toBe(texto));
 });
 
@@ -92,6 +97,9 @@ describe('pieTarjeta', () => {
         conSaldo: false,
       })),
     );
+  it('el pie cuenta las compras previas', () => {
+    expect(pieTarjeta(armarTarjeta([], 4))).toBe('4 de 10 · falta 1 para el 10 %');
+  });
   it.each([
     [0, '0 de 10 · faltan 5 para el 10 %'],
     [3, '3 de 10 · faltan 2 para el 10 %'],

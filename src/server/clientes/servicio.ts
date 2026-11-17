@@ -6,6 +6,7 @@ import { parsearFechaISO } from '@/domain/fechas';
 import { escaparLike, normalizar } from '@/domain/texto';
 import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
+import { MSG_PREVIAS_RANGO } from './mensajes';
 
 export interface DatosCliente {
   nombre: string;
@@ -16,6 +17,8 @@ export interface DatosCliente {
   usuarioRed?: string | null;
   vendedorHabitualId?: string | null;
   notas?: string;
+  /** L-1: 0–9. Sin valor = no se cambia (en el alta, 0). */
+  comprasPrevias?: number;
 }
 
 const opcional = (v: string | null | undefined) => {
@@ -33,6 +36,9 @@ function validar(d: DatosCliente) {
     if (!cumpleanos)
       throw new ErrorNegocio('cliente_invalido', 'La fecha de cumpleaños no es válida.', 'cumpleanos');
   }
+  const previas = d.comprasPrevias;
+  if (previas !== undefined && !(Number.isInteger(previas) && previas >= 0 && previas <= 9))
+    throw new ErrorNegocio('cliente_invalido', MSG_PREVIAS_RANGO, 'comprasPrevias');
   return {
     nombre,
     referencia: opcional(d.referencia),
@@ -42,11 +48,13 @@ function validar(d: DatosCliente) {
     usuarioRed: opcional(d.usuarioRed),
     vendedorHabitualId: opcional(d.vendedorHabitualId),
     notas: (d.notas ?? '').trim(),
+    comprasPrevias: previas,
   };
 }
 
 export function crearCliente(db: Ejecutor, d: DatosCliente): Promise<string> {
-  const valores = validar(d);
+  // El alta siempre empieza en 0 compras previas: corregirlas exige motivo y queda auditado (solo en UPDATE).
+  const valores = { ...validar(d), comprasPrevias: undefined };
   return conErroresDeNegocio(async () => {
     const [c] = await db.insert(cliente).values(valores).returning({ id: cliente.id });
     return c!.id;
@@ -71,13 +79,15 @@ export function actualizarCliente(
           usuarioRed: cliente.usuarioRed,
           vendedorHabitualId: cliente.vendedorHabitualId,
           notas: cliente.notas,
+          comprasPrevias: cliente.comprasPrevias,
         })
         .from(cliente)
         .where(eq(cliente.id, d.id))
         .for('no key update');
       if (!actual) throw new ErrorNegocio('no_encontrado', 'El cliente no existe.');
       if (actual.version !== d.version) throw conflictoVersion();
-      const fila = (x: typeof actual | typeof v) => ({
+      const nuevo = { ...v, comprasPrevias: v.comprasPrevias ?? actual.comprasPrevias };
+      const fila = (x: typeof actual | typeof nuevo) => ({
         nombre: x.nombre,
         referencia: x.referencia,
         telefono: x.telefono,
@@ -86,8 +96,9 @@ export function actualizarCliente(
         usuario_red: x.usuarioRed,
         vendedor_habitual_id: x.vendedorHabitualId,
         notas: x.notas,
+        compras_previas: String(x.comprasPrevias),
       });
-      const cambios = calcularCambios(fila(actual), fila(v));
+      const cambios = calcularCambios(fila(actual), fila(nuevo));
       if (cambios.length === 0) return { cambios: 0 };
       await fijarContextoAuditoria(tx, {
         adminId: d.adminId,
@@ -95,7 +106,7 @@ export function actualizarCliente(
       });
       const filas = await tx
         .update(cliente)
-        .set({ ...v, version: sql`${cliente.version} + 1` })
+        .set({ ...nuevo, version: sql`${cliente.version} + 1` })
         .where(and(eq(cliente.id, d.id), eq(cliente.version, d.version)))
         .returning({ id: cliente.id });
       if (filas.length === 0) throw conflictoVersion();

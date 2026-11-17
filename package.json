@@ -25,7 +25,8 @@
     "bd:configurar": "tsx scripts/configurar-bd.ts",
     "smoke": "tsx scripts/smoke.ts",
     "excel:migrar": "tsx scripts/migrar-excel.ts",
-    "excel:kzr": "tsx scripts/importar-kzr.ts"
+    "excel:kzr": "tsx scripts/importar-kzr.ts",
+    "excel:tarjetas": "tsx scripts/importar-tarjetas.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "1.2.0",

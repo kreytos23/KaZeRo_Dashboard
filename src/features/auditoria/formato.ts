@@ -20,6 +20,7 @@ export const ETIQUETA_CAMPO: Readonly<Record<string, string>> = {
   usuario_red: 'Usuario en la red',
   vendedor_habitual: 'Vendedor habitual',
   notas: 'Notas',
+  compras_previas: 'Compras previas',
   fecha_envio: 'Fecha de envío',
   imagen_clave: 'Foto',
   // Pedido (Plan 3). vendedor_id se guarda como 'vendedor' (llave foránea).

@@ -146,6 +146,8 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       'notas',
       'version',
       'updated_at',
+      // 2026-11-16 (0028): compras de la tarjeta de papel; el trigger exige motivo y que no haya notas en la tarjeta 1.
+      'compras_previas',
     ];
     expect(orden(updates)).toEqual(
       [

@@ -5,15 +5,17 @@ import { Anillo, Collar, Flor } from './iconos-lealtad';
 import { etiquetaCasilla, pieTarjeta } from './texto-lealtad';
 
 function Icono({ k }: { k: Casilla }) {
-  const color =
-    k.pctBps > 0 ? 'text-secundario' : k.estado === 'ocupada' ? 'text-primario' : 'text-borde-campo';
+  let color = 'text-borde-campo';
+  if (k.pctBps > 0) color = 'text-secundario';
+  else if (k.estado === 'ocupada') color = 'text-primario';
+  else if (k.estado === 'previa') color = 'text-tinta-suave';
   const clase = `size-8 ${color}`;
   if (k.pctBps === 1000) return <Anillo className={clase} />;
   if (k.pctBps === 2000) return <Collar className={clase} />;
-  return <Flor llena={k.estado === 'ocupada'} className={clase} />;
+  return <Flor llena={k.estado !== 'libre'} className={clase} />;
 }
 
-/** Tarjeta de lealtad (R-25, D-4). Server Component sin JS: una sola fila de 10 lugares, la tarjeta actual. */
+/** Tarjeta de lealtad (R-25, D-4). Server Component sin JS: una sola fila de 10 lugares, la tarjeta actual; los lugares de papel salen como «anterior». */
 export function TarjetaLealtad({ tarjeta }: { tarjeta: Tarjeta }) {
   return (
     <section aria-labelledby="tarjeta-lealtad" className="tarjeta @container flex flex-col gap-3 p-4">
@@ -47,6 +49,11 @@ export function TarjetaLealtad({ tarjeta }: { tarjeta: Tarjeta }) {
             <span aria-hidden="true" className="text-meta text-tinta-suave">
               {k.pctBps > 0 ? `${k.posicion} · ${formatoPct(k.pctBps)}` : k.posicion}
             </span>
+            {k.estado === 'previa' && (
+              <span aria-hidden="true" className="text-meta text-tinta-suave">
+                anterior
+              </span>
+            )}
             {k.folio !== null && (
               <Link
                 href={`/panel/pedidos/${k.folio}`}
