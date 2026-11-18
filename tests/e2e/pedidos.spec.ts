@@ -266,6 +266,9 @@ test('el listado de pedidos filtra por estado, cliente y fechas', async ({ page 
     await elegirOpcion(f, 'Estado', 'Todos');
     // El filtro «Cliente» es un buscador (no un select): escribe, elige la opción y no ofrece crear clientes.
     const combo = f.getByRole('combobox', { name: 'Cliente', exact: true });
+    // Primero una que existe: así el índice ya cargó y el «0 opciones» de abajo no pasa por vacío.
+    await combo.fill(`FiltroAbierto ${m}`);
+    await expect(f.getByRole('option', { name: new RegExp(`FiltroAbierto ${m}`) })).toBeVisible();
     await combo.fill(`NoExiste ${m}`);
     await expect(f.getByRole('option')).toHaveCount(0);
     await combo.fill(`FiltroAbierto ${m}`);

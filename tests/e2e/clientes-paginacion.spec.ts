@@ -15,7 +15,7 @@ test('la lista de clientes se pagina de 50 en 50 y conserva el filtro en los enl
     await Promise.all(numeros.slice(i, i + 10).map((n) => sembrarCliente(`${prefijo} ${n}`)));
 
   await irA(page, `/panel/clientes?q=${prefijo}`);
-  const filas = page.getByRole('link', { name: new RegExp(`^${prefijo} \d{2}$`) });
+  const filas = page.getByRole('link', { name: new RegExp(`^${prefijo} \\d{2}$`) });
   await expect(filas).toHaveCount(50);
   await expect(page.getByText('Mostrando 1–50 de 51')).toBeVisible();
   await expect(filas.first()).toHaveText(`${prefijo} 01`);

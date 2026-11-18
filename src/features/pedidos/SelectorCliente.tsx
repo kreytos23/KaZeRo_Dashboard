@@ -148,6 +148,8 @@ export function SelectorCliente({
             e.preventDefault();
             setActivo(Math.max(sel - 1, 0));
           } else if (e.key === 'Enter') {
+            // En un filtro (sin alta) y con la lista cerrada, Enter envía el formulario como los demás campos.
+            if (!conAlta && !visible) return;
             // Enter nunca envía el pedido desde aquí: solo elige.
             e.preventDefault();
             if (visible && opciones[sel]) aceptar(opciones[sel]);
