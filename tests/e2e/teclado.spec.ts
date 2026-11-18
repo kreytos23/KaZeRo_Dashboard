@@ -113,6 +113,8 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await page.keyboard.press('Enter');
     await expect(estadoCon(page, 'Cliente agregado.')).toBeVisible();
 
+    // La lista va por páginas: según el nombre, la clienta nueva puede no caer en la primera.
+    await irA(page, `/panel/clientes?q=${encodeURIComponent(cliente)}`);
     const enlace = page.getByRole('link', { name: cliente, exact: true });
     await enfocar(page, enlace);
     await page.keyboard.press('Enter');

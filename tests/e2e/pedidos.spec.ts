@@ -269,7 +269,8 @@ test('el listado de pedidos filtra por estado, cliente y fechas', async ({ page 
     // Primero una que existe: así el índice ya cargó y el «0 opciones» de abajo no pasa por vacío.
     await combo.fill(`FiltroAbierto ${m}`);
     await expect(f.getByRole('option', { name: new RegExp(`FiltroAbierto ${m}`) })).toBeVisible();
-    await combo.fill(`NoExiste ${m}`);
+    // Sin la marca del proyecto: el buscador también busca por palabras sueltas y «M»/«E» coinciden con muchas.
+    await combo.fill('Qxzwvqxz');
     await expect(f.getByRole('option')).toHaveCount(0);
     await combo.fill(`FiltroAbierto ${m}`);
     await f.getByRole('option', { name: new RegExp(`FiltroAbierto ${m}`) }).click();
