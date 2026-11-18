@@ -266,14 +266,16 @@ test('el listado de pedidos filtra por estado, cliente y fechas', async ({ page 
     await elegirOpcion(f, 'Estado', 'Todos');
     // El filtro «Cliente» es un buscador (no un select): escribe, elige la opción y no ofrece crear clientes.
     const combo = f.getByRole('combobox', { name: 'Cliente', exact: true });
+    // Solo las opciones del buscador: en celular los <select> nativos del panel también exponen role=option.
+    const sugerencias = f.getByRole('listbox', { name: 'Clientes', includeHidden: true }).getByRole('option');
     // Primero una que existe: así el índice ya cargó y el «0 opciones» de abajo no pasa por vacío.
     await combo.fill(`FiltroAbierto ${m}`);
-    await expect(f.getByRole('option', { name: new RegExp(`FiltroAbierto ${m}`) })).toBeVisible();
+    await expect(sugerencias.filter({ hasText: `FiltroAbierto ${m}` })).toBeVisible();
     // Sin la marca del proyecto: el buscador también busca por palabras sueltas y «M»/«E» coinciden con muchas.
     await combo.fill('Qxzwvqxz');
-    await expect(f.getByRole('option')).toHaveCount(0);
+    await expect(sugerencias).toHaveCount(0);
     await combo.fill(`FiltroAbierto ${m}`);
-    await f.getByRole('option', { name: new RegExp(`FiltroAbierto ${m}`) }).click();
+    await sugerencias.filter({ hasText: `FiltroAbierto ${m}` }).click();
   });
   await expect(page).toHaveURL(/cliente=/);
   // El formulario GET envía también los campos vacíos (`estado=`), como antes de la fase 3: lo que importa es que
