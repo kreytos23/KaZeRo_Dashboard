@@ -1,23 +1,35 @@
 import Link from 'next/link';
 import { conDbLectura } from '@/db/client';
+import { acotarPagina, leerPagina } from '@/domain/paginacion';
 import { Campo } from '@/features/ui/Campo';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
+import { Paginacion } from '@/features/ui/Paginacion';
 import { FormAccion } from '@/features/ui/FormAccion';
 import { requerirSesion } from '@/server/auth/sesion-actual';
-import { listarClientes } from '@/server/clientes/servicio';
+import { contarClientes, listarClientes } from '@/server/clientes/servicio';
 import { accionCrearCliente } from './acciones';
 
 export const metadata = { title: 'Clientes' };
 
+const POR_PAGINA = 50;
+
 export default async function PaginaClientes({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string | string[] }>;
+  searchParams: Promise<{ q?: string | string[]; pagina?: string | string[] }>;
 }) {
   await requerirSesion();
-  const bruto = (await searchParams).q;
-  const q = (Array.isArray(bruto) ? bruto[0] : bruto)?.slice(0, 120) ?? '';
-  const clientes = await conDbLectura((db) => listarClientes(db, { q, limite: 100 }));
+  const sp = await searchParams;
+  const q = (Array.isArray(sp.q) ? sp.q[0] : sp.q)?.slice(0, 120) ?? '';
+  const solicitada = leerPagina(sp.pagina);
+  const [clientes, total, pagina] = await conDbLectura(async (db) => {
+    const pedir = (pag: number) =>
+      listarClientes(db, { q, limite: POR_PAGINA, offset: (pag - 1) * POR_PAGINA });
+    // Total y página en paralelo (mismo WHERE); si la página pedida se pasa de la última, se vuelve a pedir.
+    const [n, primera] = await Promise.all([contarClientes(db, { q }), pedir(solicitada)]);
+    const pag = acotarPagina(solicitada, n, POR_PAGINA);
+    return [pag === solicitada ? primera : await pedir(pag), n, pag] as const;
+  });
   return (
     <section className="flex max-w-3xl flex-col gap-6">
       <h1 className="text-2xl font-semibold">Clientes</h1>
@@ -46,6 +58,7 @@ export default async function PaginaClientes({
           </li>
         ))}
       </ul>
+      <Paginacion pagina={pagina} total={total} porPagina={POR_PAGINA} parametros={{ q }} />
       {clientes.length === 0 &&
         (q ? (
           <EstadoVacio

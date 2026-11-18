@@ -6,7 +6,13 @@ import {
   obtenerOCrearCatalogo,
   resolverCatalogos,
 } from '@/server/catalogos/servicio';
-import { actualizarCliente, crearCliente, listarClientes, obtenerCliente } from '@/server/clientes/servicio';
+import {
+  actualizarCliente,
+  contarClientes,
+  crearCliente,
+  listarClientes,
+  obtenerCliente,
+} from '@/server/clientes/servicio';
 import { ErrorNegocio } from '@/server/errores';
 import {
   actualizarVendedor,
@@ -130,5 +136,28 @@ describe('clientes (R-70)', () => {
       'Clienta',
     ]);
     expect((await app((db) => listarClientes(db, { q: '%' }))).map((c) => c.nombre)).toEqual(['100% Real']);
+  });
+  it('cuenta con el mismo filtro que lista y excluye «Venta de mostrador»', async () => {
+    await app((db) => crearCliente(db, { nombre: 'Rocío Santibañez' }));
+    await app((db) => crearCliente(db, { nombre: 'Clienta', referencia: '5to norte' }));
+    await app((db) => crearCliente(db, { nombre: '100% Real' }));
+    expect(await app((db) => contarClientes(db))).toBe(3);
+    expect(await app((db) => contarClientes(db, { q: 'santibanez' }))).toBe(1);
+    expect(await app((db) => contarClientes(db, { q: '5TO NORTE' }))).toBe(1);
+    expect(await app((db) => contarClientes(db, { q: '%' }))).toBe(1);
+    expect(await app((db) => contarClientes(db, { q: 'mostrador' }))).toBe(0);
+    expect(await app((db) => listarClientes(db, { q: 'mostrador' }))).toEqual([]);
+  });
+  it('pagina con offset y limite en orden por nombre', async () => {
+    for (const n of ['Dora', 'Ana', 'Elsa', 'Berta', 'Carla'])
+      await app((db) => crearCliente(db, { nombre: n }));
+    const nombres = async (o: { limite: number; offset?: number }) =>
+      (await app((db) => listarClientes(db, o))).map((c) => c.nombre);
+    expect(await nombres({ limite: 2 })).toEqual(['Ana', 'Berta']);
+    expect(await nombres({ limite: 2, offset: 2 })).toEqual(['Carla', 'Dora']);
+    expect(await nombres({ limite: 2, offset: 4 })).toEqual(['Elsa']);
+    expect(await nombres({ limite: 2, offset: 10 })).toEqual([]);
+    // Un offset inválido (negativo) se trata como 0.
+    expect(await nombres({ limite: 2, offset: -3 })).toEqual(['Ana', 'Berta']);
   });
 });

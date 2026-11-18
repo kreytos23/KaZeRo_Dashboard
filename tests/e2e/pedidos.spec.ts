@@ -264,7 +264,12 @@ test('el listado de pedidos filtra por estado, cliente y fechas', async ({ page 
   // Cliente.
   await filtrar(page, async (f) => {
     await elegirOpcion(f, 'Estado', 'Todos');
-    await elegirOpcion(f, 'Cliente', `FiltroAbierto ${m}`, true);
+    // El filtro «Cliente» es un buscador (no un select): escribe, elige la opción y no ofrece crear clientes.
+    const combo = f.getByRole('combobox', { name: 'Cliente', exact: true });
+    await combo.fill(`NoExiste ${m}`);
+    await expect(f.getByRole('option')).toHaveCount(0);
+    await combo.fill(`FiltroAbierto ${m}`);
+    await f.getByRole('option', { name: new RegExp(`FiltroAbierto ${m}`) }).click();
   });
   await expect(page).toHaveURL(/cliente=/);
   // El formulario GET envía también los campos vacíos (`estado=`), como antes de la fase 3: lo que importa es que

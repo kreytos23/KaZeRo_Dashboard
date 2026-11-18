@@ -16,6 +16,14 @@ export interface Paginacion {
   elementos: ElementoPaginacion[];
 }
 
+const MAX_PAGINA = 1000;
+
+/** `?pagina=` es entrada del usuario: solo dígitos, acotado a 1..1000; lo inválido es la página 1. */
+export function leerPagina(bruto: string | string[] | undefined): number {
+  const v = Array.isArray(bruto) ? (bruto[0] ?? '') : (bruto ?? '');
+  return /^\d{1,10}$/.test(v) ? Math.min(Math.max(Number(v), 1), MAX_PAGINA) : 1;
+}
+
 export const totalDePaginas = (total: number, porPagina: number): number =>
   Math.max(1, Math.ceil(Math.max(0, total) / Math.max(1, porPagina)));
 
