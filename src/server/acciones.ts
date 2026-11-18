@@ -7,10 +7,15 @@ import type { EstadoAccion } from '@/features/ui/estado';
 import { ErrorNegocio } from './errores';
 
 /** Envuelve el cuerpo de una Server Action: éxito → { ok }, ErrorNegocio → { error }, lo demás → mensaje genérico. */
-export async function ejecutarAccion(fn: () => Promise<string | void>): Promise<EstadoAccion> {
+export async function ejecutarAccion(
+  fn: () => Promise<string | Pick<EstadoAccion, 'ok' | 'enlace'> | void>,
+): Promise<EstadoAccion> {
   try {
+    const r = await fn();
+    if (r && typeof r === 'object')
+      return { ok: r.ok || 'Guardado.', ...(r.enlace ? { enlace: r.enlace } : {}) };
     // `||` a propósito: una cadena vacía también cae al mensaje por defecto, para que siempre haya un status visible.
-    return { ok: (await fn()) || 'Guardado.' };
+    return { ok: r || 'Guardado.' };
   } catch (e) {
     // redirect() y notFound() lanzan errores especiales que Next debe recibir.
     unstable_rethrow(e);

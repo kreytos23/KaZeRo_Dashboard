@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { startTransition, useActionState, useEffect, useRef } from 'react';
 import { marcarIndiceSucio } from '@/search/eventos';
 import { useHidratado } from './hidratado';
@@ -110,6 +111,14 @@ export function FormAccion({
       {/* Siempre montado: una región que nace con texto no se anuncia. Al guardar, el aviso dibuja su palomita. */}
       <p role="status" className={estado.ok ? 'aviso-exito' : undefined}>
         {estado.ok}
+        {estado.ok && estado.enlace && (
+          <>
+            {' '}
+            <Link href={estado.enlace.href} className="enlace font-semibold">
+              {estado.enlace.texto}
+            </Link>
+          </>
+        )}
       </p>
       {!sinControles && <BotonEnvio textoBoton={textoBoton} pendiente={pendiente} hidratado={hidratado} />}
     </form>

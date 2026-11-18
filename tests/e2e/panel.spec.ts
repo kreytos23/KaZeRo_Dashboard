@@ -206,10 +206,8 @@ test('cliente con alta rápida se encuentra sin acentos', async ({ page }, info)
   await page.getByRole('combobox', { name: 'Buscar' }).fill(`santibanez ${m.toLowerCase()}`);
   await expect(page.getByRole('option', { name: new RegExp(`Rocío Santibañez ${m}`) })).toBeVisible();
 
-  // Ficha del cliente: tras guardar debe verse la confirmación. La lista va por páginas: se filtra para llegar a ella.
-  await page.getByLabel('Filtrar clientes').fill(`Santibañez ${m}`);
-  await page.getByRole('button', { name: 'Filtrar' }).click();
-  await page.getByRole('link', { name: `Rocío Santibañez ${m}` }).click();
+  // Ficha del cliente: el aviso del alta enlaza a ella (la lista va por páginas y puede no estar en la visible).
+  await estadoCon(page, 'Cliente agregado.').getByRole('link', { name: 'Abrir su ficha' }).click();
   await expect(page.getByRole('heading', { name: `Rocío Santibañez ${m}` })).toBeVisible();
   await page.getByLabel('Notas').fill('Prefiere plata');
   await page.getByRole('button', { name: 'Guardar cambios' }).click();

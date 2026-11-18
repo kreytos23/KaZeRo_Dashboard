@@ -10,11 +10,12 @@ import { actualizarCliente, crearCliente } from '@/server/clientes/servicio';
 export async function accionCrearCliente(_: EstadoAccion, fd: FormData): Promise<EstadoAccion> {
   await requerirSesion();
   return ejecutarAccion(async () => {
-    await conDb((db) =>
+    const id = await conDb((db) =>
       crearCliente(db, { nombre: texto(fd, 'nombre'), referencia: texto(fd, 'referencia') }),
     );
     revalidatePath('/panel/clientes');
-    return 'Cliente agregado.';
+    // La lista va por páginas: la clienta nueva puede no caer en la que se está viendo.
+    return { ok: 'Cliente agregado.', enlace: { href: `/panel/clientes/${id}`, texto: 'Abrir su ficha' } };
   });
 }
 

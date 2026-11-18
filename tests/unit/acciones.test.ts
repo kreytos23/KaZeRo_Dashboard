@@ -8,6 +8,13 @@ describe('ejecutarAccion', () => {
   it('devuelve el mensaje de éxito', async () => {
     expect(await ejecutarAccion(async () => 'Vendedor agregado.')).toEqual({ ok: 'Vendedor agregado.' });
   });
+  it('pasa el enlace del aviso cuando la acción lo devuelve', async () => {
+    const enlace = { href: '/panel/clientes/x', texto: 'Abrir su ficha' };
+    expect(await ejecutarAccion(async () => ({ ok: 'Cliente agregado.', enlace }))).toEqual({
+      ok: 'Cliente agregado.',
+      enlace,
+    });
+  });
   it('usa un mensaje por defecto si la acción no devuelve texto', async () => {
     expect(await ejecutarAccion(async () => {})).toEqual({ ok: 'Guardado.' });
   });
