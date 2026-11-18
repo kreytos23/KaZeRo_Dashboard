@@ -6,13 +6,14 @@ import { formatoFolio } from '@/domain/pedidos';
 import { Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { FiltrosPlegables } from '@/features/ui/FiltrosPlegables';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
+import { SelectorCliente } from '@/features/pedidos/SelectorCliente';
 import { Paginacion } from '@/features/ui/Paginacion';
 import { filtrosActivos } from '@/features/ui/filtros-url';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPedido } from '@/features/ui/estado-visual';
 import { Saldo } from '@/features/ui/Saldo';
 import { requerirSesion } from '@/server/auth/sesion-actual';
-import { listarClientes, obtenerCliente } from '@/server/clientes/servicio';
+import { obtenerCliente } from '@/server/clientes/servicio';
 import { contarPedidos, listarPedidos } from '@/server/pedidos/lecturas';
 import { listarVendedores } from '@/server/vendedores/servicio';
 import { ETIQUETA_ESTADO_PEDIDO, fechaCorta } from './etiquetas';
@@ -31,7 +32,7 @@ export default async function PaginaPedidos({
 }) {
   await requerirSesion();
   const f = leerFiltrosPedidos(await searchParams);
-  const [pedidos, vendedores, clientes, elegido, total, pagina] = await conDbLectura(async (db) => {
+  const [pedidos, vendedores, elegido, total, pagina] = await conDbLectura(async (db) => {
     const filtros = {
       q: f.q,
       estado: f.estado,
@@ -44,24 +45,16 @@ export default async function PaginaPedidos({
     const pedir = (pag: number) =>
       listarPedidos(db, { ...filtros, limite: POR_PAGINA, offset: (pag - 1) * POR_PAGINA });
     // Total y página en paralelo (mismo WHERE); si la página pedida se pasa de la última, se vuelve a pedir.
-    const [n, primera, vs, cs, el] = await Promise.all([
+    const [n, primera, vs, el] = await Promise.all([
       contarPedidos(db, filtros),
       pedir(f.pagina),
       listarVendedores(db),
-      // Hasta 200 clientes en el selector; si el filtrado no está entre ellos se trae aparte.
-      listarClientes(db, { limite: 200 }),
       f.cliente ? obtenerCliente(db, f.cliente) : Promise.resolve(null),
     ]);
     const pag = acotarPagina(f.pagina, n, POR_PAGINA);
     const pds = pag === f.pagina ? primera : await pedir(pag);
-    return [pds, vs, cs, el, n, pag] as const;
+    return [pds, vs, el, n, pag] as const;
   });
-  const opcionesCliente = [
-    { valor: '', texto: 'Todos' },
-    ...(elegido && !clientes.some((c) => c.id === elegido.id) ? [elegido] : [])
-      .concat(clientes)
-      .map((c) => ({ valor: c.id, texto: c.nombre })),
-  ];
   const { activos, hrefLimpiar } = filtrosActivos(RUTA, [
     { clave: 'q', valor: f.q, etiqueta: f.q && `“${f.q}”` },
     { clave: 'estado', valor: f.estado, etiqueta: f.estado && ETIQUETA_ESTADO_PEDIDO[f.estado] },
@@ -73,7 +66,7 @@ export default async function PaginaPedidos({
     {
       clave: 'cliente',
       valor: f.cliente,
-      etiqueta: f.cliente && (opcionesCliente.find((c) => c.valor === f.cliente)?.texto ?? 'Cliente'),
+      etiqueta: f.cliente && (elegido?.nombre ?? 'Cliente'),
     },
     { clave: 'desde', valor: f.desde, etiqueta: f.desde && `Desde ${fechaCorta(f.desde)}` },
     { clave: 'hasta', valor: f.hasta, etiqueta: f.hasta && `Hasta ${fechaCorta(f.hasta)}` },
@@ -115,11 +108,10 @@ export default async function PaginaPedidos({
             ...vendedores.map((v) => ({ valor: v.id, texto: v.nombre })),
           ]}
         />
-        <Selector
-          etiqueta="Cliente"
+        <SelectorCliente
           name="cliente"
-          defaultValue={f.cliente ?? ''}
-          opciones={opcionesCliente}
+          conAlta={false}
+          inicial={elegido ? { id: elegido.id, nombre: elegido.nombre } : null}
         />
         <Campo etiqueta="Desde" name="desde" type="date" defaultValue={f.desde ?? ''} />
         <Campo etiqueta="Hasta" name="hasta" type="date" defaultValue={f.hasta ?? ''} />

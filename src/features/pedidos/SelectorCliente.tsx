@@ -26,9 +26,17 @@ interface Opcion {
 export function SelectorCliente({
   inicial,
   onElegir,
+  name = 'clienteId',
+  conAlta = true,
+  etiqueta = 'Cliente',
 }: {
   inicial: ClienteElegido | null;
-  onElegir: (c: ClienteElegido | null) => void;
+  onElegir?: (c: ClienteElegido | null) => void;
+  /** Nombre del campo oculto que viaja con el formulario. */
+  name?: string;
+  /** Con `false` no se ofrece «Crear cliente…» (p. ej. un filtro: solo busca entre las existentes). */
+  conAlta?: boolean;
+  etiqueta?: string;
 }) {
   const id = useId();
   const errores = useContext(ErroresCampo);
@@ -56,10 +64,10 @@ export function SelectorCliente({
         }))
       : [];
     const exacto = encontrados.some((o) => normalizar(o.titulo) === normalizar(limpio));
-    return exacto
+    return exacto || !conAlta
       ? encontrados
       : [...encontrados, { clave: 'crear', titulo: `Crear cliente «${limpio}»`, subtitulo: 'Cliente nuevo' }];
-  }, [motor, limpio, elegido]);
+  }, [motor, limpio, elegido, conAlta]);
 
   const visible = abierto && opciones.length > 0;
   const sel = Math.max(0, Math.min(activo, opciones.length - 1));
@@ -69,7 +77,7 @@ export function SelectorCliente({
     setQ(c.nombre);
     setAbierto(false);
     setErrorAlta('');
-    onElegir(c);
+    onElegir?.(c);
   }
 
   async function crear() {
@@ -100,9 +108,9 @@ export function SelectorCliente({
   return (
     <div className="relative flex flex-col gap-1">
       <label htmlFor={`${id}-q`} className="text-meta font-medium">
-        Cliente
+        {etiqueta}
       </label>
-      <input type="hidden" name="clienteId" value={elegido?.id ?? ''} />
+      <input type="hidden" name={name} value={elegido?.id ?? ''} />
       <input
         id={`${id}-q`}
         type="text"
@@ -127,7 +135,7 @@ export function SelectorCliente({
           setErrorAlta('');
           if (elegido) {
             setElegido(null);
-            onElegir(null);
+            onElegir?.(null);
           }
         }}
         onKeyDown={(e) => {
@@ -140,6 +148,8 @@ export function SelectorCliente({
             e.preventDefault();
             setActivo(Math.max(sel - 1, 0));
           } else if (e.key === 'Enter') {
+            // En un filtro (sin alta) y con la lista cerrada, Enter envía el formulario como los demás campos.
+            if (!conAlta && !visible) return;
             // Enter nunca envía el pedido desde aquí: solo elige.
             e.preventDefault();
             if (visible && opciones[sel]) aceptar(opciones[sel]);

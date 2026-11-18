@@ -121,21 +121,33 @@ export async function obtenerCliente(db: Ejecutor, id: string) {
   return c ?? null;
 }
 
-export function listarClientes(db: Ejecutor, o: { q?: string; limite?: number } = {}) {
-  const q = normalizar(o.q ?? '');
+/** Mismo WHERE para listar y contar: sin «Venta de mostrador» y, si hay `q`, el filtro trigram. */
+function condicionesClientes(qBruto: string | undefined) {
+  const q = normalizar(qBruto ?? '');
   // ESCAPE '\': en esta plantilla JS '\\' llega a SQL como una sola barra (lecciones §2).
   // La expresión coincide con el índice trigram cliente_busqueda_trgm (la vista se expande en el plan).
   const filtro = q
     ? sql`kz_normalizar(${vCliente.nombre} || ' ' || coalesce(${vCliente.referencia}, '')) LIKE ${'%' + escaparLike(q) + '%'} ESCAPE '\\'`
     : undefined;
-  return (
-    db
-      .select()
-      .from(vCliente)
-      // «Venta de mostrador» no es una clienta de verdad: no se lista (sus notas se ven desde el exhibidor).
-      .where(and(eq(vCliente.esMostrador, false), filtro))
-      .orderBy(asc(vCliente.nombre))
-      .limit(Math.min(o.limite ?? 50, 200))
-  );
+  // «Venta de mostrador» no es una clienta de verdad: no se lista (sus notas se ven desde el exhibidor).
+  return and(eq(vCliente.esMostrador, false), filtro);
+}
+
+export function listarClientes(db: Ejecutor, o: { q?: string; limite?: number; offset?: number } = {}) {
+  return db
+    .select()
+    .from(vCliente)
+    .where(condicionesClientes(o.q))
+    .orderBy(asc(vCliente.nombre))
+    .limit(Math.min(o.limite ?? 50, 200))
+    .offset(Math.max(Math.trunc(o.offset ?? 0), 0));
+}
+
+export async function contarClientes(db: Ejecutor, o: { q?: string } = {}): Promise<number> {
+  const [r] = await db
+    .select({ n: sql<number>`count(*)::int` })
+    .from(vCliente)
+    .where(condicionesClientes(o.q));
+  return r?.n ?? 0;
 }
 export type ClienteFila = Awaited<ReturnType<typeof listarClientes>>[number];

@@ -3,6 +3,7 @@ import {
   acotarPagina,
   calcularPaginacion,
   elementosPaginacion,
+  leerPagina,
   totalDePaginas,
   type ElementoPaginacion,
 } from '@/domain/paginacion';
@@ -73,5 +74,20 @@ describe('calcularPaginacion', () => {
   it('sin filas el rango es 0–0 y hay una sola página', () => {
     const p = calcularPaginacion({ pagina: 3, total: 0, porPagina: 50 });
     expect([p.pagina, p.totalPaginas, p.desde, p.hasta]).toEqual([1, 1, 0, 0]);
+  });
+});
+
+describe('leerPagina', () => {
+  it('acepta solo dígitos, acotados a 1..1000; lo inválido es la página 1', () => {
+    expect(leerPagina('3')).toBe(3);
+    expect(leerPagina('0')).toBe(1);
+    expect(leerPagina('99999')).toBe(1000);
+    expect(leerPagina('-2')).toBe(1);
+    expect(leerPagina('2.5')).toBe(1);
+    expect(leerPagina('abc')).toBe(1);
+    expect(leerPagina('12345678901')).toBe(1);
+    expect(leerPagina('')).toBe(1);
+    expect(leerPagina(undefined)).toBe(1);
+    expect(leerPagina(['4', '5'])).toBe(4);
   });
 });
