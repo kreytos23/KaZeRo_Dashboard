@@ -237,7 +237,7 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     const regreso = page.getByRole('form', { name: 'Regresar del exhibidor' });
     await enfocar(page, regreso.getByRole('checkbox', { name: `Seleccionar ${codigo}` }));
     await page.keyboard.press('Space');
-    await enfocar(page, regreso.getByRole('button', { name: 'Regresar 1 seleccionada' }));
+    await enfocar(page, regreso.getByRole('button', { name: 'Regresar 1 pieza' }));
     await page.keyboard.press('Enter');
     await expect(estadoCon(page, '1 pieza regresada.')).toBeVisible();
 

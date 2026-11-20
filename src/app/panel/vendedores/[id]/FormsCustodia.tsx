@@ -27,8 +27,8 @@ export function FormsCustodia({ vendedorId, nombre, puedeRecibir, enPoder, elegi
         sinPiezas={`${nombre} no tiene piezas en su poder.`}
         textos={{
           vacio: 'Regresar a Kazero',
-          uno: 'Regresar 1 seleccionada',
-          varios: 'Regresar {n} seleccionadas',
+          uno: 'Regresar 1 pieza',
+          varios: 'Regresar {n} piezas',
         }}
       >
         <input type="hidden" name="vendedorId" value={vendedorId} />

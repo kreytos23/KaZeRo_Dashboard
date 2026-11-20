@@ -68,7 +68,7 @@ test('exhibidor: venta de mostrador con cobro parcial, abono, entrega parcial, c
   // Regresar la pieza que no se vendió; el cierre sigue bloqueado por el dinero pendiente.
   const regreso = page.getByRole('form', { name: 'Regresar del exhibidor' });
   await regreso.getByRole('checkbox', { name: `Seleccionar ${c}` }).check();
-  await regreso.getByRole('button', { name: 'Regresar 1 seleccionada' }).click();
+  await regreso.getByRole('button', { name: 'Regresar 1 pieza' }).click();
   await expect(estadoCon(page, '1 pieza regresada.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Piezas en el exhibidor (0)' })).toBeVisible();
 

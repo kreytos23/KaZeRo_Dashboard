@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { normalizarCodigo } from '@/domain/codigos';
 import { MAX_CARACTERES_CODIGOS } from '@/features/exhibidores/codigos';
 import { FotoPieza } from '@/features/imagenes/FotoPieza';
 import { MensajeError } from '@/features/ui/Campo';
@@ -94,11 +95,13 @@ function BuscadorElegibles({
   const resultados = useMemo(() => buscarElegibles(elegibles, q, elegidas), [elegibles, q, elegidas]);
   const visible = abierto && resultados.length > 0;
   const sel = Math.max(0, Math.min(activo, resultados.length - 1));
+  const [aviso, setAviso] = useState('');
   const consulta = q.trim();
-  const repetida = consulta && [...elegidas].some((c) => c === consulta.toUpperCase());
+  const repetida = consulta && elegidas.has(normalizarCodigo(consulta));
 
   function elegir(p: PiezaElegible) {
     onElegir(p);
+    setAviso(`${p.codigo} agregada al lote (${elegidas.size + 1}).`);
     setQ('');
     setActivo(0);
   }
@@ -127,6 +130,7 @@ function BuscadorElegibles({
           onFocus={() => setAbierto(true)}
           onChange={(e) => {
             setQ(e.target.value);
+            setAviso('');
             setActivo(0);
             setAbierto(true);
           }}
@@ -181,12 +185,13 @@ function BuscadorElegibles({
         </ul>
       </div>
       <MensajeError idControl={`${id}-q`} error={error} />
-      <p id={`${id}-ayuda`} role="status" className="text-meta text-tinta-suave empty:hidden">
+      {/* Siempre montado y con altura propia: una región que nace con texto no se anuncia. */}
+      <p id={`${id}-ayuda`} role="status" className="min-h-5 text-meta text-tinta-suave">
         {consulta && !visible && abierto
           ? repetida
-            ? `${consulta.toUpperCase()} ya está en el lote.`
+            ? `${normalizarCodigo(consulta)} ya está en el lote.`
             : `Ninguna pieza disponible coincide con «${consulta}».`
-          : ''}
+          : aviso}
       </p>
     </div>
   );
@@ -214,6 +219,8 @@ export function FormEntregaLote({
 }) {
   const [elegidas, setElegidas] = useState<PiezaElegible[]>([]);
   const [pegado, setPegado] = useState('');
+  // Lo que había pegado al enviar: de ahí sale a qué control le toca el error, aunque luego se edite.
+  const pegadoAlEnviar = useRef(false);
   const codigosElegidos = useMemo(() => new Set(elegidas.map((p) => p.codigo)), [elegidas]);
   const codigos = unirCodigos(
     elegidas.map((p) => p.codigo),
@@ -230,6 +237,9 @@ export function FormEntregaLote({
       etiqueta={etiqueta}
       textoBoton={textoBoton(textos, codigos.length)}
       deshabilitado={codigos.length === 0}
+      alEnviar={() => {
+        pegadoAlEnviar.current = pegado.trim() !== '';
+      }}
     >
       {children}
       <input type="hidden" name="codigos" value={codigos.join('\n')} />
@@ -246,7 +256,7 @@ export function FormEntregaLote({
                 onElegir={(p) =>
                   setElegidas((xs) => (xs.some((x) => x.codigo === p.codigo) ? xs : [...xs, p]))
                 }
-                error={pegado.trim() ? undefined : error}
+                error={pegadoAlEnviar.current ? undefined : error}
               />
             )}
             {elegidas.length > 0 && (
@@ -272,7 +282,11 @@ export function FormEntregaLote({
                 ))}
               </ul>
             )}
-            <PegarCodigos valor={pegado} onCambio={setPegado} error={pegado.trim() ? error : undefined} />
+            <PegarCodigos
+              valor={pegado}
+              onCambio={setPegado}
+              error={pegadoAlEnviar.current ? error : undefined}
+            />
           </>
         )}
       </ErrorDelLote>
@@ -320,6 +334,7 @@ export function FormRegresoLote({
   const idTodas = useId();
   const [marcadas, setMarcadas] = useState<ReadonlySet<string>>(new Set());
   const [pegado, setPegado] = useState('');
+  const pegadoAlEnviar = useRef(false);
   const todas = useRef<HTMLInputElement>(null);
   const seleccionables = piezas.filter((p) => p.seleccionable).map((p) => p.codigo);
   // Solo cuentan las que siguen en la lista (tras revalidar, una pieza pudo salir).
@@ -349,6 +364,9 @@ export function FormRegresoLote({
       textoBoton={textoBoton(textos, codigos.length)}
       deshabilitado={codigos.length === 0}
       sinControles={piezas.length === 0}
+      alEnviar={() => {
+        pegadoAlEnviar.current = pegado.trim() !== '';
+      }}
     >
       {children}
       <input type="hidden" name="codigos" value={codigos.join('\n')} />
@@ -357,7 +375,7 @@ export function FormRegresoLote({
         {(error) => {
           if (piezas.length === 0) return <p className="text-meta text-tinta-suave">{sinPiezas}</p>;
           // Sin lo pegado, el error cuelga de «Seleccionar todas», el control principal de la lista.
-          const errorLista = pegado.trim() || seleccionables.length === 0 ? undefined : error;
+          const errorLista = pegadoAlEnviar.current || seleccionables.length === 0 ? undefined : error;
           return (
             <>
               {seleccionables.length > 0 && (
@@ -389,7 +407,7 @@ export function FormRegresoLote({
                 {piezas.map((p) => (
                   <li key={p.codigo} className="flex flex-wrap items-center gap-x-2 py-0.5">
                     {p.seleccionable ? (
-                      <label className="casilla-fila shrink-0">
+                      <label className="casilla-fila min-w-11 shrink-0 justify-center">
                         <span className="casilla-caja">
                           <input
                             type="checkbox"
@@ -404,7 +422,7 @@ export function FormRegresoLote({
                       </label>
                     ) : (
                       // Mismo ancho que la casilla: los códigos quedan alineados.
-                      <span aria-hidden="true" className="w-8 shrink-0" />
+                      <span aria-hidden="true" className="w-11 shrink-0" />
                     )}
                     <Link
                       href={`/panel/inventario/${encodeURIComponent(p.codigo)}`}
@@ -417,7 +435,11 @@ export function FormRegresoLote({
                   </li>
                 ))}
               </ul>
-              <PegarCodigos valor={pegado} onCambio={setPegado} error={pegado.trim() ? error : undefined} />
+              <PegarCodigos
+                valor={pegado}
+                onCambio={setPegado}
+                error={pegadoAlEnviar.current ? error : undefined}
+              />
             </>
           );
         }}

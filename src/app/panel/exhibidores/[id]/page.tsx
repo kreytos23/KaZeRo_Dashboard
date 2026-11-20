@@ -198,8 +198,8 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
                 }))}
                 textos={{
                   vacio: 'Regresar piezas',
-                  uno: 'Regresar 1 seleccionada',
-                  varios: 'Regresar {n} seleccionadas',
+                  uno: 'Regresar 1 pieza',
+                  varios: 'Regresar {n} piezas',
                 }}
               >
                 <input type="hidden" name="exhibidorId" value={e.id} />

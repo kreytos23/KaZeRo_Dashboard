@@ -145,8 +145,8 @@ describe('entregar a vendedora', () => {
 });
 
 describe('piezas elegibles para entregar o enviar (selector de lotes)', () => {
-  it('solo disponibles sin custodia: excluye vendidas, apartadas, en exhibidor, con un asociado y regalo', async () => {
-    for (const c of ['CUE1', 'CUE2', 'CUE3', 'CUE4', 'CUE5', 'CUE6', 'CUE7']) await alta(c);
+  it('solo disponibles sin custodia: excluye vendidas, apartadas, en exhibidor, con un asociado, regalo, defecto y guardada', async () => {
+    for (const c of ['CUE1', 'CUE2', 'CUE3', 'CUE4', 'CUE5', 'CUE6', 'CUE7', 'CUE8', 'CUE9']) await alta(c);
     const exhibidorId = await app((db) =>
       crearExhibidor(db, { vendedorId: ids.perla, nombre: 'Perla E', fechaEnvio: '2026-09-16' }),
     );
@@ -164,10 +164,16 @@ describe('piezas elegibles para entregar o enviar (selector de lotes)', () => {
         pagador: 'cliente',
       }),
     );
-    await app(async (db) => {
-      const p = (await obtenerPiezaPorCodigo(db, 'CUE6'))!;
-      await cambiarEstado(db, { piezaId: p.id, version: p.version, aEstado: 'regalo', adminId });
-    });
+    for (const [codigo, aEstado] of [
+      ['CUE6', 'regalo'],
+      ['CUE8', 'defecto'],
+      ['CUE9', 'guardada'],
+    ] as const) {
+      await app(async (db) => {
+        const p = (await obtenerPiezaPorCodigo(db, codigo))!;
+        await cambiarEstado(db, { piezaId: p.id, version: p.version, aEstado, adminId });
+      });
+    }
     expect((await ficha('CUE5')).estado).toBe('vendida');
 
     const elegibles = await app((db) => piezasDisponiblesEnKazero(db));

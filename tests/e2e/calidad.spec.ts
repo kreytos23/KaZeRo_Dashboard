@@ -82,7 +82,7 @@ test('dos formularios con el mismo campo describen cada uno su propio error', as
   await entrega.getByRole('button', { name: `Entregar 1 pieza a ${nombre}` }).click();
   await expect(enEntrega).toHaveAccessibleDescription(`No se entregó nada. No existen: ZQ${m}1.`);
   const enRegreso = await pegarEn(regreso, `zq${m}2 ZQ${m}2`); // repetido: el lote ya lo manda una vez
-  await regreso.getByRole('button', { name: 'Regresar 1 seleccionada' }).click();
+  await regreso.getByRole('button', { name: 'Regresar 1 pieza' }).click();
   await expect(enRegreso).toHaveAccessibleDescription(`No se regresó nada. No existen: ZQ${m}2.`);
   await expect(enEntrega).toHaveAccessibleDescription(`No se entregó nada. No existen: ZQ${m}1.`);
   await expect(enRegreso).toHaveValue(`zq${m}2 ZQ${m}2`); // el error conserva lo escrito

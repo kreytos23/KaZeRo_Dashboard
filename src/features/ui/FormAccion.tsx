@@ -66,6 +66,7 @@ export function FormAccion({
   sinControles = false,
   deshabilitado = false,
   etiqueta,
+  alEnviar,
 }: {
   accion: Accion;
   textoBoton: string;
@@ -78,6 +79,8 @@ export function FormAccion({
   deshabilitado?: boolean;
   /** Nombre accesible del formulario (lo vuelve un landmark `form`); útil con varios en la misma página. */
   etiqueta?: string;
+  /** Se llama justo al enviar (antes de la acción): p. ej. para recordar qué había en el formulario. */
+  alEnviar?: () => void;
 }) {
   const [estado, despachar, pendiente] = useActionState(accion, {});
   const form = useRef<HTMLFormElement>(null);
@@ -102,6 +105,7 @@ export function FormAccion({
       onSubmit={(e) => {
         e.preventDefault();
         if (pendiente) return;
+        alEnviar?.();
         const datos = new FormData(e.currentTarget);
         startTransition(() => despachar(datos));
       }}

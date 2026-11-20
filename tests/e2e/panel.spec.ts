@@ -93,7 +93,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await expect(page.getByRole('link', { name: codigo })).toBeVisible();
   const regreso = page.getByRole('form', { name: 'Regresar del exhibidor' });
   await regreso.getByRole('checkbox', { name: 'Seleccionar todas' }).check();
-  await regreso.getByRole('button', { name: 'Regresar 1 seleccionada' }).click();
+  await regreso.getByRole('button', { name: 'Regresar 1 pieza' }).click();
   await expect(estadoCon(page, '1 pieza regresada.')).toBeVisible();
   await expect(page.getByRole('link', { name: codigo })).toHaveCount(0);
 

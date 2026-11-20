@@ -40,6 +40,7 @@ test('entregar a un asociado: solo se ofrecen disponibles, se quitan etiquetas y
   await expect(entrega.getByText(`Ninguna pieza disponible coincide con «LP${m}V1».`)).toBeVisible();
   await buscar.fill(`LP${m}P1`);
   await expect(opciones).toHaveCount(0);
+  await expect(entrega.getByText(`Ninguna pieza disponible coincide con «LP${m}P1».`)).toBeVisible();
   await buscar.fill(`lp${m}a`);
   await expect(opciones).toHaveCount(3);
 
@@ -70,7 +71,7 @@ test('entregar a un asociado: solo se ofrecen disponibles, se quitan etiquetas y
   await expect(enPoder.getByRole('link', { name: a })).toBeVisible();
   await expect(enPoder.getByRole('link', { name: c })).toBeVisible();
   await regreso.getByRole('checkbox', { name: 'Seleccionar todas' }).check();
-  await regreso.getByRole('button', { name: 'Regresar 2 seleccionadas' }).click();
+  await regreso.getByRole('button', { name: 'Regresar 2 piezas' }).click();
   await expect(estadoCon(page, '2 piezas regresadas.')).toBeVisible();
   await expect(regreso.getByText(`${nombre} no tiene piezas en su poder.`)).toBeVisible();
 });
