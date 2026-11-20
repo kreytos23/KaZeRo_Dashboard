@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 const PESTANAS = [
   ['/panel/reportes/deudores', 'Deudores'],
   ['/panel/reportes/comisiones', 'Comisiones'],
+  ['/panel/reportes/exhibidores', 'Exhibidores'],
 ] as const;
 
 export default function LayoutReportes({ children }: { children: React.ReactNode }) {
