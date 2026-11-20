@@ -46,7 +46,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
 
   // Ficha del vendedor: tras guardar debe verse la confirmación (regresión de la key/remount).
   await page.getByRole('link', { name: `Perla ${m}` }).click();
-  await expect(page.getByRole('heading', { name: `Perla ${m}` })).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1, name: `Perla ${m}` })).toBeVisible();
   await page.getByLabel('Comisión (%)').fill('20');
   // R-09: cambiar dinero exige motivo; el campo lo anuncia en su etiqueta.
   await expect(page.getByLabel('Motivo del cambio (obligatorio)')).toBeVisible();
