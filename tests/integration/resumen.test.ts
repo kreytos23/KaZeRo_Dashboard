@@ -118,11 +118,16 @@ describe('resumen del periodo', () => {
     });
   });
 
-  it('M-1 y M-4: una devolución resta de ventas y de margen', async () => {
+  it('M-1, M-2 y M-4: una devolución resta de ventas y margen; el saldo a favor no es un cobro', async () => {
     await alta('RS07', 4000);
     await alta('RS08', 4000);
-    const p = await pedido(['RS07', 'RS08']);
-    await pagar(p.id, 20000);
+    await alta('RS15', 4000, 10000, 'Collares');
+    // Subtotal 20000 y descuento manual 2000: se reparte 1000 a cada línea (iguales) y cada una queda en 9000.
+    const p = await pedido(['RS07', 'RS08'], {
+      descuentoManualCentavos: 2000,
+      descuentoManualMotivo: 'Promoción',
+    });
+    await pagar(p.id, 18000);
     const [linea] = await app((db) =>
       db.select({ id: pedidoItem.id }).from(pedidoItem).where(eq(pedidoItem.pedidoId, p.id)).limit(1),
     );
@@ -135,11 +140,35 @@ describe('resumen del periodo', () => {
         motivo: 'Se rompió el broche',
       }),
     );
+    // Ventas: 18000 - 9000 devuelto = 9000. Margen: línea que queda 9000 - 4000 = 5000 (importe ya repartido).
+    // Cobros: solo los 18000 en efectivo. Categorías: Aretes 9000 (la devuelta no cuenta).
     expect(await resumen()).toMatchObject({
-      ventasCentavos: 10000,
-      margenCentavos: 6000,
-      baseMargenCentavos: 10000,
+      ventasCentavos: 9000,
+      margenCentavos: 5000,
+      baseMargenCentavos: 9000,
+      cobrosCentavos: 18000,
+      topCategorias: [{ nombre: 'Aretes', centavos: 9000 }],
     });
+    // La devolución dejó 9000 a favor de la clienta: una nota nueva se paga 5000 con ese saldo.
+    const nueva = await pedido(['RS15']);
+    await pagar(nueva.id, 5000, 'saldo_favor');
+    // Ventas: 9000 + 10000 = 19000. Margen: 5000 + (10000 - 4000) = 11000. Base: 9000 + 10000 = 19000.
+    // Notas: 2. Categorías: Collares 10000 y Aretes 9000. Top (misma clienta y vendedora): 19000.
+    // Cobros: igual que antes, 18000: los 5000 de saldo a favor no son dinero nuevo (M-2).
+    const r = await resumen();
+    expect(r).toMatchObject({
+      ventasCentavos: 19000,
+      notas: 2,
+      margenCentavos: 11000,
+      baseMargenCentavos: 19000,
+      cobrosCentavos: 18000,
+    });
+    expect(r.topCategorias).toEqual([
+      { nombre: 'Collares', centavos: 10000 },
+      { nombre: 'Aretes', centavos: 9000 },
+    ]);
+    expect(r.topClientas).toEqual([{ nombre: 'Clienta Sintética', centavos: 19000 }]);
+    expect(r.topVendedoras).toEqual([{ nombre: 'Perla Ejemplo', centavos: 19000 }]);
   });
 
   it('M-5: la venta de mostrador no entra en el top de clientas', async () => {
@@ -159,12 +188,14 @@ describe('resumen del periodo', () => {
         codigos: ['RS13'],
         clienteId: null,
         fecha: '2026-01-10',
-        cobradoCentavos: 0,
+        cobradoCentavos: 5000,
         metodo: 'efectivo',
       }),
     );
     const r = await resumen();
     expect(r.notas).toBe(2);
+    // M-2: lo que cobra un exhibidor cuenta como cobro aunque la pieza aún no se haya entregado.
+    expect(r.cobrosCentavos).toBe(5000);
     expect(r.topClientas).toEqual([{ nombre: 'Clienta Sintética', centavos: 10000 }]);
     expect(r.topVendedoras).toEqual([{ nombre: 'Perla Ejemplo', centavos: 20000 }]);
     expect(r.topCategorias).toEqual([{ nombre: 'Aretes', centavos: 20000 }]);
