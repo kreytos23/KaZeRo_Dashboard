@@ -19,6 +19,16 @@ export function repartirDescuentoManual(precios: readonly number[], descuento: n
 }
 
 /**
+ * Lo pagado por cada línea: precio_final − su parte del descuento manual. La usan la devolución y el Resumen, para
+ * que ambos repartan igual: `precios` = todas las líneas no quitadas del pedido (también las ya devueltas), en orden
+ * estable por id. La suma es exactamente Σ precios − descuento.
+ */
+export function importesConDescuento(precios: readonly number[], descuentoManual: number): number[] {
+  const cuotas = repartirDescuentoManual(precios, descuentoManual);
+  return precios.map((p, i) => p - cuotas[i]!);
+}
+
+/**
  * Lo pagado por una línea: precio_final − su parte del descuento manual (nunca más de lo cobrado).
  * `lineas` = todas las vigentes del pedido (también las ya devueltas), en orden estable por id.
  */
@@ -29,11 +39,8 @@ export function montoDevolucion(
 ): number {
   const i = lineas.findIndex((l) => l.id === lineaId);
   if (i < 0) throw new RangeError('La línea no es del pedido');
-  return (
-    lineas[i]!.precioFinal -
-    repartirDescuentoManual(
-      lineas.map((l) => l.precioFinal),
-      descuentoManual,
-    )[i]!
-  );
+  return importesConDescuento(
+    lineas.map((l) => l.precioFinal),
+    descuentoManual,
+  )[i]!;
 }
