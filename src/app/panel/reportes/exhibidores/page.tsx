@@ -28,7 +28,11 @@ export default async function ReporteExhibidores({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <form role="search" method="get" className="flex flex-wrap items-end gap-2">
+        <form
+          role="search"
+          method="get"
+          className="flex max-w-full min-w-0 flex-wrap items-end gap-2 [&>div]:max-w-full [&>div]:min-w-0"
+        >
           <Selector
             etiqueta="Mes"
             name="mes"

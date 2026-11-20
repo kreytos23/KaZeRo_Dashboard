@@ -41,7 +41,7 @@ export function HojaExhibidor({ h }: { h: Hoja }) {
             ['Enviadas', String(p.enviadas)],
             ['Vendidas', String(p.vendidas)],
             ['Regresadas', String(p.regresadas)],
-            ['Regresadas por cancelación', String(p.porCancelacion)],
+            ['Regresadas por cancelación o edición', String(p.porCancelacion)],
             ...(p.otros !== 0 ? ([['Otros movimientos', String(p.otros)]] as [string, string][]) : []),
             ['Al cierre', String(p.alCierre)],
           ]}

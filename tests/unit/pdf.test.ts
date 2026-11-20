@@ -136,14 +136,15 @@ describe('PDF', () => {
 });
 
 describe('acceso a las rutas de PDF', () => {
-  it.each(['/panel/reportes/deudores/pdf', '/panel/reportes/comisiones/2026-11/pdf'])(
-    '%s exige sesión y no se cachea',
-    (ruta) => {
-      expect(decidirAcceso(ruta, false)).toBe('redirigir_login');
-      expect(decidirAcceso(ruta, true)).toBe('pasar');
-      expect(cacheControlPara(ruta)).toBe('private, no-store');
-    },
-  );
+  it.each([
+    '/panel/reportes/deudores/pdf',
+    '/panel/reportes/comisiones/2026-11/pdf',
+    '/panel/reportes/exhibidores/pdf',
+  ])('%s exige sesión y no se cachea', (ruta) => {
+    expect(decidirAcceso(ruta, false)).toBe('redirigir_login');
+    expect(decidirAcceso(ruta, true)).toBe('pasar');
+    expect(cacheControlPara(ruta)).toBe('private, no-store');
+  });
 });
 
 describe('PDF de exhibidores', () => {

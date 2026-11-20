@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
 import { pago, vExhibidor, vPedido } from '@/db/schema';
@@ -142,13 +142,20 @@ describe('reporte mensual de exhibidores', () => {
       }),
     );
     const [cobro] = await app((db) =>
-      db.select({ id: pago.id }).from(pago).where(eq(pago.exhibidorId, exhibidorId)).limit(1),
+      db
+        .select({ id: pago.id })
+        .from(pago)
+        .where(eq(pago.exhibidorId, exhibidorId))
+        .orderBy(asc(pago.createdAt))
+        .limit(1),
     );
     await app((db) =>
       anularPago(db, { key: randomUUID(), adminId, pagoId: cobro!.id, motivo: 'Mal capturado' }),
     );
     const h = await hoja();
     expect(h.dinero.alCierre).toBe(await app((db) => porEntregarCentavos(db, exhibidorId)));
+    // Se anuló el primer cobro (8000): queda cobrado el segundo (3000).
+    expect(h.dinero.cobrado).toBe(3000);
     expect(h.dinero.entregado).toBe(2000);
   });
 
@@ -161,11 +168,23 @@ describe('reporte mensual de exhibidores', () => {
   });
 
   it('X-1: la hoja no trae costo ni datos de clientas', async () => {
-    await enviar('RX10');
+    await alta('RX10', 4321);
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['RX10'] }));
     await venta(['RX10'], 0);
     const texto = JSON.stringify(await hoja());
     expect(texto).not.toContain('Sintética');
     expect(texto).not.toContain('5550000000');
     expect(texto.toLowerCase()).not.toContain('costo');
+    expect(texto).not.toContain('4321');
+    expect(texto).not.toContain('43.21');
+  });
+
+  it('un mes futuro se marca en curso, igual que el actual, y el pasado no', async () => {
+    const futuro = await app((db) => reporteExhibidores(db, { mes: mesSiguiente(mes), hoy }));
+    expect(futuro.enCurso).toBe(true);
+    const actual = await app((db) => reporteExhibidores(db, { mes, hoy }));
+    expect(actual.enCurso).toBe(true);
+    const pasado = await app((db) => reporteExhibidores(db, { mes: mesAnterior(mes), hoy }));
+    expect(pasado.enCurso).toBe(false);
   });
 });

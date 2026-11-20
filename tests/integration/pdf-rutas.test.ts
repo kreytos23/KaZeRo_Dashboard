@@ -7,6 +7,7 @@ import { iniciarLogin, verificarSegundoFactor } from '@/server/auth/servicio';
 import { generarCodigoTotp } from '@/server/auth/totp';
 import { crearCliente } from '@/server/clientes/servicio';
 import { crearPedido } from '@/server/pedidos/servicio';
+import { crearExhibidor, enviarPiezas } from '@/server/exhibidores/servicio';
 import { altaPieza } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { adminDePrueba, llaveTotp, truncarTodo, urlApp, urlOwner } from './utilidades';
@@ -148,6 +149,7 @@ describe('PDF de exhibidores', () => {
     const { GET } = await import('@/app/panel/reportes/exhibidores/pdf/route');
     const res = await GET(new Request(`${ruta}?mes=2026-10`));
     expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'no_autenticado' });
     expect(res.headers.get('cache-control')).toContain('no-store');
   });
 
@@ -158,6 +160,35 @@ describe('PDF de exhibidores', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('application/pdf');
     expect(res.headers.get('content-disposition')).toBe('attachment; filename="exhibidores-2026-10.pdf"');
+    expect(await bytes(res)).toBe('%PDF-');
+  });
+
+  it('con ?exhibidor= el nombre del archivo lleva el exhibidor con slug', async () => {
+    cookieActual = await sesionCompleta();
+    const vendedorId = await app((db) =>
+      crearVendedor(db, { nombre: 'Perla Ejemplo', tipo: 'revendedora', comisionPct: '10.00' }),
+    );
+    const exhibidorId = await app((db) =>
+      crearExhibidor(db, { vendedorId, nombre: 'Salón Prueba', fechaEnvio: '2026-10-01' }),
+    );
+    // La hoja solo existe si el exhibidor tuvo actividad en el mes: se le envía una pieza hoy.
+    await app((db) =>
+      altaPieza(db, {
+        codigo: 'EX01',
+        categoria: 'Aretes',
+        descripcion: 'Arete',
+        costoCentavos: 0,
+        precioCentavos: 10000,
+      }),
+    );
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EX01'] }));
+    const mesActual = hoyMX().slice(0, 7);
+    const { GET } = await import('@/app/panel/reportes/exhibidores/pdf/route');
+    const res = await GET(new Request(`${ruta}?mes=${mesActual}&exhibidor=${exhibidorId}`));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-disposition')).toBe(
+      `attachment; filename="exhibidores-${mesActual}-salon-prueba.pdf"`,
+    );
   });
 
   it('un mes inválido → 400, sin llegar a la consulta', async () => {

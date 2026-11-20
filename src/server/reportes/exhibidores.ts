@@ -189,5 +189,5 @@ export async function reporteExhibidores(
       },
     ];
   });
-  return { mes: o.mes, enCurso: o.mes === mesDe(hoy), hojas };
+  return { mes: o.mes, enCurso: o.mes >= mesDe(hoy), hojas };
 }
