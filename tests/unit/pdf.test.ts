@@ -5,9 +5,10 @@ import type { ReporteComisiones } from '@/server/comisiones/lecturas';
 
 vi.mock('server-only', () => ({}));
 
-const { nombreArchivoComisiones, nombreArchivoDeudores } = await import('@/server/pdf/nombres');
+const { nombreArchivoComisiones, nombreArchivoDeudores, nombreArchivoExhibidores } =
+  await import('@/server/pdf/nombres');
 const { textoCierre } = await import('@/server/pdf/ComisionesPdf');
-const { pdfComisiones, pdfDeudores } = await import('@/server/pdf/generar');
+const { pdfComisiones, pdfDeudores, pdfExhibidores } = await import('@/server/pdf/generar');
 
 describe('texto de cierre', () => {
   it('muestra el día en hora de México: un cierre a las 02:00 UTC cae el día anterior', () => {
@@ -143,4 +144,47 @@ describe('acceso a las rutas de PDF', () => {
       expect(cacheControlPara(ruta)).toBe('private, no-store');
     },
   );
+});
+
+describe('PDF de exhibidores', () => {
+  const hoja = {
+    exhibidorId: '00000000-0000-4000-8000-000000000001',
+    nombre: 'Salón Prueba',
+    vendedorNombre: 'Perla Ejemplo',
+    piezas: {
+      alInicio: 2,
+      enviadas: 1,
+      vendidas: 1,
+      regresadas: 0,
+      porCancelacion: 0,
+      otros: -1,
+      alCierre: 1,
+    },
+    dinero: { alInicio: 1000, cobrado: 500, entregado: 200, ajustes: 0, alCierre: 1300 },
+    piezasAlCierre: [{ codigo: 'AB01', descripcion: 'Arete', precioCentavos: 10000 }],
+    ventas: [
+      {
+        pedidoId: '00000000-0000-4000-8000-000000000002',
+        folio: 12,
+        fecha: '2026-10-05',
+        piezas: 1,
+        totalCentavos: 10000,
+        cobradoCentavos: 500,
+        saldoCentavos: 9500,
+        estado: 'abierto' as const,
+      },
+    ],
+  };
+  it('una hoja: bytes de un PDF', async () => {
+    const bytes = await pdfExhibidores({ mes: '2026-10-01', enCurso: false, hojas: [hoja] }, [hoja]);
+    expect(cabecera(bytes)).toBe('%PDF-');
+  });
+  it('sin hojas: también genera el PDF', async () => {
+    const bytes = await pdfExhibidores({ mes: '2026-10-01', enCurso: true, hojas: [] }, []);
+    expect(cabecera(bytes)).toBe('%PDF-');
+  });
+  it('nombre con y sin exhibidor', () => {
+    expect(nombreArchivoExhibidores('2026-10')).toBe('exhibidores-2026-10.pdf');
+    expect(nombreArchivoExhibidores('2026-10', 'Salón Prueba')).toBe('exhibidores-2026-10-salon-prueba.pdf');
+  });
 });

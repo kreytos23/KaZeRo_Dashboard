@@ -140,3 +140,30 @@ describe('PDF de comisiones', () => {
     expect((await GET(new Request('http://localhost/x'), ctx('2019-01'))).status).toBe(404);
   });
 });
+
+describe('PDF de exhibidores', () => {
+  const ruta = 'http://localhost/panel/reportes/exhibidores/pdf';
+
+  it('sin cookie → 401 JSON', async () => {
+    const { GET } = await import('@/app/panel/reportes/exhibidores/pdf/route');
+    const res = await GET(new Request(`${ruta}?mes=2026-10`));
+    expect(res.status).toBe(401);
+    expect(res.headers.get('cache-control')).toContain('no-store');
+  });
+
+  it('con sesión → 200 y nombre con el mes', async () => {
+    cookieActual = await sesionCompleta();
+    const { GET } = await import('@/app/panel/reportes/exhibidores/pdf/route');
+    const res = await GET(new Request(`${ruta}?mes=2026-10`));
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toBe('application/pdf');
+    expect(res.headers.get('content-disposition')).toBe('attachment; filename="exhibidores-2026-10.pdf"');
+  });
+
+  it('un mes inválido → 400, sin llegar a la consulta', async () => {
+    cookieActual = await sesionCompleta();
+    const { GET } = await import('@/app/panel/reportes/exhibidores/pdf/route');
+    const res = await GET(new Request(`${ruta}?mes=2026-13`));
+    expect(res.status).toBe(400);
+  });
+});
