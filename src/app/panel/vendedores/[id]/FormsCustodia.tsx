@@ -1,46 +1,59 @@
 'use client';
 
-import { AreaTexto } from '@/features/ui/Campo';
-import { FormAccion } from '@/features/ui/FormAccion';
+import { FormEntregaLote, FormRegresoLote, type PiezaARegresar } from '@/features/piezas/FormsLotePiezas';
+import type { PiezaElegible } from '@/features/piezas/lote-piezas';
 import { accionEntregarAVendedora, accionRegresarAKazero } from '../acciones';
 
 interface Props {
   vendedorId: string;
   nombre: string;
-  /** Una vendedora inactiva puede devolver piezas, pero no recibir más. */
+  /** Un asociado inactivo puede devolver piezas, pero no recibir más. */
   puedeRecibir: boolean;
+  /** Lo que tiene ahora; solo las disponibles llevan casilla (las apartadas regresan al cancelar la nota). */
+  enPoder: PiezaARegresar[];
+  /** Disponibles en Kazero y sin custodia: lo único que se le puede entregar. */
+  elegibles: PiezaElegible[];
 }
 
-/** Lotes por códigos, iguales a los del exhibidor: todo o nada, uno por línea o separados por espacio o coma. */
-export function FormsCustodia({ vendedorId, nombre, puedeRecibir }: Props) {
+/** Lotes todo o nada, iguales a los del exhibidor: casillas para regresar y buscador para entregar. */
+export function FormsCustodia({ vendedorId, nombre, puedeRecibir, enPoder, elegibles }: Props) {
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div className="flex flex-col gap-6">
+      <FormRegresoLote
+        accion={accionRegresarAKazero}
+        etiqueta="Regresar a Kazero"
+        etiquetaLista="Piezas en su poder"
+        piezas={enPoder}
+        sinPiezas={`${nombre} no tiene piezas en su poder.`}
+        textos={{
+          vacio: 'Regresar a Kazero',
+          uno: 'Regresar 1 pieza',
+          varios: 'Regresar {n} piezas',
+        }}
+      >
+        <input type="hidden" name="vendedorId" value={vendedorId} />
+      </FormRegresoLote>
       {puedeRecibir ? (
-        <FormAccion accion={accionEntregarAVendedora} textoBoton={`Entregar a ${nombre}`} limpiarAlGuardar>
-          <input type="hidden" name="vendedorId" value={vendedorId} />
-          <AreaTexto
+        <section aria-labelledby="entregar-a" className="flex flex-col gap-2">
+          <h3 id="entregar-a" className="text-base font-semibold">
+            Entregar a {nombre}
+          </h3>
+          <FormEntregaLote
+            accion={accionEntregarAVendedora}
             etiqueta={`Entregar a ${nombre}`}
-            name="codigos"
-            rows={5}
-            required
-            maxLength={20000}
-            placeholder="Uno por línea o separados por espacio o coma"
-          />
-        </FormAccion>
+            elegibles={elegibles}
+            textos={{
+              vacio: `Entregar a ${nombre}`,
+              uno: `Entregar 1 pieza a ${nombre}`,
+              varios: `Entregar {n} piezas a ${nombre}`,
+            }}
+          >
+            <input type="hidden" name="vendedorId" value={vendedorId} />
+          </FormEntregaLote>
+        </section>
       ) : (
         <p className="aviso-atencion">Este asociado está inactivo: no se le pueden entregar piezas.</p>
       )}
-      <FormAccion accion={accionRegresarAKazero} textoBoton="Regresar a Kazero" limpiarAlGuardar>
-        <input type="hidden" name="vendedorId" value={vendedorId} />
-        <AreaTexto
-          etiqueta="Regresar a Kazero"
-          name="codigos"
-          rows={5}
-          required
-          maxLength={20000}
-          placeholder="Uno por línea o separados por espacio o coma"
-        />
-      </FormAccion>
     </div>
   );
 }

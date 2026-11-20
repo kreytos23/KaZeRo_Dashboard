@@ -7,10 +7,10 @@ import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero'
 import { hoyMX } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
-import { AreaTexto, Campo, CampoCasilla } from '@/features/ui/Campo';
+import { Campo, CampoCasilla } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
-import { MAX_CARACTERES_CODIGOS } from '@/features/exhibidores/codigos';
 import { PorEntregar } from '@/features/exhibidores/PorEntregar';
+import { FormEntregaLote, FormRegresoLote } from '@/features/piezas/FormsLotePiezas';
 import { montoMovimiento, rotuloMovimiento } from '@/features/exhibidores/dinero-ui';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoExhibidor, vistaEstadoPedido } from '@/features/ui/estado-visual';
@@ -22,6 +22,7 @@ import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { historialDineroExhibidor, ventasDeExhibidor } from '@/server/exhibidores/lecturas-dinero';
 import { obtenerExhibidor } from '@/server/exhibidores/servicio';
+import { piezasDisponiblesEnKazero } from '@/server/piezas/custodia';
 import { obtenerVendedor } from '@/server/vendedores/servicio';
 import { fechaCorta } from '../../pedidos/etiquetas';
 import { accionCerrar, accionEditarExhibidor, accionEnviar, accionRegresar } from '../acciones';
@@ -33,15 +34,19 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [e, cambios, historial, ventas, vendedor] = await conDbLectura(async (db) => {
+  const [e, cambios, historial, ventas, vendedor, elegibles] = await conDbLectura(async (db) => {
     const [ex, ...resto] = await Promise.all([
       obtenerExhibidor(db, id.data),
       historialDeCambios(db, 'exhibidor', id.data),
       historialDineroExhibidor(db, id.data),
       ventasDeExhibidor(db, id.data),
     ]);
-    // Solo esto depende del exhibidor leído.
-    return [ex, ...resto, ex ? await obtenerVendedor(db, ex.vendedorId) : null] as const;
+    // Solo esto depende del exhibidor leído; los elegibles para enviar, solo si sigue abierto.
+    const [vend, elegibles] = await Promise.all([
+      ex ? obtenerVendedor(db, ex.vendedorId) : null,
+      ex?.estado === 'abierto' ? piezasDisponiblesEnKazero(db) : [],
+    ]);
+    return [ex, ...resto, vend, elegibles] as const;
   });
   if (!e) notFound();
   const abierto = e.estado === 'abierto';
@@ -178,7 +183,28 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
             <h2 id="piezas-exhibidor" className="text-lg font-semibold">
               Piezas en el exhibidor ({e.piezasActuales})
             </h2>
-            {e.piezas.length === 0 ? (
+            {abierto ? (
+              <FormRegresoLote
+                accion={accionRegresar}
+                etiqueta="Regresar del exhibidor"
+                etiquetaLista="Piezas en el exhibidor"
+                sinPiezas="No hay piezas en este exhibidor."
+                // Regla de `regresarPiezas`: en_exhibidor y de este exhibidor (justo lo que trae `obtenerExhibidor`).
+                piezas={e.piezas.map((p) => ({
+                  codigo: p.codigo,
+                  descripcion: p.descripcion,
+                  seleccionable: true,
+                  nota: formatoMXN(numericACentavos(p.precio)),
+                }))}
+                textos={{
+                  vacio: 'Regresar piezas',
+                  uno: 'Regresar 1 pieza',
+                  varios: 'Regresar {n} piezas',
+                }}
+              >
+                <input type="hidden" name="exhibidorId" value={e.id} />
+              </FormRegresoLote>
+            ) : e.piezas.length === 0 ? (
               <p className="text-meta text-tinta-suave">No hay piezas en este exhibidor.</p>
             ) : (
               <ul className="tarjeta flex flex-col divide-y divide-borde px-4 text-dato">
@@ -285,27 +311,19 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
           )}
           {abierto && (
             <div className="order-6 flex flex-col gap-6">
-              <FormAccion accion={accionEnviar} textoBoton="Enviar piezas" limpiarAlGuardar>
-                <input type="hidden" name="exhibidorId" value={e.id} />
-                <AreaTexto
-                  etiqueta="Códigos a enviar"
-                  name="codigos"
-                  rows={4}
-                  required
-                  maxLength={MAX_CARACTERES_CODIGOS}
-                  placeholder="Uno por línea o separados por espacio o coma"
-                />
-              </FormAccion>
-              <FormAccion accion={accionRegresar} textoBoton="Regresar piezas" limpiarAlGuardar>
-                <input type="hidden" name="exhibidorId" value={e.id} />
-                <AreaTexto
-                  etiqueta="Códigos a regresar"
-                  name="codigos"
-                  rows={4}
-                  required
-                  maxLength={MAX_CARACTERES_CODIGOS}
-                />
-              </FormAccion>
+              <section aria-labelledby="enviar-piezas" className="flex flex-col gap-2">
+                <h2 id="enviar-piezas" className="text-lg font-semibold">
+                  Enviar al exhibidor
+                </h2>
+                <FormEntregaLote
+                  accion={accionEnviar}
+                  etiqueta="Enviar al exhibidor"
+                  elegibles={elegibles}
+                  textos={{ vacio: 'Enviar piezas', uno: 'Enviar 1 pieza', varios: 'Enviar {n} piezas' }}
+                >
+                  <input type="hidden" name="exhibidorId" value={e.id} />
+                </FormEntregaLote>
+              </section>
             </div>
           )}
           {formEditar}

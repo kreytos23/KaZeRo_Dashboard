@@ -64,6 +64,9 @@ export function FormAccion({
   limpiarAlGuardar = false,
   className = 'flex flex-col gap-3',
   sinControles = false,
+  deshabilitado = false,
+  etiqueta,
+  alEnviar,
 }: {
   accion: Accion;
   textoBoton: string;
@@ -72,6 +75,12 @@ export function FormAccion({
   className?: string;
   /** Mantiene montado el aviso (role=status) pero sin botón: p. ej. tras quitar la foto ya no hay nada que quitar. */
   sinControles?: boolean;
+  /** Apaga el botón sin indicador: p. ej. un lote de piezas sin ninguna elegida. */
+  deshabilitado?: boolean;
+  /** Nombre accesible del formulario (lo vuelve un landmark `form`); útil con varios en la misma página. */
+  etiqueta?: string;
+  /** Se llama justo al enviar (antes de la acción): p. ej. para recordar qué había en el formulario. */
+  alEnviar?: () => void;
 }) {
   const [estado, despachar, pendiente] = useActionState(accion, {});
   const form = useRef<HTMLFormElement>(null);
@@ -89,12 +98,14 @@ export function FormAccion({
     <form
       ref={form}
       method="post"
+      aria-label={etiqueta}
       data-hidratado={hidratado ? 'si' : 'no'}
       className={className}
       aria-busy={pendiente}
       onSubmit={(e) => {
         e.preventDefault();
         if (pendiente) return;
+        alEnviar?.();
         const datos = new FormData(e.currentTarget);
         startTransition(() => despachar(datos));
       }}
@@ -120,7 +131,14 @@ export function FormAccion({
           </>
         )}
       </p>
-      {!sinControles && <BotonEnvio textoBoton={textoBoton} pendiente={pendiente} hidratado={hidratado} />}
+      {!sinControles && (
+        <BotonEnvio
+          textoBoton={textoBoton}
+          pendiente={pendiente}
+          hidratado={hidratado}
+          deshabilitado={deshabilitado}
+        />
+      )}
     </form>
   );
 }

@@ -28,8 +28,11 @@ test('exhibidor: venta de mostrador con cobro parcial, abono, entrega parcial, c
   await page.getByRole('link', { name: nombre }).click();
   await expect(page.getByRole('heading', { name: nombre, exact: true })).toBeVisible();
 
-  await page.getByLabel('Códigos a enviar').fill([a, b, c].join(' '));
-  await page.getByRole('button', { name: 'Enviar piezas' }).click();
+  // «Pegar varios códigos»: la opción plegada para lotes grandes o lector de código de barras.
+  const envio = page.getByRole('form', { name: 'Enviar al exhibidor' });
+  await envio.getByText('Pegar varios códigos').click();
+  await envio.getByLabel('Códigos', { exact: true }).fill([a, b, c].join(' '));
+  await envio.getByRole('button', { name: 'Enviar 3 piezas' }).click();
   await expect(estadoCon(page, '3 piezas enviadas.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Piezas en el exhibidor (3)' })).toBeVisible();
 
@@ -63,8 +66,9 @@ test('exhibidor: venta de mostrador con cobro parcial, abono, entrega parcial, c
   await expect(page.locator('dt:has-text("Entregado") + dd')).toHaveText('$50.00');
 
   // Regresar la pieza que no se vendió; el cierre sigue bloqueado por el dinero pendiente.
-  await page.getByLabel('Códigos a regresar').fill(c);
-  await page.getByRole('button', { name: 'Regresar piezas' }).click();
+  const regreso = page.getByRole('form', { name: 'Regresar del exhibidor' });
+  await regreso.getByRole('checkbox', { name: `Seleccionar ${c}` }).check();
+  await regreso.getByRole('button', { name: 'Regresar 1 pieza' }).click();
   await expect(estadoCon(page, '1 pieza regresada.')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Piezas en el exhibidor (0)' })).toBeVisible();
 

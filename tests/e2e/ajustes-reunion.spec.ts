@@ -69,8 +69,13 @@ test('pieza con vendedora: se entrega desde su ficha, aparece filtrada en el inv
   await sembrarPiezas([codigo], 14900);
 
   await irA(page, `/panel/vendedores/${vendedoraId}`);
-  await page.getByLabel(`Entregar a ${nombre}`).fill(codigo);
-  await page.getByRole('button', { name: `Entregar a ${nombre}` }).click();
+  // Selector de lotes: se busca la pieza, entra como etiqueta y el botón dice cuántas lleva.
+  const entrega = page.getByRole('form', { name: `Entregar a ${nombre}` });
+  await expect(entrega.getByRole('button', { name: `Entregar a ${nombre}` })).toBeDisabled();
+  await entrega.getByRole('combobox', { name: 'Buscar pieza' }).fill(codigo.toLowerCase());
+  await entrega.getByRole('option', { name: new RegExp(codigo) }).click();
+  await expect(entrega.getByRole('list', { name: 'Piezas del lote' })).toContainText(codigo);
+  await entrega.getByRole('button', { name: `Entregar 1 pieza a ${nombre}` }).click();
   await expect(estadoCon(page, '1 pieza entregada.')).toBeVisible();
   await expect(
     page.getByRole('list', { name: 'Piezas en su poder' }).getByRole('link', { name: codigo }),
