@@ -32,26 +32,6 @@ export function periodoDeUrl(
   return esteMes(false);
 }
 
-/**
- * M-3: el descuento manual es de la nota y `precio_final` no lo trae. Se reparte en proporción, y los centavos
- * que sobran van a los residuos mayores: la suma del resultado es exactamente Σ precios − manual.
- */
-export function repartirDescuento(precios: readonly number[], manual: number): number[] {
-  const suma = precios.reduce((a, b) => a + b, 0);
-  if (suma === 0) return precios.map(() => 0);
-  const cuotas = precios.map((p, i) => ({
-    i,
-    cuota: Math.floor((manual * p) / suma),
-    residuo: (manual * p) % suma,
-  }));
-  let faltan = manual - cuotas.reduce((a, c) => a + c.cuota, 0);
-  for (const c of [...cuotas].sort((a, b) => b.residuo - a.residuo || a.i - b.i)) {
-    if (faltan-- <= 0) break;
-    c.cuota += 1;
-  }
-  return precios.map((p, i) => p - cuotas[i]!.cuota);
-}
-
 export interface LineaVendida {
   importe: number;
   costo: number;
@@ -87,9 +67,21 @@ export function resumirLineas(lineas: readonly LineaVendida[]): ResumenLineas {
   return r;
 }
 
-export function top5(importes: ReadonlyMap<string, number>): { nombre: string; centavos: number }[] {
-  return [...importes]
-    .map(([nombre, centavos]) => ({ nombre, centavos }))
-    .sort((a, b) => b.centavos - a.centavos || a.nombre.localeCompare(b.nombre, 'es'))
+export interface FilaTop {
+  /** Clienta o asociado; las categorías se agrupan por nombre y no lo llevan. */
+  id?: string;
+  nombre: string;
+  centavos: number;
+}
+
+/** Los 5 mayores; empate por nombre y, si dos se llaman igual, por id (orden estable). */
+export function top5<T extends FilaTop>(filas: Iterable<T>): T[] {
+  return [...filas]
+    .sort(
+      (a, b) =>
+        b.centavos - a.centavos ||
+        a.nombre.localeCompare(b.nombre, 'es') ||
+        (a.id ?? '').localeCompare(b.id ?? ''),
+    )
     .slice(0, 5);
 }

@@ -1,9 +1,10 @@
-import { and, count, eq, gte, isNotNull, isNull, lte, ne, notInArray, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, gte, isNull, lte, ne, notInArray, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { pago, vCliente, vPedido, vPedidoItem, vPieza } from '@/db/schema';
+import { importesConDescuento } from '@/domain/devolucion';
 import { numericACentavos } from '@/domain/dinero';
 import { hoyMX } from '@/domain/fechas';
-import { repartirDescuento, resumirLineas, top5, type LineaVendida } from '@/domain/resumen';
+import { resumirLineas, top5, type FilaTop, type LineaVendida } from '@/domain/resumen';
 import { etiquetaUbicacion } from '@/domain/ubicacion';
 import { reporteDeudores } from './deudores';
 
@@ -14,18 +15,27 @@ export interface Resumen {
   margenCentavos: number;
   baseMargenCentavos: number;
   piezasSinCosto: number;
-  topVendedoras: { nombre: string; centavos: number }[];
+  topVendedoras: FilaConId[];
   topCategorias: { nombre: string; centavos: number }[];
-  topClientas: { nombre: string; centavos: number }[];
+  topClientas: FilaConId[];
   porCobrarCentavos: number;
   ubicaciones: { etiqueta: string; piezas: number }[];
 }
 
+export type FilaConId = Required<FilaTop>;
+
 const sumar = (m: Map<string, number>, llave: string, n: number) => m.set(llave, (m.get(llave) ?? 0) + n);
+/** m-1: por id, no por nombre: dos clientas (o asociados) homónimas son dos filas. */
+const sumarPorId = (m: Map<string, FilaConId>, id: string, nombre: string, n: number) => {
+  const f = m.get(id);
+  if (f) f.centavos += n;
+  else m.set(id, { id, nombre, centavos: n });
+};
 
 /**
  * Resumen del periodo [desde, hasta] (fechas de negocio, columnas `date`). Cinco lecturas en paralelo, sin consultas
- * por fila; el reparto del descuento y el margen salen de las funciones puras de `@/domain/resumen`.
+ * por fila; el reparto del descuento sale de `@/domain/devolucion` (el mismo que la devolución) y el margen de
+ * `@/domain/resumen`.
  */
 export async function resumenDePeriodo(
   db: Ejecutor,
@@ -43,7 +53,9 @@ export async function resumenDePeriodo(
       .select({
         total: vPedido.total,
         devuelto: vPedido.devuelto,
+        vendedorId: vPedido.vendedorId,
         vendedorNombre: vPedido.vendedorNombre,
+        clienteId: vPedido.clienteId,
         clienteNombre: vPedido.clienteNombre,
         esMostrador: vCliente.esMostrador,
       })
@@ -62,8 +74,10 @@ export async function resumenDePeriodo(
       .from(vPedidoItem)
       .innerJoin(vPedido, eq(vPedido.id, vPedidoItem.pedidoId))
       .innerJoin(vPieza, eq(vPieza.id, vPedidoItem.piezaId))
-      // Las devueltas siguen en el total: entran al reparto (M-3), pero no al resultado.
-      .where(and(delPeriodo, or(eq(vPedidoItem.vigente, true), isNotNull(vPedidoItem.devolucionId)))),
+      // I-1: mismo conjunto y orden que la devolución (`server/pedidos/devolucion.ts`): las líneas no quitadas, por
+      // id. Las devueltas siguen en el total: entran al reparto (M-3), pero no al resultado.
+      .where(and(delPeriodo, isNull(vPedidoItem.quitadoAt)))
+      .orderBy(asc(vPedidoItem.pedidoId), asc(vPedidoItem.id)),
     // M-2: cobros del periodo sin los pagos deshechos ni el saldo a favor (no es dinero nuevo).
     db
       .select({ total: sql<string>`coalesce(sum(${pago.monto}), 0)` })
@@ -90,15 +104,15 @@ export async function resumenDePeriodo(
       .groupBy(vPieza.ubicacion, vPieza.exhibidorNombre, vPieza.vendedorCustodiaNombre),
   ]);
 
-  const vendedoras = new Map<string, number>();
-  const clientas = new Map<string, number>();
+  const vendedoras = new Map<string, FilaConId>();
+  const clientas = new Map<string, FilaConId>();
   let ventasCentavos = 0;
   for (const n of notas) {
     const neto = numericACentavos(n.total) - numericACentavos(n.devuelto);
     ventasCentavos += neto;
-    sumar(vendedoras, n.vendedorNombre, neto);
+    sumarPorId(vendedoras, n.vendedorId, n.vendedorNombre, neto);
     // M-5: la venta de mostrador no es una clienta.
-    if (!n.esMostrador) sumar(clientas, n.clienteNombre, neto);
+    if (!n.esMostrador) sumarPorId(clientas, n.clienteId, n.clienteNombre, neto);
   }
 
   const porNota = new Map<string, typeof lineas>();
@@ -109,7 +123,7 @@ export async function resumenDePeriodo(
   }
   const vendidas: LineaVendida[] = [];
   for (const ls of porNota.values()) {
-    const importes = repartirDescuento(
+    const importes = importesConDescuento(
       ls.map((l) => numericACentavos(l.precioFinal)),
       numericACentavos(ls[0]!.manual),
     );
@@ -145,9 +159,9 @@ export async function resumenDePeriodo(
     margenCentavos: r.margenCentavos,
     baseMargenCentavos: r.baseMargenCentavos,
     piezasSinCosto: r.piezasSinCosto,
-    topVendedoras: top5(vendedoras),
-    topCategorias: top5(r.categorias),
-    topClientas: top5(clientas),
+    topVendedoras: top5(vendedoras.values()),
+    topCategorias: top5([...r.categorias].map(([nombre, centavos]) => ({ nombre, centavos }))),
+    topClientas: top5(clientas.values()),
     porCobrarCentavos: deudores.totalCentavos,
     ubicaciones: [...porUbicacion]
       .map(([etiqueta, piezas]) => ({ etiqueta, piezas }))

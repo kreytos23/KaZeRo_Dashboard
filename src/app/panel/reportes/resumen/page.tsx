@@ -1,7 +1,7 @@
 import { conDbLectura } from '@/db/client';
 import { formatoMXN } from '@/domain/dinero';
 import { fechaCorta, hoyMX } from '@/domain/fechas';
-import { periodoDeUrl } from '@/domain/resumen';
+import { periodoDeUrl, type FilaTop } from '@/domain/resumen';
 import { Campo, Selector } from '@/features/ui/Campo';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { resumenDePeriodo } from '@/server/reportes/resumen';
@@ -26,7 +26,7 @@ function Dato({ titulo, valor, detalle }: { titulo: string; valor: string; detal
 }
 
 /** Barras de una sola serie: el largo es proporcional al mayor, sin pista de fondo ni animación; el monto va en texto. */
-function Top({ titulo, filas }: { titulo: string; filas: { nombre: string; centavos: number }[] }) {
+function Top({ titulo, filas }: { titulo: string; filas: FilaTop[] }) {
   const mayor = filas[0]?.centavos ?? 0;
   return (
     <section className="tarjeta flex min-w-0 flex-col gap-3 p-4">
@@ -36,7 +36,7 @@ function Top({ titulo, filas }: { titulo: string; filas: { nombre: string; centa
       ) : (
         <ol className="flex flex-col gap-3 text-dato">
           {filas.map((f) => (
-            <li key={f.nombre} className="flex flex-col gap-1">
+            <li key={f.id ?? f.nombre} className="flex flex-col gap-1">
               <div className="flex justify-between gap-3">
                 <span className="min-w-0 truncate">{f.nombre}</span>
                 <span className="shrink-0 tabular-nums">{formatoMXN(f.centavos)}</span>
@@ -66,6 +66,8 @@ export default async function Resumen({
   const periodo = periodoDeUrl({ periodo: uno(sp.periodo), desde: uno(sp.desde), hasta: uno(sp.hasta) }, hoy);
   const r = await conDbLectura((db) => resumenDePeriodo(db, { ...periodo, hoy }));
   const pct = r.baseMargenCentavos > 0 ? (r.margenCentavos / r.baseMargenCentavos) * 100 : null;
+  // m-2: sin base ni piezas sin costo no hubo ventas en el periodo; «Sin costos» sería falso.
+  const sinMargen = r.baseMargenCentavos === 0 && r.piezasSinCosto === 0 ? 'Sin ventas' : 'Sin costos';
   return (
     <div className="flex flex-col gap-6">
       <form
@@ -93,7 +95,7 @@ export default async function Resumen({
         <Dato titulo="Cobros" valor={formatoMXN(r.cobrosCentavos)} />
         <Dato
           titulo="Margen"
-          valor={pct === null ? 'Sin costos' : formatoMXN(r.margenCentavos)}
+          valor={pct === null ? sinMargen : formatoMXN(r.margenCentavos)}
           detalle={pct === null ? undefined : `${pct.toFixed(1)} % de lo vendido con costo`}
         />
         <Dato titulo="Por cobrar hoy" valor={formatoMXN(r.porCobrarCentavos)} />

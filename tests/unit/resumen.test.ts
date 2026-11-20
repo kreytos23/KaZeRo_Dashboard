@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { periodoDeUrl, repartirDescuento, resumirLineas, top5 } from '@/domain/resumen';
+import { importesConDescuento } from '@/domain/devolucion';
+import { periodoDeUrl, resumirLineas, top5 } from '@/domain/resumen';
 
 const HOY = '2026-11-07';
 
@@ -46,21 +47,26 @@ describe('periodoDeUrl', () => {
   });
 });
 
-describe('repartirDescuento', () => {
+// M-3 / I-1: el Resumen calcula los importes con el mismo reparto que la devolución (`repartirDescuentoManual`).
+describe('importesConDescuento', () => {
   it('sin descuento no cambia nada', () => {
-    expect(repartirDescuento([1000, 2000], 0)).toEqual([1000, 2000]);
+    expect(importesConDescuento([1000, 2000], 0)).toEqual([1000, 2000]);
   });
   it('reparte en proporción', () => {
-    expect(repartirDescuento([10000, 30000], 4000)).toEqual([9000, 27000]);
+    expect(importesConDescuento([10000, 30000], 4000)).toEqual([9000, 27000]);
   });
-  it('los centavos sobrantes no se pierden: la suma es exacta', () => {
-    const r = repartirDescuento([1000, 1000, 1000], 100);
+  it('los centavos sobrantes no se pierden: la suma es exacta y el empate va a la primera línea', () => {
+    const r = importesConDescuento([1000, 1000, 1000], 100);
     expect(r.reduce((a, b) => a + b, 0)).toBe(2900);
-    expect(Math.max(...r) - Math.min(...r)).toBeLessThanOrEqual(1);
+    expect(r).toEqual([966, 967, 967]);
+    expect(importesConDescuento([10000, 10000], 1001)).toEqual([9499, 9500]);
   });
   it('nota con total 0', () => {
-    expect(repartirDescuento([1000, 500], 1500)).toEqual([0, 0]);
-    expect(repartirDescuento([0, 0], 0)).toEqual([0, 0]);
+    expect(importesConDescuento([1000, 500], 1500)).toEqual([0, 0]);
+    expect(importesConDescuento([0, 0], 0)).toEqual([0, 0]);
+  });
+  it('rechaza un descuento mayor que la suma', () => {
+    expect(() => importesConDescuento([1000], 1001)).toThrow(RangeError);
   });
 });
 
@@ -94,14 +100,21 @@ describe('resumirLineas', () => {
 
 describe('top5', () => {
   it('ordena, corta a 5 y desempata por nombre', () => {
-    const m = new Map([
+    const filas = [
       ['b', 10],
       ['a', 10],
       ['c', 30],
       ['d', 1],
       ['e', 2],
       ['f', 3],
+    ].map(([nombre, centavos]) => ({ nombre: nombre as string, centavos: centavos as number }));
+    expect(top5(filas).map((x) => x.nombre)).toEqual(['c', 'a', 'b', 'f', 'e']);
+  });
+  it('m-1: dos homónimas son dos filas, en orden estable por id', () => {
+    const r = top5([
+      { id: 'id-2', nombre: 'Ana Ejemplo', centavos: 500 },
+      { id: 'id-1', nombre: 'Ana Ejemplo', centavos: 500 },
     ]);
-    expect(top5(m).map((x) => x.nombre)).toEqual(['c', 'a', 'b', 'f', 'e']);
+    expect(r.map((x) => x.id)).toEqual(['id-1', 'id-2']);
   });
 });

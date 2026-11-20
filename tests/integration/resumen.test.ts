@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { conDbUrl } from '@/db/pool';
 import { pedidoItem, vPedido } from '@/db/schema';
@@ -167,8 +167,43 @@ describe('resumen del periodo', () => {
       { nombre: 'Collares', centavos: 10000 },
       { nombre: 'Aretes', centavos: 9000 },
     ]);
-    expect(r.topClientas).toEqual([{ nombre: 'Clienta Sintética', centavos: 19000 }]);
-    expect(r.topVendedoras).toEqual([{ nombre: 'Perla Ejemplo', centavos: 19000 }]);
+    expect(r.topClientas).toEqual([{ id: clienteId, nombre: 'Clienta Sintética', centavos: 19000 }]);
+    expect(r.topVendedoras).toEqual([{ id: vendedorId, nombre: 'Perla Ejemplo', centavos: 19000 }]);
+  });
+
+  it('I-1: descuento impar y devolución de la segunda línea: categorías y margen cuadran con las ventas', async () => {
+    await alta('RS16', 4000, 10000);
+    await alta('RS17', 4000, 10000);
+    // Subtotal 20000, descuento manual 1001 (impar). Reparto por residuo mayor en orden de id: 1001·10000/20000 =
+    // 500,5 → 500 a cada línea, sobra 1 centavo y el empate va a la primera: cuotas [501, 500], importes
+    // [9499, 9500]. Total de la nota: 20000 − 1001 = 18999.
+    const p = await pedido(['RS16', 'RS17'], {
+      descuentoManualCentavos: 1001,
+      descuentoManualMotivo: 'Promoción',
+    });
+    await pagar(p.id, 18999);
+    const lineas = await app((db) =>
+      db
+        .select({ id: pedidoItem.id })
+        .from(pedidoItem)
+        .where(eq(pedidoItem.pedidoId, p.id))
+        .orderBy(asc(pedidoItem.id)),
+    );
+    await app((db) =>
+      devolverPiezaDefectuosa(db, {
+        key: randomUUID(),
+        adminId,
+        pedidoId: p.id,
+        itemId: lineas[1]!.id,
+        motivo: 'Se rompió el broche',
+      }),
+    );
+    // Devolución de la segunda: 9500. Ventas: 18999 − 9500 = 9499. Queda la primera: Aretes 9499, margen
+    // 9499 − 4000 = 5499 sobre base 9499. Si el Resumen repartiera en otro orden, Aretes saldría en 9500.
+    const r = await resumen();
+    expect(r).toMatchObject({ ventasCentavos: 9499, margenCentavos: 5499, baseMargenCentavos: 9499 });
+    expect(r.topCategorias).toEqual([{ nombre: 'Aretes', centavos: 9499 }]);
+    expect(r.topCategorias.reduce((a, c) => a + c.centavos, 0)).toBe(r.ventasCentavos);
   });
 
   it('M-5: la venta de mostrador no entra en el top de clientas', async () => {
@@ -196,8 +231,8 @@ describe('resumen del periodo', () => {
     expect(r.notas).toBe(2);
     // M-2: lo que cobra un exhibidor cuenta como cobro aunque la pieza aún no se haya entregado.
     expect(r.cobrosCentavos).toBe(5000);
-    expect(r.topClientas).toEqual([{ nombre: 'Clienta Sintética', centavos: 10000 }]);
-    expect(r.topVendedoras).toEqual([{ nombre: 'Perla Ejemplo', centavos: 20000 }]);
+    expect(r.topClientas).toEqual([{ id: clienteId, nombre: 'Clienta Sintética', centavos: 10000 }]);
+    expect(r.topVendedoras).toEqual([{ id: vendedorId, nombre: 'Perla Ejemplo', centavos: 20000 }]);
     expect(r.topCategorias).toEqual([{ nombre: 'Aretes', centavos: 20000 }]);
   });
 
