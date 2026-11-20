@@ -40,6 +40,19 @@ export function mesSiguiente(mes: Mes): Mes {
   return new Date(Date.UTC(a, m, 1)).toISOString().slice(0, 10);
 }
 
+export function mesAnterior(mes: Mes): Mes {
+  const a = Number(mes.slice(0, 4));
+  const m = Number(mes.slice(5, 7));
+  return new Date(Date.UTC(a, m - 2, 1)).toISOString().slice(0, 10);
+}
+
+/** Los `n` meses que terminan en el de `hoy`, del más nuevo al más viejo (para los selectores). */
+export function mesesRecientes(hoy: string, n: number): Mes[] {
+  const meses = [mesDe(hoy)];
+  while (meses.length < n) meses.push(mesAnterior(meses[meses.length - 1]!));
+  return meses;
+}
+
 export function mesCerrable(mes: Mes, hoy: string): boolean {
   return finDeMes(mes) < hoy;
 }

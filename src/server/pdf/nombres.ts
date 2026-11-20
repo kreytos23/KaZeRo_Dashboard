@@ -20,3 +20,7 @@ export const nombreArchivoDeudores = (fecha: string, vendedora?: string | null) 
 /** 'comisiones-2026-11.pdf' | 'comisiones-2026-11-perla-ejemplo.pdf' */
 export const nombreArchivoComisiones = (mes: string, vendedora?: string | null) =>
   nombre(`comisiones-${mes}`, vendedora);
+
+/** 'exhibidores-2026-11.pdf' | 'exhibidores-2026-11-salon-ejemplo.pdf' */
+export const nombreArchivoExhibidores = (mes: string, exhibidor?: string | null) =>
+  nombre(`exhibidores-${mes}`, exhibidor);
