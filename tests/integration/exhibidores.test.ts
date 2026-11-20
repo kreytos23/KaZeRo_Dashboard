@@ -111,7 +111,7 @@ describe('exhibidores', () => {
       }),
     );
     await expect(app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EX01'] }))).rejects.toThrow(
-      'El vendedor del exhibidor está inactivo.',
+      'El asociado del exhibidor está inactivo.',
     );
     expect(await estadoDe('EX01')).toBe('disponible');
   });

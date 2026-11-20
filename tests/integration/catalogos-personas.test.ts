@@ -75,7 +75,7 @@ describe('vendedores (R-40)', () => {
     await app((db) => crearVendedor(db, { nombre: 'Perla', tipo: 'revendedora', comisionPct: '18.00' }));
     await expect(
       app((db) => crearVendedor(db, { nombre: 'PERLA', tipo: 'casa', comisionPct: '0.00' })),
-    ).rejects.toThrow('Ya existe un vendedor con ese nombre.');
+    ).rejects.toThrow('Ya existe un asociado con ese nombre.');
   });
   it('valida la comisión antes de la BD, con mensaje claro', async () => {
     const mensaje = 'La comisión debe ser un número entre 0 y 100 con hasta 2 decimales.';

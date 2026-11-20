@@ -38,16 +38,16 @@ export default async function PaginaExhibidores({
       <h1 className="text-2xl font-semibold">Exhibidores</h1>
       {activos.length === 0 ? (
         <p className="text-meta text-tinta-suave">
-          Primero agrega un vendedor activo en{' '}
+          Primero agrega un asociado activo en{' '}
           <Link href="/panel/vendedores" className="enlace">
-            Vendedores
+            Asociados
           </Link>
           .
         </p>
       ) : (
         <FormAccion accion={accionCrearExhibidor} textoBoton="Crear exhibidor" limpiarAlGuardar>
           <Selector
-            etiqueta="Vendedor"
+            etiqueta="Asociado"
             name="vendedorId"
             required
             opciones={activos.map((v) => ({ valor: v.id, texto: v.nombre }))}
@@ -64,7 +64,7 @@ export default async function PaginaExhibidores({
       )}
       <form role="search" className="flex flex-wrap items-end gap-2">
         <Selector
-          etiqueta="Filtrar por vendedor"
+          etiqueta="Filtrar por asociado"
           name="vendedor"
           defaultValue={vendedorId ?? ''}
           opciones={[{ valor: '', texto: 'Todos' }, ...todos.map((v) => ({ valor: v.id, texto: v.nombre }))]}
@@ -101,7 +101,7 @@ export default async function PaginaExhibidores({
       {exhibidores.length === 0 &&
         (vendedorId ? (
           <EstadoVacio
-            titulo="Esa vendedora aún no tiene exhibidores."
+            titulo="Ese asociado aún no tiene exhibidores."
             accion={{ href: '/panel/exhibidores', texto: 'Ver todos' }}
           />
         ) : (
@@ -110,7 +110,7 @@ export default async function PaginaExhibidores({
             detalle={
               activos.length > 0
                 ? 'Crea el primero con el formulario de arriba.'
-                : 'Primero agrega un vendedor activo y luego crea el exhibidor.'
+                : 'Primero agrega un asociado activo y luego crea el exhibidor.'
             }
           />
         ))}

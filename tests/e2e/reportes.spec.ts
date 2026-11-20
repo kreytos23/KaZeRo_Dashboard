@@ -69,7 +69,7 @@ test.describe('reportes', () => {
     await expect(tarjeta(page, vendedora)).toContainText('$99.00');
     await expect(tarjeta(page, otra)).toBeVisible();
 
-    await elegirOpcion(page, 'Vendedora', vendedora, true);
+    await elegirOpcion(page, 'Asociado', vendedora, true);
     await page.getByRole('button', { name: 'Filtrar' }).click();
     await expect(page).toHaveURL(/vendedor=/);
     await expect(page.getByText(`Clienta Rep ${sufijo}`)).toBeVisible();

@@ -9,7 +9,7 @@ test('cada sección tiene su título y las rutas inexistentes muestran su 404 si
   await irA(page, '/panel/inventario');
   await expect(page).toHaveTitle('Inventario · Kazero');
   await irA(page, '/panel/vendedores');
-  await expect(page).toHaveTitle('Vendedores · Kazero');
+  await expect(page).toHaveTitle('Asociados · Kazero');
   await irA(page, '/panel');
   await expect(page).toHaveTitle('Panel · Kazero');
 
@@ -43,15 +43,15 @@ test('el error de negocio aparece junto a su campo y conserva lo escrito', async
   for (let i = 0; i < 2; i++) {
     await page.getByLabel('Nombre').fill(nombre);
     await page.getByLabel('Comisión (%)').fill('18');
-    await page.getByRole('button', { name: 'Agregar vendedor' }).click();
+    await page.getByRole('button', { name: 'Agregar asociado' }).click();
     if (i === 0)
-      await expect(page.getByRole('status').filter({ hasText: 'Vendedor agregado.' })).toBeVisible();
+      await expect(page.getByRole('status').filter({ hasText: 'Asociado agregado.' })).toBeVisible();
   }
   const campo = page.getByLabel('Nombre');
   await expect(campo).toHaveAttribute('aria-invalid', 'true');
   await expect(campo).toHaveValue(nombre);
   await expect(campo).toBeFocused();
-  await expect(campo).toHaveAccessibleDescription('Ya existe un vendedor con ese nombre.');
+  await expect(campo).toHaveAccessibleDescription('Ya existe un asociado con ese nombre.');
 });
 
 test('dos formularios con el mismo campo describen cada uno su propio error', async ({ page }, info) => {
@@ -59,10 +59,10 @@ test('dos formularios con el mismo campo describen cada uno su propio error', as
   await irA(page, '/panel/vendedores');
   await page.getByLabel('Nombre').fill(`Vend ids ${m}`);
   await page.getByLabel('Comisión (%)').fill('10');
-  await page.getByRole('button', { name: 'Agregar vendedor' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Vendedor agregado.' })).toBeVisible();
+  await page.getByRole('button', { name: 'Agregar asociado' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Asociado agregado.' })).toBeVisible();
   await irA(page, '/panel/exhibidores');
-  await elegirOpcion(page, 'Vendedor', `Vend ids ${m}`, true);
+  await elegirOpcion(page, 'Asociado', `Vend ids ${m}`, true);
   await page.getByLabel('Nombre del exhibidor').fill(`Exh ids ${m}`);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Exhibidor creado.' })).toBeVisible();

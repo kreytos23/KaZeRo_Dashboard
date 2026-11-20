@@ -83,7 +83,7 @@ test('pieza con vendedora: se entrega desde su ficha, aparece filtrada en el inv
 
   await irA(page, '/panel/pedidos/nuevo');
   await elegirCliente(page, `Cliente V ${m}`);
-  await elegirOpcion(page, 'Vendedor', nombre);
+  await elegirOpcion(page, 'Asociado', nombre);
   await agregarPieza(page, codigo);
   await expect(page.getByRole('list', { name: 'Piezas del pedido' })).toContainText(`Con ${nombre}`);
   await page.getByRole('button', { name: 'Crear pedido' }).click();

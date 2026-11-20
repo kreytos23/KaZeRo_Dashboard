@@ -128,7 +128,7 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
           }}
         />
         <Selector
-          etiqueta="Vendedor"
+          etiqueta="Asociado"
           name="vendedorId"
           required
           opciones={vendedores.map((v) => ({ valor: v.id, texto: v.nombre }))}
@@ -199,10 +199,10 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
                       : '…'}
                   {p?.disponible && p.vendedorCustodiaId && (
                     <span className={p.vendedorCustodiaId === vendedorId ? 'text-tinta-suave' : 'text-error'}>
-                      {' · '}Con {p.vendedorCustodiaNombre ?? 'otra vendedora'}
+                      {' · '}Con {p.vendedorCustodiaNombre ?? 'otro asociado'}
                       {p.vendedorCustodiaId === vendedorId
                         ? ''
-                        : ': la nota debe ser de esa vendedora o hay que regresarla a Kazero'}
+                        : ': la nota debe ser de ese asociado o hay que regresarla a Kazero'}
                     </span>
                   )}
                   {p && !p.disponible && (

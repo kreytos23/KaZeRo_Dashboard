@@ -130,7 +130,7 @@ describe('ubicación en el inventario (Plan 3.1)', () => {
     expect(textoMovimiento({ ...m, tipo: 'devolucion' })).toBe('Devuelta por defecto (KZR-5)');
     expect(textoMovimiento({ ...m, tipo: 'alta' })).toBe('Alta');
     expect(textoMovimiento({ vendedorNombre: null, pedidoFolio: null, tipo: 'entrega_vendedora' })).toBe(
-      'Entregada a vendedora',
+      'Entregada a un asociado',
     );
   });
 });

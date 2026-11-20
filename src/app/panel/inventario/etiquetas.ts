@@ -22,8 +22,8 @@ export const ETIQUETA_MOVIMIENTO: Record<string, string> = {
   apartado: 'Apartada en pedido',
   liberacion: 'Liberada',
   // Plan 3.1.
-  entrega_vendedora: 'Entregada a vendedora',
-  regreso_vendedora: 'Regresó de vendedora',
+  entrega_vendedora: 'Entregada a un asociado',
+  regreso_vendedora: 'Regresó de un asociado',
   devolucion: 'Devuelta por defecto',
 };
 
@@ -33,12 +33,12 @@ export function textoMovimiento(m: {
   vendedorNombre: string | null;
   pedidoFolio: number | null;
 }): string {
-  const vendedora = m.vendedorNombre ?? 'vendedora';
+  const vendedora = m.vendedorNombre ?? 'un asociado';
   switch (m.tipo) {
     case 'entrega_vendedora':
       return `Entregada a ${vendedora}`;
     case 'regreso_vendedora':
-      return m.vendedorNombre ? `Regresó a Kazero de ${m.vendedorNombre}` : 'Regresó a Kazero de vendedora';
+      return m.vendedorNombre ? `Regresó a Kazero de ${m.vendedorNombre}` : 'Regresó a Kazero de un asociado';
     case 'devolucion':
       return m.pedidoFolio === null
         ? 'Devuelta por defecto'
@@ -54,7 +54,7 @@ export type UbicacionFiltro = (typeof UBICACIONES_FILTRO)[number];
 export const ETIQUETA_UBICACION_FILTRO: Record<UbicacionFiltro, string> = {
   kazero: 'Kazero',
   exhibidor: 'Exhibidor',
-  vendedora: 'Con vendedora',
+  vendedora: 'Con asociado',
 };
 
 type Manual = 'regalo' | 'defecto' | 'guardada' | 'disponible';

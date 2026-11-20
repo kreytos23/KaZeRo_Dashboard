@@ -131,9 +131,9 @@ describe('entregar a vendedora', () => {
     await alta('CU21');
     const v = (await app((db) => obtenerVendedor(db, ids.lupita)))!;
     await app((db) => actualizarVendedor(db, { ...v, adminId, activo: false }));
-    await expect(entregar(ids.lupita, ['CU21'])).rejects.toThrow('La vendedora está inactiva.');
-    await expect(entregar(ids.casa, ['CU21'])).rejects.toThrow('Kazero es la casa: elige una vendedora.');
-    await expect(entregar(randomUUID(), ['CU21'])).rejects.toThrow('La vendedora no existe.');
+    await expect(entregar(ids.lupita, ['CU21'])).rejects.toThrow('El asociado está inactivo.');
+    await expect(entregar(ids.casa, ['CU21'])).rejects.toThrow('Kazero es la casa: elige un asociado.');
+    await expect(entregar(randomUUID(), ['CU21'])).rejects.toThrow('El asociado no existe.');
     await expect(entregar(ids.perla, [' '])).rejects.toThrow('Escribe al menos un código.');
     expect(await custodiaDe('CU21')).toBeNull();
   });

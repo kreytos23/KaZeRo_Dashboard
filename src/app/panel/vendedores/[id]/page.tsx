@@ -32,7 +32,7 @@ import { FormsCustodia } from './FormsCustodia';
 import { FormPagoAgrupado } from './FormPagoAgrupado';
 import { FormUsarSaldo } from './FormUsarSaldo';
 
-export const metadata = { title: 'Vendedor' };
+export const metadata = { title: 'Asociado' };
 
 export default async function FichaVendedor({ params }: { params: Promise<{ id: string }> }) {
   await requerirSesion();

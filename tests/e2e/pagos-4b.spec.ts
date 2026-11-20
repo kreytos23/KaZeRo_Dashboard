@@ -54,7 +54,7 @@ test('pago agrupado: reparto sugerido, aviso de duplicado y deshacer el pago', a
   ).toBeVisible();
   await agrupado.getByRole('button', { name: 'Registrar pago agrupado', exact: true }).click();
   await expect(
-    estadoCon(page, 'Pago registrado. Sobraron $102.00: quedan como saldo a favor de la vendedora.'),
+    estadoCon(page, 'Pago registrado. Sobraron $102.00: quedan como saldo a favor del asociado.'),
   ).toBeVisible();
   await expect(montoSaldoFavor(page)).toHaveText('$102.00');
   for (const { folio } of [pedidoViejo, pedidoNuevo]) {
@@ -81,7 +81,7 @@ test('pago agrupado: reparto sugerido, aviso de duplicado y deshacer el pago', a
   await expect(confirmar).toBeChecked();
   await agrupado.getByRole('button', { name: 'Registrar pago agrupado', exact: true }).click();
   await expect(
-    estadoCon(page, 'Pago registrado. Sobraron $400.00: quedan como saldo a favor de la vendedora.'),
+    estadoCon(page, 'Pago registrado. Sobraron $400.00: quedan como saldo a favor del asociado.'),
   ).toBeVisible();
   await expect(montoSaldoFavor(page)).toHaveText('$502.00');
 
@@ -89,7 +89,7 @@ test('pago agrupado: reparto sugerido, aviso de duplicado y deshacer el pago', a
   await agrupado.getByLabel('Monto del pago', { exact: true }).fill('50');
   await agrupado.getByRole('button', { name: 'Registrar pago agrupado', exact: true }).click();
   await expect(
-    estadoCon(page, 'Pago registrado. Sobraron $50.00: quedan como saldo a favor de la vendedora.'),
+    estadoCon(page, 'Pago registrado. Sobraron $50.00: quedan como saldo a favor del asociado.'),
   ).toBeVisible();
   await expect(montoSaldoFavor(page)).toHaveText('$552.00');
 

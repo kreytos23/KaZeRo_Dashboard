@@ -182,7 +182,7 @@ export async function enviarPiezas(
       );
       if (estado === 'cerrado') throw new ErrorNegocio('exhibidor_cerrado', MSG_EXHIBIDOR_CERRADO);
       if (!vendedorActivo)
-        throw new ErrorNegocio('vendedor_inactivo', 'El vendedor del exhibidor está inactivo.');
+        throw new ErrorNegocio('vendedor_inactivo', 'El asociado del exhibidor está inactivo.');
       // Plan 3.1: una pieza disponible puede estar con una vendedora; esa no se manda a exhibidor.
       const noDisponibles = porEscritura(piezas.filter((p) => p.estado !== 'disponible' || p.custodiaId));
       if (faltantes.length || noDisponibles.length) {

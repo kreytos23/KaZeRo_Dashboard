@@ -114,7 +114,7 @@ export async function registrarPagoAgrupado(
             const p = bloqueados.get(a.pedidoId);
             if (!p) throw new ErrorNegocio('no_encontrado', 'El pedido no existe.');
             if (p.vendedorId !== v.vendedorId)
-              throw new ErrorNegocio('pedido_ajeno', 'El pedido es de otra vendedora.', 'aplicaciones');
+              throw new ErrorNegocio('pedido_ajeno', 'El pedido es de otro asociado.', 'aplicaciones');
             if (p.estado === 'liquidado')
               throw new ErrorNegocio(
                 'pedido_liquidado',

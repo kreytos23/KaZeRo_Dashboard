@@ -13,7 +13,7 @@ export function etiquetaUbicacion(u: {
     case 'exhibidor':
       return `Exhibidor ${u.exhibidorNombre ?? ''}`.trim();
     case 'vendedora':
-      return `Con ${u.vendedorNombre ?? 'vendedora'}`;
+      return `Con ${u.vendedorNombre ?? 'un asociado'}`;
     case 'fuera':
       return u.estado === 'regalo' ? 'Regalo' : u.estado === 'vendida' ? 'Vendida' : 'Fuera de Kazero';
   }

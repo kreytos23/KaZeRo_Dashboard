@@ -9,15 +9,15 @@ import { listarVendedores } from '@/server/vendedores/servicio';
 import { accionCrearVendedor } from './acciones';
 import { TIPOS } from './tipos';
 
-export const metadata = { title: 'Vendedores' };
+export const metadata = { title: 'Asociados' };
 
 export default async function PaginaVendedores() {
   await requerirSesion();
   const vendedores = await conDbLectura((db) => listarVendedores(db));
   return (
     <section className="flex max-w-3xl flex-col gap-6">
-      <h1 className="text-2xl font-semibold">Vendedores</h1>
-      <FormAccion accion={accionCrearVendedor} textoBoton="Agregar vendedor" limpiarAlGuardar>
+      <h1 className="text-2xl font-semibold">Asociados</h1>
+      <FormAccion accion={accionCrearVendedor} textoBoton="Agregar asociado" limpiarAlGuardar>
         <Campo etiqueta="Nombre" name="nombre" required maxLength={80} />
         <Selector etiqueta="Tipo" name="tipo" opciones={TIPOS} />
         <Campo etiqueta="Comisión (%)" name="comision" inputMode="decimal" defaultValue="0" required />
@@ -25,7 +25,7 @@ export default async function PaginaVendedores() {
       <div className="tarjeta overflow-x-auto px-2 empty:hidden">
         {vendedores.length > 0 && (
           <table className="w-full text-left text-dato">
-            <caption className="sr-only">Lista de vendedores</caption>
+            <caption className="sr-only">Lista de asociados</caption>
             <thead className="text-meta font-semibold text-tinta-suave">
               <tr>
                 <th scope="col" className="px-3 py-3">
@@ -64,7 +64,7 @@ export default async function PaginaVendedores() {
       </div>
       {vendedores.length === 0 && (
         <EstadoVacio
-          titulo="Aún no hay vendedores."
+          titulo="Aún no hay asociados."
           detalle="Agrega el primero con el formulario de arriba para poder entregarle piezas y registrar sus ventas."
         />
       )}

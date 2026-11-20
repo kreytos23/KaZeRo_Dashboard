@@ -97,10 +97,10 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await page.keyboard.type('15');
     // En CI el tecleo puede ir por delante del estado del formulario: se confirma el valor y el botón listo antes de Enter.
     await expect(comision).toHaveValue('15');
-    await expect(page.getByRole('button', { name: 'Agregar vendedor' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Agregar asociado' })).toBeEnabled();
     await page.keyboard.press('Enter');
     // La acción del servidor contra la rama de Neon de CI puede pasar de los 5 s por defecto.
-    await expect(estadoCon(page, 'Vendedor agregado.')).toBeVisible({ timeout: 15_000 });
+    await expect(estadoCon(page, 'Asociado agregado.')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole('link', { name: vendedor })).toBeVisible();
   });
 
@@ -198,7 +198,7 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await expect(estadoCon(page, 'Estado actualizado.')).toBeVisible();
 
     await irA(page, '/panel/exhibidores');
-    const vendedor = page.getByLabel('Vendedor', { exact: true });
+    const vendedor = page.getByLabel('Asociado', { exact: true });
     await enfocar(page, vendedor);
     // Con el select abierto (Enter) se baja con flechas hasta la opción y Enter la elige. La búsqueda por tecleo
     // de la lista caduca en CI lento (y un espacio elige la opción resaltada), así que no se usa aquí.
@@ -279,7 +279,7 @@ test.describe('menú del celular con teclado', () => {
     // Elegir una sección con Enter navega, cierra el menú y devuelve el foco al botón.
     await page.keyboard.press('Tab'); // salir -> botón (vuelta completa)
     await expect(boton).toBeFocused();
-    await enfocar(page, menu.getByRole('link', { name: 'Vendedores' }));
+    await enfocar(page, menu.getByRole('link', { name: 'Asociados' }));
     await page.keyboard.press('Enter');
     await expect(page).toHaveURL(/\/panel\/vendedores$/);
     await expect(boton).toHaveAttribute('aria-expanded', 'false');
@@ -287,7 +287,7 @@ test.describe('menú del celular con teclado', () => {
 
     // Y la sección actual se marca en el menú.
     await page.keyboard.press('Enter');
-    await expect(menu.getByRole('link', { name: 'Vendedores' })).toHaveAttribute('aria-current', 'page');
+    await expect(menu.getByRole('link', { name: 'Asociados' })).toHaveAttribute('aria-current', 'page');
   });
 
   test('en escritorio no hay botón de menú y la navegación está a la vista', async ({ page }, info) => {

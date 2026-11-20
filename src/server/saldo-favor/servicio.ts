@@ -128,7 +128,7 @@ async function bloquearTitular(tx: Ejecutor, t: Titular): Promise<void> {
   if (!f)
     throw new ErrorNegocio(
       'no_encontrado',
-      'clienteId' in t ? 'La clienta no existe.' : 'La vendedora no existe.',
+      'clienteId' in t ? 'La clienta no existe.' : 'El asociado no existe.',
     );
 }
 

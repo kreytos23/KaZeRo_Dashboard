@@ -11,7 +11,7 @@ const MAX_RECIENTES = 20;
 const ETIQUETA_TIPO: Record<Resultado['tipo'], string> = {
   pieza: 'Pieza',
   cliente: 'Cliente',
-  vendedor: 'Vendedor',
+  vendedor: 'Asociado',
   pedido: 'Nota',
 };
 

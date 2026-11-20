@@ -90,7 +90,7 @@ export function actualizarVendedor(
         .from(vendedor)
         .where(eq(vendedor.id, d.id))
         .for('no key update');
-      if (!actual) throw new ErrorNegocio('no_encontrado', 'El vendedor no existe.');
+      if (!actual) throw new ErrorNegocio('no_encontrado', 'El asociado no existe.');
       if (actual.version !== d.version) throw conflictoVersion();
       const cambios = calcularCambios(
         {

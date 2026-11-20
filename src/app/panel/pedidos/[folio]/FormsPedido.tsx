@@ -105,7 +105,7 @@ function CamposPago(p: Props) {
           defaultValue="cliente"
           opciones={[
             { valor: 'cliente', texto: `${p.clienteNombre} (cliente)` },
-            { valor: 'vendedor', texto: `${p.vendedorNombre} (vendedor)` },
+            { valor: 'vendedor', texto: `${p.vendedorNombre} (asociado)` },
           ]}
         />
       )}

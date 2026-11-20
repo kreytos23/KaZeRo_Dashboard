@@ -21,7 +21,7 @@ test('exhibidor: venta de mostrador con cobro parcial, abono, entrega parcial, c
 
   // Crear el exhibidor y enviarle las tres piezas.
   await irA(page, '/panel/exhibidores');
-  await elegirOpcion(page, 'Vendedor', vendedora, true);
+  await elegirOpcion(page, 'Asociado', vendedora, true);
   await page.getByLabel('Nombre del exhibidor').fill(nombre);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
   await expect(estadoCon(page, 'Exhibidor creado.')).toBeVisible();

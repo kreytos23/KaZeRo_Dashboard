@@ -108,7 +108,7 @@ export async function registrarPagoComision(
           const fecha = fechaPago ?? hoyMX();
           const corte = await corteYVendedora(tx, d.corteId, d.vendedorId);
           if (!corte) throw new ErrorNegocio('no_encontrado', 'Ese mes no tiene cierre.');
-          if (!corte.nombre) throw new ErrorNegocio('no_encontrado', 'La vendedora no existe.');
+          if (!corte.nombre) throw new ErrorNegocio('no_encontrado', 'El asociado no existe.');
           const [suma] = await tx
             .select({ total: sql<string>`coalesce(sum(${comisionLinea.monto}), 0)::text` })
             .from(comisionLinea)
