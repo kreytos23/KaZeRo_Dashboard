@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
 const PESTANAS = [
+  ['/panel/reportes/resumen', 'Resumen'],
   ['/panel/reportes/deudores', 'Deudores'],
   ['/panel/reportes/comisiones', 'Comisiones'],
   ['/panel/reportes/exhibidores', 'Exhibidores'],
