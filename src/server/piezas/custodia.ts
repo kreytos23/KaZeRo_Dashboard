@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import {
   exhibidor,
@@ -13,6 +13,7 @@ import {
 import { formatoFolio } from '@/domain/pedidos';
 import { ErrorNegocio, conErroresDeNegocio } from '@/server/errores';
 import { codigosValidos } from '@/server/exhibidores/servicio';
+import type { PiezaElegible } from '@/features/piezas/lote-piezas';
 import type { PiezaBloqueada } from '@/server/pedidos/comun';
 
 /**
@@ -226,6 +227,24 @@ export function piezasDeVendedora(
     .from(vPieza)
     .leftJoin(vPedidoItem, and(eq(vPedidoItem.piezaId, vPieza.id), eq(vPedidoItem.vigente, true)))
     .where(eq(vPieza.vendedorCustodiaId, vendedorId))
+    .orderBy(asc(vPieza.codigo));
+}
+
+/**
+ * Piezas que se pueden entregar a un asociado o enviar a un exhibidor: la misma regla que `entregarAVendedora`
+ * y `enviarPiezas` (`disponible` y sin custodia; sin custodia y disponible implica sin exhibidor). Una consulta,
+ * columnas explícitas y nunca costo ni precio. El servidor vuelve a validar todo al guardar.
+ */
+export function piezasDisponiblesEnKazero(db: Ejecutor): Promise<PiezaElegible[]> {
+  return db
+    .select({
+      id: vPieza.id,
+      codigo: vPieza.codigo,
+      descripcion: vPieza.descripcion,
+      imagenClave: vPieza.imagenClave,
+    })
+    .from(vPieza)
+    .where(and(eq(vPieza.estado, 'disponible'), isNull(vPieza.vendedorCustodiaId)))
     .orderBy(asc(vPieza.codigo));
 }
 

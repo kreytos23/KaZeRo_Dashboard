@@ -85,12 +85,15 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await page.getByRole('link', { name: `Exhibidor ${m}` }).click();
   await expect(page.getByRole('heading', { name: `Exhibidor ${m}` })).toBeVisible();
 
-  await page.getByLabel('Códigos a enviar').fill(codigo.toLowerCase());
-  await page.getByRole('button', { name: 'Enviar piezas' }).click();
+  const envio = page.getByRole('form', { name: 'Enviar al exhibidor' });
+  await envio.getByRole('combobox', { name: 'Buscar pieza' }).fill(codigo.toLowerCase());
+  await envio.getByRole('option', { name: new RegExp(codigo) }).click();
+  await envio.getByRole('button', { name: 'Enviar 1 pieza' }).click();
   await expect(estadoCon(page, '1 pieza enviada.')).toBeVisible();
   await expect(page.getByRole('link', { name: codigo })).toBeVisible();
-  await page.getByLabel('Códigos a regresar').fill(codigo);
-  await page.getByRole('button', { name: 'Regresar piezas' }).click();
+  const regreso = page.getByRole('form', { name: 'Regresar del exhibidor' });
+  await regreso.getByRole('checkbox', { name: 'Seleccionar todas' }).check();
+  await regreso.getByRole('button', { name: 'Regresar 1 seleccionada' }).click();
   await expect(estadoCon(page, '1 pieza regresada.')).toBeVisible();
   await expect(page.getByRole('link', { name: codigo })).toHaveCount(0);
 

@@ -8,7 +8,12 @@ import { crearCliente } from '@/server/clientes/servicio';
 import { crearExhibidor, enviarPiezas } from '@/server/exhibidores/servicio';
 import { registrarPagoDePedido } from '@/server/pagos/servicio';
 import { cancelarPedido, crearPedido, editarPedido } from '@/server/pedidos/servicio';
-import { entregarAVendedora, piezasDeVendedora, regresarAKazero } from '@/server/piezas/custodia';
+import {
+  entregarAVendedora,
+  piezasDeVendedora,
+  piezasDisponiblesEnKazero,
+  regresarAKazero,
+} from '@/server/piezas/custodia';
 import {
   altaPieza,
   cambiarEstado,
@@ -136,6 +141,40 @@ describe('entregar a vendedora', () => {
     await expect(entregar(randomUUID(), ['CU21'])).rejects.toThrow('El asociado no existe.');
     await expect(entregar(ids.perla, [' '])).rejects.toThrow('Escribe al menos un código.');
     expect(await custodiaDe('CU21')).toBeNull();
+  });
+});
+
+describe('piezas elegibles para entregar o enviar (selector de lotes)', () => {
+  it('solo disponibles sin custodia: excluye vendidas, apartadas, en exhibidor, con un asociado y regalo', async () => {
+    for (const c of ['CUE1', 'CUE2', 'CUE3', 'CUE4', 'CUE5', 'CUE6', 'CUE7']) await alta(c);
+    const exhibidorId = await app((db) =>
+      crearExhibidor(db, { vendedorId: ids.perla, nombre: 'Perla E', fechaEnvio: '2026-09-16' }),
+    );
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['CUE2'] }));
+    await entregar(ids.lupita, ['CUE3']);
+    await crear(ids.casa, ['CUE4']); // apartada
+    const vendido = await crear(ids.casa, ['CUE5']);
+    await app((db) =>
+      registrarPagoDePedido(db, {
+        key: randomUUID(),
+        adminId,
+        pedidoId: vendido.id,
+        montoCentavos: 10000,
+        metodo: 'efectivo',
+        pagador: 'cliente',
+      }),
+    );
+    await app(async (db) => {
+      const p = (await obtenerPiezaPorCodigo(db, 'CUE6'))!;
+      await cambiarEstado(db, { piezaId: p.id, version: p.version, aEstado: 'regalo', adminId });
+    });
+    expect((await ficha('CUE5')).estado).toBe('vendida');
+
+    const elegibles = await app((db) => piezasDisponiblesEnKazero(db));
+    expect(elegibles.map((p) => p.codigo)).toEqual(['CUE1', 'CUE7']);
+    // Columnas explícitas: nunca costo ni precio.
+    expect(Object.keys(elegibles[0]!).sort()).toEqual(['codigo', 'descripcion', 'id', 'imagenClave']);
+    expect(elegibles[0]).toMatchObject({ codigo: 'CUE1', descripcion: 'Anillo CUE1', imagenClave: null });
   });
 });
 

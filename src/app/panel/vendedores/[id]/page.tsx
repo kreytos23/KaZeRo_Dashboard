@@ -19,7 +19,7 @@ import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { ErrorNegocio } from '@/server/errores';
 import { listarExhibidores } from '@/server/exhibidores/servicio';
-import { piezasDeVendedora } from '@/server/piezas/custodia';
+import { piezasDeVendedora, piezasDisponiblesEnKazero } from '@/server/piezas/custodia';
 import { pedidosAbiertosDeVendedora } from '@/server/pagos/lecturas';
 import { saldoFavorDe } from '@/server/saldo-favor/servicio';
 import { movimientosSaldoFavor } from '@/server/saldo-favor/servicio';
@@ -38,21 +38,23 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [v, exhibidores, cambios, saldoFavor, enPoder, resumen, abiertos, libro] = await conDbLectura((db) =>
-    Promise.all([
-      obtenerVendedor(db, id.data),
-      listarExhibidores(db, { vendedorId: id.data }),
-      historialDeCambios(db, 'vendedor', id.data),
-      saldoFavorDe(db, { vendedorId: id.data }),
-      piezasDeVendedora(db, id.data),
-      resumenDeVendedora(db, id.data),
-      pedidosAbiertosDeVendedora(db, id.data),
-      movimientosSaldoFavor(db, { vendedorId: id.data, limite: 100 }),
-    ]),
-  ).catch((e: unknown) => {
-    if (e instanceof ErrorNegocio && e.codigo === 'no_encontrado') notFound();
-    throw e;
-  });
+  const [v, exhibidores, cambios, saldoFavor, enPoder, resumen, abiertos, libro, elegibles] =
+    await conDbLectura((db) =>
+      Promise.all([
+        obtenerVendedor(db, id.data),
+        listarExhibidores(db, { vendedorId: id.data }),
+        historialDeCambios(db, 'vendedor', id.data),
+        saldoFavorDe(db, { vendedorId: id.data }),
+        piezasDeVendedora(db, id.data),
+        resumenDeVendedora(db, id.data),
+        pedidosAbiertosDeVendedora(db, id.data),
+        movimientosSaldoFavor(db, { vendedorId: id.data, limite: 100 }),
+        piezasDisponiblesEnKazero(db),
+      ]),
+    ).catch((e: unknown) => {
+      if (e instanceof ErrorNegocio && e.codigo === 'no_encontrado') notFound();
+      throw e;
+    });
   if (!v) notFound();
   return (
     <section className="flex flex-col gap-6">
@@ -66,38 +68,31 @@ export default async function FichaVendedor({ params }: { params: Promise<{ id: 
               <h2 id="piezas-en-poder" className="text-lg font-semibold">
                 Piezas en su poder ({enPoder.length})
               </h2>
-              {enPoder.length === 0 ? (
-                <p className="text-meta text-tinta-suave">{v.nombre} no tiene piezas en su poder.</p>
-              ) : (
-                <ul
-                  aria-label="Piezas en su poder"
-                  className="tarjeta flex flex-col divide-y divide-borde px-4 text-dato"
-                >
-                  {enPoder.map((p) => (
-                    <li key={p.codigo} className="flex flex-wrap items-center gap-x-3 py-1">
-                      <Link
-                        href={`/panel/inventario/${encodeURIComponent(p.codigo)}`}
-                        className="enlace inline-flex min-h-11 items-center font-mono text-monto font-semibold"
-                      >
-                        {p.codigo}
-                      </Link>
-                      <span className="min-w-0 flex-1">{p.descripcion}</span>
-                      <span className="text-tinta-suave">
-                        {ETIQUETA_ESTADO[p.estado]}
-                        {p.folio !== null && (
-                          <>
-                            {' en '}
-                            <Link href={`/panel/pedidos/${p.folio}`} className="enlace">
-                              {formatoFolio(p.folio)}
-                            </Link>
-                          </>
-                        )}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <FormsCustodia vendedorId={v.id} nombre={v.nombre} puedeRecibir={v.activo} />
+              <FormsCustodia
+                vendedorId={v.id}
+                nombre={v.nombre}
+                puedeRecibir={v.activo}
+                elegibles={elegibles}
+                // Regla de `regresarAKazero`: solo regresan las suyas que siguen disponibles.
+                enPoder={enPoder.map((p) => ({
+                  codigo: p.codigo,
+                  descripcion: p.descripcion,
+                  seleccionable: p.estado === 'disponible',
+                  nota: (
+                    <>
+                      {ETIQUETA_ESTADO[p.estado]}
+                      {p.folio !== null && (
+                        <>
+                          {' en '}
+                          <Link href={`/panel/pedidos/${p.folio}`} className="enlace">
+                            {formatoFolio(p.folio)}
+                          </Link>
+                        </>
+                      )}
+                    </>
+                  ),
+                }))}
+              />
             </section>
           )}
           <section aria-labelledby="exhibidores-vendedor" className="order-2 flex flex-col gap-2">

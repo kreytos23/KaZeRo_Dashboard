@@ -219,13 +219,25 @@ test.describe('formularios solo con teclado', { tag: '@escritorio' }, () => {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: exhibidor, exact: true })).toBeVisible();
 
-    await escribirEn(page, page.getByLabel('Códigos a enviar'), codigo);
-    await tabHacia(page, page.getByRole('button', { name: 'Enviar piezas' }));
+    // Selector de lotes: se escribe en el buscador, ↓ resalta la pieza y Enter la agrega (sin enviar el formulario).
+    const envio = page.getByRole('form', { name: 'Enviar al exhibidor' });
+    const buscar = envio.getByRole('combobox', { name: 'Buscar pieza' });
+    await escribirEn(page, buscar, codigo);
+    await expect(envio.getByRole('option', { name: new RegExp(codigo) })).toBeVisible();
+    await page.keyboard.press('Enter');
+    await expect(envio.getByRole('list', { name: 'Piezas del lote' })).toContainText(codigo);
+    await expect(buscar).toBeFocused();
+    // Tab: «Quitar», «Pegar varios códigos» y el botón, en orden visual.
+    await tabHacia(page, envio.getByRole('button', { name: `Quitar ${codigo}` }));
+    await tabHacia(page, envio.getByText('Pegar varios códigos'));
+    await tabHacia(page, envio.getByRole('button', { name: 'Enviar 1 pieza' }));
     await page.keyboard.press('Space');
     await expect(estadoCon(page, '1 pieza enviada.')).toBeVisible();
 
-    await escribirEn(page, page.getByLabel('Códigos a regresar'), codigo);
-    await tabHacia(page, page.getByRole('button', { name: 'Regresar piezas' }));
+    const regreso = page.getByRole('form', { name: 'Regresar del exhibidor' });
+    await enfocar(page, regreso.getByRole('checkbox', { name: `Seleccionar ${codigo}` }));
+    await page.keyboard.press('Space');
+    await enfocar(page, regreso.getByRole('button', { name: 'Regresar 1 seleccionada' }));
     await page.keyboard.press('Enter');
     await expect(estadoCon(page, '1 pieza regresada.')).toBeVisible();
 
