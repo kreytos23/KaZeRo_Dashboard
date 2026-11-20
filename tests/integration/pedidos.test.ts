@@ -454,7 +454,7 @@ describe('crearPedido', () => {
         adminId,
       }),
     );
-    await expect(crear({ codigos: [a!] })).rejects.toThrow('El vendedor está inactivo.');
+    await expect(crear({ codigos: [a!] })).rejects.toThrow('El asociado está inactivo.');
     expect((await app((db) => obtenerPiezaPorCodigo(db, a!)))!.estado).toBe('disponible');
   });
 

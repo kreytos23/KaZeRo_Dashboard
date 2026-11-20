@@ -61,7 +61,7 @@ export default async function PaginaPedidos({
     {
       clave: 'vendedor',
       valor: f.vendedor,
-      etiqueta: f.vendedor && (vendedores.find((v) => v.id === f.vendedor)?.nombre ?? 'Vendedor'),
+      etiqueta: f.vendedor && (vendedores.find((v) => v.id === f.vendedor)?.nombre ?? 'Asociado'),
     },
     {
       clave: 'cliente',
@@ -100,7 +100,7 @@ export default async function PaginaPedidos({
           ]}
         />
         <Selector
-          etiqueta="Vendedor"
+          etiqueta="Asociado"
           name="vendedor"
           defaultValue={f.vendedor ?? ''}
           opciones={[
@@ -184,7 +184,7 @@ export default async function PaginaPedidos({
                     Cliente
                   </th>
                   <th scope="col" className="px-3 py-3">
-                    Vendedor
+                    Asociado
                   </th>
                   <th scope="col" className="px-3 py-3 text-right">
                     Total

@@ -83,7 +83,7 @@ export function crearMotor(indice: IndiceBusqueda) {
       clave: `vendedor:${id}`,
       tipo: 'vendedor',
       titulo: nombre,
-      subtitulo: 'Vendedor',
+      subtitulo: 'Asociado',
       href: `/panel/vendedores/${encodeURIComponent(id)}`,
       miniatura: null,
     };

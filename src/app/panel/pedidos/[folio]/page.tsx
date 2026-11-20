@@ -147,7 +147,7 @@ export default async function FichaPedido({
                 {p.clienteNombre}
               </Link>
             </dd>
-            <dt className="font-medium">Vendedor</dt>
+            <dt className="font-medium">Asociado</dt>
             <dd>{p.vendedorNombre}</dd>
             <dt className="font-medium">Fecha</dt>
             <dd>{fechaCorta(p.fecha)}</dd>

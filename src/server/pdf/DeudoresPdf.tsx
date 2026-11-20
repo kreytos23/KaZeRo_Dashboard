@@ -17,7 +17,7 @@ export function DeudoresPdf({ r, filtro, logo }: { r: Reporte; filtro: string | 
         <Encabezado
           logo={logo}
           titulo="Reporte de deudores"
-          meta={[`Generado el ${fechaCorta(r.fecha)}`, `Vendedora: ${filtro ?? 'todas'}`]}
+          meta={[`Generado el ${fechaCorta(r.fecha)}`, `Asociado: ${filtro ?? 'todos'}`]}
         />
         {r.grupos.length === 0 && <Text style={estilos.vacio}>No hay pedidos con saldo pendiente.</Text>}
         {r.grupos.map((g) => (

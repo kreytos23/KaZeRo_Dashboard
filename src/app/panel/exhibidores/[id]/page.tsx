@@ -117,7 +117,7 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
       )}
       {abierto && vendedor && !vendedor.activo && (
         <p className="aviso-atencion max-w-3xl">
-          El vendedor de este exhibidor está inactivo: no se podrán enviar piezas hasta reactivarlo.
+          El asociado de este exhibidor está inactivo: no se podrán enviar piezas hasta reactivarlo.
         </p>
       )}
       <div className="ficha-cols">

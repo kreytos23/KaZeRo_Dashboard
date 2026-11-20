@@ -52,7 +52,7 @@ test('tarjeta de 10: el quinto pedido abierto recibe 10 % aunque otra nota tenga
   await expect(resumen(page)).toContainText('$134.10');
   await page.getByRole('button', { name: 'Crear pedido' }).click();
   await folioDeLaFicha(page);
-  await expect(page.getByText('Lugar 5: −10 %')).toBeVisible();
+  await expect(page.getByText('Compra 5: −10 %')).toBeVisible();
 
   await page.getByRole('link', { name: `Tarjeta ${m}` }).click();
   await expect(page.getByText('5 de 10')).toBeVisible();
@@ -83,7 +83,7 @@ test('pieza con vendedora: se entrega desde su ficha, aparece filtrada en el inv
 
   await irA(page, '/panel/pedidos/nuevo');
   await elegirCliente(page, `Cliente V ${m}`);
-  await elegirOpcion(page, 'Vendedor', nombre);
+  await elegirOpcion(page, 'Asociado', nombre);
   await agregarPieza(page, codigo);
   await expect(page.getByRole('list', { name: 'Piezas del pedido' })).toContainText(`Con ${nombre}`);
   await page.getByRole('button', { name: 'Crear pedido' }).click();

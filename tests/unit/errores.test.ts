@@ -107,24 +107,24 @@ describe('traducción de errores de Postgres', () => {
   it.each([
     [
       'pieza_una_ubicacion',
-      'Una pieza no puede estar en un exhibidor y con una vendedora a la vez.',
+      'Una pieza no puede estar en un exhibidor y con un asociado a la vez.',
       undefined,
     ],
     [
       'pieza_custodia_solo_si_aplica',
-      'Solo una pieza disponible o apartada puede estar con una vendedora.',
+      'Solo una pieza disponible o apartada puede estar con un asociado.',
       undefined,
     ],
     [
       'pieza_cambio_custodia',
-      'La pieza debe estar disponible en Kazero para entregarse, y regresar antes de pasar a otra vendedora.',
+      'La pieza debe estar disponible en Kazero para entregarse, y regresar antes de pasar a otro asociado.',
       'codigos',
     ],
     ['devolucion_pedido_item_uq', 'Esa pieza ya se devolvió.', undefined],
     ['devolucion_no_es_ultima_venta', 'La pieza no está vendida por este pedido.', undefined],
     [
       'pieza_alta_custodia',
-      'Una pieza nueva queda en Kazero: entrégala a la vendedora después del alta.',
+      'Una pieza nueva queda en Kazero: entrégala al asociado después del alta.',
       undefined,
     ],
     ['devolucion_pedido_no_liquidado', 'Solo se devuelven piezas de pedidos liquidados.', undefined],
@@ -192,6 +192,6 @@ describe('traducción de errores de Postgres', () => {
       conErroresDeNegocio(async () => {
         throw envuelto({ code: '23505', constraint: 'vendedor_nombre_uq' });
       }),
-    ).rejects.toThrow('Ya existe un vendedor con ese nombre.');
+    ).rejects.toThrow('Ya existe un asociado con ese nombre.');
   });
 });

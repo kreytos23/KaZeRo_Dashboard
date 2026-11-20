@@ -74,10 +74,9 @@ export async function entregarAVendedora(
         .select({ nombre: vendedor.nombre, activo: vendedor.activo, tipo: vendedor.tipo })
         .from(vendedor)
         .where(eq(vendedor.id, d.vendedorId));
-      if (!v) throw new ErrorNegocio('no_encontrado', 'La vendedora no existe.');
-      if (!v.activo) throw new ErrorNegocio('vendedor_inactivo', 'La vendedora está inactiva.');
-      if (v.tipo === 'casa')
-        throw new ErrorNegocio('vendedor_casa', 'Kazero es la casa: elige una vendedora.');
+      if (!v) throw new ErrorNegocio('no_encontrado', 'El asociado no existe.');
+      if (!v.activo) throw new ErrorNegocio('vendedor_inactivo', 'El asociado está inactivo.');
+      if (v.tipo === 'casa') throw new ErrorNegocio('vendedor_casa', 'Kazero es la casa: elige un asociado.');
       const { piezas, porEscritura, faltantes } = await bloquearPorCodigo(tx, codigos);
       // Solo se entrega lo que está disponible en Kazero: sin custodia (y, por tanto, sin exhibidor).
       const noDisponibles = porEscritura(piezas.filter((p) => p.estado !== 'disponible' || p.custodia));
@@ -101,7 +100,7 @@ export async function entregarAVendedora(
             if (p.custodia)
               return p.custodia === d.vendedorId
                 ? `ya la tiene ${v.nombre}`
-                : `la tiene ${vendedoras.get(p.custodia) ?? 'otra vendedora'}`;
+                : `la tiene ${vendedoras.get(p.custodia) ?? 'otro asociado'}`;
             if (p.estado === 'en_exhibidor')
               return `en exhibidor ${p.exhibidorId ? (exhibidores.get(p.exhibidorId) ?? '') : ''}`.trim();
             return p.estado;
@@ -144,7 +143,7 @@ export async function regresarAKazero(
         .select({ nombre: vendedor.nombre })
         .from(vendedor)
         .where(eq(vendedor.id, d.vendedorId));
-      if (!v) throw new ErrorNegocio('no_encontrado', 'La vendedora no existe.');
+      if (!v) throw new ErrorNegocio('no_encontrado', 'El asociado no existe.');
       const { piezas, porEscritura, faltantes } = await bloquearPorCodigo(tx, codigos);
       const suyas = (p: (typeof piezas)[number]) => p.custodia === d.vendedorId;
       const ajenas = porEscritura(piezas.filter((p) => !suyas(p)));
@@ -248,13 +247,13 @@ export function exigirCustodia(
     porVendedora.set(p.vendedorCustodiaId!, lista);
   }
   const grupos = [...porVendedora].map(([id, codigos]) => {
-    const quien = nombres.get(id) ?? 'otra vendedora';
+    const quien = nombres.get(id) ?? 'otro asociado';
     return `${codigos.join(', ')} ${codigos.length === 1 ? 'la tiene' : 'las tiene'} ${quien}`;
   });
   const sufijo =
     porVendedora.size === 1
-      ? `la nota debe ser de ${nombres.get([...porVendedora.keys()][0]!) ?? 'esa vendedora'}, o regrésa${ajenas.length === 1 ? 'la' : 'las'} a Kazero.`
-      : 'haz una nota por vendedora, o regrésalas a Kazero.';
+      ? `la nota debe ser de ${nombres.get([...porVendedora.keys()][0]!) ?? 'ese asociado'}, o regrésa${ajenas.length === 1 ? 'la' : 'las'} a Kazero.`
+      : 'haz una nota por asociado, o regrésalas a Kazero.';
   throw new ErrorNegocio('pieza_de_otra_vendedora', `${grupos.join('; ')}: ${sufijo}`, 'codigos');
 }
 

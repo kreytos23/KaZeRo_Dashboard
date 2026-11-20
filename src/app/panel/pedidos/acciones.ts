@@ -152,7 +152,7 @@ export async function accionPagoAgrupado(_: EstadoAccion, fd: FormData): Promise
     );
     revalidarPedidos();
     return r.sobranteCentavos > 0
-      ? `Pago registrado. Sobraron ${formatoMXN(r.sobranteCentavos)}: quedan como saldo a favor de la vendedora.`
+      ? `Pago registrado. Sobraron ${formatoMXN(r.sobranteCentavos)}: quedan como saldo a favor del asociado.`
       : 'Pago registrado.';
   });
 }

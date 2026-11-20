@@ -44,7 +44,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
   );
   if (!c) notFound();
   const opciones = [
-    { valor: '', texto: '— Sin vendedor habitual —' },
+    { valor: '', texto: '— Sin asociado habitual —' },
     ...vendedores
       .filter((v) => v.activo || v.id === c.vendedorHabitualId)
       .map((v) => ({ valor: v.id, texto: v.nombre })),
@@ -162,7 +162,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
                   maxLength={80}
                 />
                 <Selector
-                  etiqueta="Vendedor habitual"
+                  etiqueta="Asociado habitual"
                   name="vendedorHabitualId"
                   opciones={opciones}
                   defaultValue={c.vendedorHabitualId ?? ''}
@@ -182,7 +182,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
                     />
                     <p className="text-meta text-tinta-suave">
                       {resumen.previasEditables
-                        ? 'Compras de su tarjeta de papel. Ocupan los primeros lugares; cambiarlas pide motivo.'
+                        ? 'Compras de su tarjeta de papel. Cuentan como sus primeras compras en la tarjeta; cambiarlas pide motivo.'
                         : 'Ya tiene notas en su primera tarjeta: no se pueden cambiar.'}
                     </p>
                   </div>

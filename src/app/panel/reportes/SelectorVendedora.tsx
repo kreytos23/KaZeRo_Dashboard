@@ -10,10 +10,10 @@ export function SelectorVendedora({
 }) {
   return (
     <Selector
-      etiqueta="Vendedora"
+      etiqueta="Asociado"
       name="vendedor"
       defaultValue={actual}
-      opciones={[{ valor: '', texto: 'Todas' }, ...vendedores.map((v) => ({ valor: v.id, texto: v.nombre }))]}
+      opciones={[{ valor: '', texto: 'Todos' }, ...vendedores.map((v) => ({ valor: v.id, texto: v.nombre }))]}
     />
   );
 }

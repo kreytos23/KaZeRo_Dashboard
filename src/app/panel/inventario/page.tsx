@@ -70,7 +70,7 @@ export default async function PaginaInventario({
     {
       clave: 'vendedor',
       valor: f.vendedor,
-      etiqueta: f.vendedor && (vendedoras.find((v) => v.id === f.vendedor)?.nombre ?? 'Vendedora'),
+      etiqueta: f.vendedor && (vendedoras.find((v) => v.id === f.vendedor)?.nombre ?? 'Asociado'),
     },
     { clave: 'categoria', valor: f.categoria, etiqueta: f.categoria },
     { clave: 'material', valor: f.material, etiqueta: f.material },
@@ -113,7 +113,7 @@ export default async function PaginaInventario({
           ]}
         />
         <Selector
-          etiqueta="Vendedora"
+          etiqueta="Asociado"
           name="vendedor"
           defaultValue={f.vendedor ?? ''}
           opciones={[

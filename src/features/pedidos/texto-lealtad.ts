@@ -24,14 +24,14 @@ export function textoLealtadGuardada(p: {
   if (!p.cuentaTarjeta || p.posicionTarjeta === null) return 'No cuenta para la tarjeta de lealtad.';
   // Motivo histórico: R-29 se derogó el 2026-10-23, pero los pedidos viejos lo conservan (R-27).
   if (p.sinLealtadMotivo === 'saldo_pendiente') return 'Sin descuento (regla anterior: saldo pendiente)';
-  const donde = `Lugar ${p.posicionTarjeta}`;
+  const donde = `Compra ${p.posicionTarjeta}`;
   const bps = numericAPctBps(p.descuentoLealtadPct);
   return bps > 0 ? `${donde}: −${formatoPct(bps)}` : `${donde}.`;
 }
 
 /** Nombre accesible de una casilla: «Lugar 5: KZR-31, con saldo». */
 export function etiquetaCasilla(c: Casilla): string {
-  const partes = [`Lugar ${c.posicion}`];
+  const partes = [`Compra ${c.posicion}`];
   const detalle: string[] = [];
   if (c.estado === 'libre') detalle.push('libre');
   if (c.estado === 'previa') detalle.push('compra anterior');

@@ -38,7 +38,7 @@ function Hoja({ h, meta, logo }: { h: HojaExhibidor; meta: string[]; logo: Buffe
       <Encabezado
         logo={logo}
         titulo={`Exhibidor ${h.nombre}`}
-        meta={[...meta, `Vendedora: ${h.vendedorNombre}`]}
+        meta={[...meta, `Asociado: ${h.vendedorNombre}`]}
       />
       <Cuadre
         titulo="Piezas"

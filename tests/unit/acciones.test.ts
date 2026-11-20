@@ -6,7 +6,7 @@ import { ErrorNegocio } from '@/server/errores';
 describe('ejecutarAccion', () => {
   afterEach(() => vi.restoreAllMocks());
   it('devuelve el mensaje de éxito', async () => {
-    expect(await ejecutarAccion(async () => 'Vendedor agregado.')).toEqual({ ok: 'Vendedor agregado.' });
+    expect(await ejecutarAccion(async () => 'Asociado agregado.')).toEqual({ ok: 'Asociado agregado.' });
   });
   it('pasa el enlace del aviso cuando la acción lo devuelve', async () => {
     const enlace = { href: '/panel/clientes/x', texto: 'Abrir su ficha' };

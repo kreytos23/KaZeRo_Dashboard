@@ -9,7 +9,7 @@ const NAVEGACION = [
   ['/panel/inventario', 'Inventario'],
   ['/panel/exhibidores', 'Exhibidores'],
   ['/panel/clientes', 'Clientes'],
-  ['/panel/vendedores', 'Vendedores'],
+  ['/panel/vendedores', 'Asociados'],
   ['/panel/reportes', 'Reportes'],
   ['/panel/catalogos', 'Catálogos'],
   ['/panel/administradores', 'Administradores'],

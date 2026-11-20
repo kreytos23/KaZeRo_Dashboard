@@ -40,8 +40,8 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await page.getByLabel('Nombre').fill(`Perla ${m}`);
   await elegirOpcion(page, 'Tipo', 'Revendedora');
   await page.getByLabel('Comisión (%)').fill('18');
-  await page.getByRole('button', { name: 'Agregar vendedor' }).click();
-  await expect(estadoCon(page, 'Vendedor agregado.')).toBeVisible();
+  await page.getByRole('button', { name: 'Agregar asociado' }).click();
+  await expect(estadoCon(page, 'Asociado agregado.')).toBeVisible();
   await expect(page.getByRole('link', { name: `Perla ${m}` })).toBeVisible();
 
   // Ficha del vendedor: tras guardar debe verse la confirmación (regresión de la key/remount).
@@ -78,7 +78,7 @@ test('vendedor, pieza, búsqueda global y exhibidor', async ({ page }, info) => 
   await expect(page).toHaveURL(new RegExp(`/panel/inventario/${codigo}$`));
 
   await irA(page, '/panel/exhibidores');
-  await elegirOpcion(page, 'Vendedor', `Perla ${m}`, true);
+  await elegirOpcion(page, 'Asociado', `Perla ${m}`, true);
   await page.getByLabel('Nombre del exhibidor').fill(`Exhibidor ${m}`);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
   await expect(estadoCon(page, 'Exhibidor creado.')).toBeVisible();
@@ -234,11 +234,11 @@ test('editar un exhibidor abierto y renombrar un catálogo, ambos con historial'
   await page.getByLabel('Nombre').fill(`Edith ${m}`);
   await elegirOpcion(page, 'Tipo', 'Negocio a consignación');
   await page.getByLabel('Comisión (%)').fill('10');
-  await page.getByRole('button', { name: 'Agregar vendedor' }).click();
-  await expect(estadoCon(page, 'Vendedor agregado.')).toBeVisible();
+  await page.getByRole('button', { name: 'Agregar asociado' }).click();
+  await expect(estadoCon(page, 'Asociado agregado.')).toBeVisible();
 
   await irA(page, '/panel/exhibidores');
-  await elegirOpcion(page, 'Vendedor', `Edith ${m}`, true);
+  await elegirOpcion(page, 'Asociado', `Edith ${m}`, true);
   await page.getByLabel('Nombre del exhibidor').fill(`Vitrina ${m}`);
   await page.getByRole('button', { name: 'Crear exhibidor' }).click();
   await expect(estadoCon(page, 'Exhibidor creado.')).toBeVisible();

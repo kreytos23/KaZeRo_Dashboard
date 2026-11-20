@@ -258,7 +258,7 @@ export async function reporteComisiones(
       .select({ nombre: vendedor.nombre })
       .from(vendedor)
       .where(eq(vendedor.id, o.vendedorId));
-    if (!v) throw new ErrorNegocio('no_encontrado', 'La vendedora no existe.');
+    if (!v) throw new ErrorNegocio('no_encontrado', 'El asociado no existe.');
     vendedoras.push({
       vendedorId: o.vendedorId,
       vendedorNombre: v.nombre,

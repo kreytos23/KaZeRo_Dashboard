@@ -16,7 +16,7 @@ const tipo = z.enum(['casa', 'revendedora', 'consignacion']);
 
 function leer(fd: FormData) {
   const t = tipo.safeParse(texto(fd, 'tipo'));
-  if (!t.success) throw new ErrorNegocio('tipo', 'Elige un tipo de vendedor.', 'tipo');
+  if (!t.success) throw new ErrorNegocio('tipo', 'Elige un tipo de asociado.', 'tipo');
   const bruto = texto(fd, 'comision');
   // El servicio vuelve a validar y da el mensaje de error si no es un porcentaje.
   return { nombre: texto(fd, 'nombre'), tipo: t.data, comisionPct: porcentajeANumeric(bruto) ?? bruto };
@@ -28,7 +28,7 @@ export async function accionCrearVendedor(_: EstadoAccion, fd: FormData): Promis
     const datos = leer(fd);
     await conDb((db) => crearVendedor(db, datos));
     revalidatePath('/panel/vendedores');
-    return 'Vendedor agregado.';
+    return 'Asociado agregado.';
   });
 }
 

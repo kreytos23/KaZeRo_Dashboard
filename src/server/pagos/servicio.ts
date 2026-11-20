@@ -148,7 +148,7 @@ export async function registrarPagoEnTx(
     if (ex.vendedorId !== p.vendedorId)
       throw new ErrorNegocio(
         'exhibidor_ajeno',
-        'El exhibidor es de otra vendedora que la del pedido.',
+        'El exhibidor es de otro asociado que el del pedido.',
         'exhibidorId',
       );
   }

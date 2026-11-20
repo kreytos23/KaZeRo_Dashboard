@@ -120,7 +120,7 @@ const MENSAJES: Record<string, string> = {
   cliente_red_social_largo: 'La red social admite hasta 40 caracteres.',
   cliente_usuario_red_largo: 'El usuario admite hasta 80 caracteres.',
   cliente_notas_largo: 'Las notas admiten hasta 2000 caracteres.',
-  vendedor_nombre_uq: 'Ya existe un vendedor con ese nombre.',
+  vendedor_nombre_uq: 'Ya existe un asociado con ese nombre.',
   vendedor_comision_rango: 'La comisión debe estar entre 0 y 100.',
   vendedor_nombre_largo: 'El nombre debe tener entre 1 y 80 caracteres.',
   cliente_nombre_largo: 'El nombre debe tener entre 1 y 120 caracteres.',
@@ -173,13 +173,13 @@ const MENSAJES: Record<string, string> = {
   saldo_favor_pedido_requerido: PEDIDO_INCONSISTENTE,
   // Plan 3.1 (0016/0017). Los nombres viejos (saldo_favor_signo, saldo_favor_pedido_requerido) se conservan
   // arriba por si un despliegue anterior los reporta durante la transición.
-  pieza_una_ubicacion: 'Una pieza no puede estar en un exhibidor y con una vendedora a la vez.',
-  pieza_custodia_solo_si_aplica: 'Solo una pieza disponible o apartada puede estar con una vendedora.',
+  pieza_una_ubicacion: 'Una pieza no puede estar en un exhibidor y con un asociado a la vez.',
+  pieza_custodia_solo_si_aplica: 'Solo una pieza disponible o apartada puede estar con un asociado.',
   pieza_cambio_custodia:
-    'La pieza debe estar disponible en Kazero para entregarse, y regresar antes de pasar a otra vendedora.',
+    'La pieza debe estar disponible en Kazero para entregarse, y regresar antes de pasar a otro asociado.',
   devolucion_pedido_item_uq: 'Esa pieza ya se devolvió.',
   devolucion_no_es_ultima_venta: 'La pieza no está vendida por este pedido.',
-  pieza_alta_custodia: 'Una pieza nueva queda en Kazero: entrégala a la vendedora después del alta.',
+  pieza_alta_custodia: 'Una pieza nueva queda en Kazero: entrégala al asociado después del alta.',
   devolucion_pedido_no_liquidado: 'Solo se devuelven piezas de pedidos liquidados.',
   devolucion_linea_no_vigente: 'Esa pieza ya no está en el pedido.',
   devolucion_pieza_no_vendida: 'La pieza no está vendida: no se puede devolver.',
@@ -209,7 +209,7 @@ const MENSAJES: Record<string, string> = {
   entrega_exhibidor_monto: 'El monto no es válido.',
   entrega_exhibidor_metodo: PEDIDO_INCONSISTENTE,
   exhibidor_cierre_con_dinero: mensajeCierreConDinero(),
-  pago_exhibidor_coherente: 'El exhibidor que cobró debe estar abierto y ser de la vendedora del pedido.',
+  pago_exhibidor_coherente: 'El exhibidor que cobró debe estar abierto y ser del asociado del pedido.',
   pago_exhibidor_sin_saldo: MSG_COBRO_SIN_SALDO_FAVOR,
   // Plan 4b (0024/0025): el servicio valida antes; estos son la última barrera.
   pago_referencia_largo: MSG_REFERENCIA_LARGA,

@@ -70,7 +70,7 @@ test('nuevo pedido con alta rápida de cliente, piezas en ráfaga (una de exhibi
   await irA(page, '/panel/pedidos/nuevo');
   await page.getByRole('combobox', { name: 'Cliente' }).fill(`Ana Pedido ${m}`);
   await page.getByRole('option', { name: `Crear cliente «Ana Pedido ${m}»` }).click();
-  await elegirOpcion(page, 'Vendedor', `Casa ${m}`, true);
+  await elegirOpcion(page, 'Asociado', `Casa ${m}`, true);
   await agregarPieza(page, `n${m}01`);
   await agregarPieza(page, `N${m}02`);
   await expect(resumen(page)).toContainText('$298.00');
@@ -106,7 +106,7 @@ test('nuevo pedido con alta rápida de cliente, piezas en ráfaga (una de exhibi
   // R-25: la tarjeta del cliente cuenta la compra.
   await page.goto(`/panel/pedidos/${folio}`);
   await page.getByRole('link', { name: `Ana Pedido ${m}`, exact: true }).click();
-  await expect(page.getByRole('listitem', { name: `Lugar 1: KZR-${folio}` })).toBeVisible();
+  await expect(page.getByRole('listitem', { name: `Compra 1: KZR-${folio}` })).toBeVisible();
 });
 
 test('R-22 y R-29 derogada: la quinta compra recibe su descuento aunque haya otra nota con saldo', async ({

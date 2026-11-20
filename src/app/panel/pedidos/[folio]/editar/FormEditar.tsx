@@ -39,7 +39,7 @@ export function FormEditar(p: Props) {
           <input type="hidden" name="version" value={p.version} />
           <CampoKey />
           <Selector
-            etiqueta="Vendedor"
+            etiqueta="Asociado"
             name="vendedorId"
             required
             defaultValue={p.vendedorId}

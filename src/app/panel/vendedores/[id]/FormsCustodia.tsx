@@ -28,7 +28,7 @@ export function FormsCustodia({ vendedorId, nombre, puedeRecibir }: Props) {
           />
         </FormAccion>
       ) : (
-        <p className="aviso-atencion">Esta vendedora está inactiva: no se le pueden entregar piezas.</p>
+        <p className="aviso-atencion">Este asociado está inactivo: no se le pueden entregar piezas.</p>
       )}
       <FormAccion accion={accionRegresarAKazero} textoBoton="Regresar a Kazero" limpiarAlGuardar>
         <input type="hidden" name="vendedorId" value={vendedorId} />
