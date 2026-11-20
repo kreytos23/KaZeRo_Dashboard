@@ -22,7 +22,7 @@ export function TarjetaLealtad({ tarjeta }: { tarjeta: Tarjeta }) {
       <h2 id="tarjeta-lealtad" className="text-lg font-semibold">
         Tarjeta de lealtad
       </h2>
-      <ol aria-label="Lugares de la tarjeta" className="grid grid-cols-5 gap-2 @2xl:grid-cols-10">
+      <ol aria-label="Compras de la tarjeta" className="grid grid-cols-5 gap-2 @2xl:grid-cols-10">
         {tarjeta.casillas.map((k) => (
           <li
             key={k.posicion}

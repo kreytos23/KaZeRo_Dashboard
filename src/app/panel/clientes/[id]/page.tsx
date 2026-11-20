@@ -182,7 +182,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
                     />
                     <p className="text-meta text-tinta-suave">
                       {resumen.previasEditables
-                        ? 'Compras de su tarjeta de papel. Ocupan los primeros lugares; cambiarlas pide motivo.'
+                        ? 'Compras de su tarjeta de papel. Cuentan como sus primeras compras en la tarjeta; cambiarlas pide motivo.'
                         : 'Ya tiene notas en su primera tarjeta: no se pueden cambiar.'}
                     </p>
                   </div>

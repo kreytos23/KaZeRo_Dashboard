@@ -10,6 +10,6 @@ test('corregir compras previas en la ficha llena los primeros lugares', async ({
   await page.getByLabel(/Motivo/).fill('Tarjeta en papel');
   await page.getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Cambios guardados.' })).toBeVisible();
-  await expect(page.getByRole('listitem', { name: 'Lugar 4: compra anterior' })).toBeVisible();
+  await expect(page.getByRole('listitem', { name: 'Compra 4: compra anterior' })).toBeVisible();
   await expect(page.getByText('4 de 10 · falta 1 para el 10 %')).toBeVisible();
 });

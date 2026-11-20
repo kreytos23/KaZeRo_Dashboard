@@ -50,7 +50,7 @@ describe('textoLealtadGuardada (ficha del pedido)', () => {
     descuentoLealtadPct: '10.00',
     sinLealtadMotivo: null,
   } as Parameters<typeof textoLealtadGuardada>[0];
-  it('con descuento', () => expect(textoLealtadGuardada(base)).toBe('Lugar 5: −10 %'));
+  it('con descuento', () => expect(textoLealtadGuardada(base)).toBe('Compra 5: −10 %'));
   it('motivo histórico de la regla derogada (R-29)', () =>
     expect(
       textoLealtadGuardada({ ...base, descuentoLealtadPct: '0.00', sinLealtadMotivo: 'saldo_pendiente' }),
@@ -69,19 +69,19 @@ describe('textoLealtadGuardada (ficha del pedido)', () => {
 
 describe('etiquetaCasilla (nombre accesible de ●◐○)', () => {
   it.each([
-    [{ posicion: 1, estado: 'ocupada', folio: 10, pctBps: 0, conSaldo: false }, 'Lugar 1: KZR-10'],
+    [{ posicion: 1, estado: 'ocupada', folio: 10, pctBps: 0, conSaldo: false }, 'Compra 1: KZR-10'],
     [
       { posicion: 5, estado: 'ocupada', folio: 12, pctBps: 1000, conSaldo: true },
-      'Lugar 5: KZR-12, con saldo, 10 % de descuento',
+      'Compra 5: KZR-12, con saldo, 10 % de descuento',
     ],
     [
       { posicion: 10, estado: 'libre', folio: null, pctBps: 2000, conSaldo: false },
-      'Lugar 10: libre, 20 % de descuento',
+      'Compra 10: libre, 20 % de descuento',
     ],
-    [{ posicion: 3, estado: 'previa', folio: null, pctBps: 0, conSaldo: false }, 'Lugar 3: compra anterior'],
+    [{ posicion: 3, estado: 'previa', folio: null, pctBps: 0, conSaldo: false }, 'Compra 3: compra anterior'],
     [
       { posicion: 5, estado: 'previa', folio: null, pctBps: 1000, conSaldo: false },
-      'Lugar 5: compra anterior, 10 % de descuento',
+      'Compra 5: compra anterior, 10 % de descuento',
     ],
   ] as const)('%j', (c, texto) => expect(etiquetaCasilla(c)).toBe(texto));
 });

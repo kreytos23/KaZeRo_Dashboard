@@ -52,7 +52,7 @@ test('tarjeta de 10: el quinto pedido abierto recibe 10 % aunque otra nota tenga
   await expect(resumen(page)).toContainText('$134.10');
   await page.getByRole('button', { name: 'Crear pedido' }).click();
   await folioDeLaFicha(page);
-  await expect(page.getByText('Lugar 5: −10 %')).toBeVisible();
+  await expect(page.getByText('Compra 5: −10 %')).toBeVisible();
 
   await page.getByRole('link', { name: `Tarjeta ${m}` }).click();
   await expect(page.getByText('5 de 10')).toBeVisible();
