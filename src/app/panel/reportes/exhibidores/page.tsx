@@ -1,9 +1,10 @@
 import { conDbLectura } from '@/db/client';
-import { mesAnterior, mesDe, mesDeUrl, mesesRecientes, nombreMes } from '@/domain/comisiones';
+import { mesDe, mesDeUrl, mesesRecientes, nombreMes } from '@/domain/comisiones';
 import { fechaLarga, hoyMX } from '@/domain/fechas';
 import { incluirVentas } from '@/domain/reporte-exhibidor';
 import { CampoCasilla, Selector } from '@/features/ui/Campo';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
+import { FormFiltros } from '@/features/ui/FormFiltros';
 import { uuidOpcional } from '@/server/acciones';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { reporteExhibidores } from '@/server/reportes/exhibidores';
@@ -19,10 +20,10 @@ export default async function ReporteExhibidores({
   await requerirSesion();
   const sp = await searchParams;
   const hoy = hoyMX();
-  // Por omisión el último mes completo: es el que se entrega.
-  const mes = mesDeUrl(typeof sp.mes === 'string' ? sp.mes : null) ?? mesAnterior(mesDe(hoy));
+  // Por omisión el mes en curso: la hoja es la «Relación de ventas» que se entrega con la fecha de hoy.
+  const mes = mesDeUrl(typeof sp.mes === 'string' ? sp.mes : null) ?? mesDe(hoy);
   const exhibidorId = uuidOpcional(typeof sp.exhibidor === 'string' ? sp.exhibidor : null) ?? '';
-  // Solo «1» enciende las ventas del mes (apagadas por omisión); funciona sin JS por ser un formulario GET.
+  // Solo «1» enciende las ventas del mes (apagadas por omisión); sin JS sigue siendo un formulario GET con «Ver».
   const ventas = incluirVentas(sp.ventas);
   const r = await conDbLectura((db) => reporteExhibidores(db, { mes, hoy, ventas }));
   const hojas = exhibidorId ? r.hojas.filter((h) => h.exhibidorId === exhibidorId) : r.hojas;
@@ -32,11 +33,7 @@ export default async function ReporteExhibidores({
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <form
-          role="search"
-          method="get"
-          className="flex max-w-full min-w-0 flex-wrap items-end gap-2 [&>div]:max-w-full [&>div]:min-w-0"
-        >
+        <FormFiltros className="flex max-w-full min-w-0 flex-wrap items-end gap-2 [&>div]:max-w-full [&>div]:min-w-0">
           <Selector
             etiqueta="Mes"
             name="mes"
@@ -55,10 +52,7 @@ export default async function ReporteExhibidores({
           <CampoCasilla name="ventas" value="1" defaultChecked={ventas}>
             Incluir ventas del mes
           </CampoCasilla>
-          <button type="submit" className="boton-secundario">
-            Ver
-          </button>
-        </form>
+        </FormFiltros>
         <a href={`/panel/reportes/exhibidores/pdf?${consulta}`} download className="boton-secundario">
           Descargar PDF
         </a>

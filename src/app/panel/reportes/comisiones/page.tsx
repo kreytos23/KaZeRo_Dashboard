@@ -7,6 +7,7 @@ import { fechaCorta, hoyMX } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
 import { Selector } from '@/features/ui/Campo';
 import { EstadoVacio } from '@/features/ui/EstadoVacio';
+import { FormFiltros } from '@/features/ui/FormFiltros';
 import { EtiquetaEstado } from '@/features/ui/EtiquetaEstado';
 import { vistaEstadoPago } from '@/features/ui/estado-visual';
 import { uuidOpcional } from '@/server/acciones';
@@ -69,13 +70,10 @@ export default async function Comisiones({
           {aviso}
         </p>
       )}
-      <form role="search" method="get" className="flex flex-wrap items-end gap-2">
+      <FormFiltros className="flex flex-wrap items-end gap-2">
         <Selector etiqueta="Mes" name="mes" defaultValue={mes.slice(0, 7)} opciones={opcionesMes} />
         <SelectorVendedora vendedores={vendedores} actual={vendedorId} />
-        <button type="submit" className="boton-secundario">
-          Ver
-        </button>
-      </form>
+      </FormFiltros>
 
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <div className="flex flex-col gap-1">

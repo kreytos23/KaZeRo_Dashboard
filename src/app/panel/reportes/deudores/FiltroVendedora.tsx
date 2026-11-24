@@ -1,6 +1,7 @@
+import { FormFiltros } from '@/features/ui/FormFiltros';
 import { SelectorVendedora } from '../SelectorVendedora';
 
-/** Formulario GET: funciona sin JavaScript (el select nativo y el botón envían `?vendedor=`). */
+/** Se aplica al elegir; sin JavaScript es un formulario GET (el select nativo y «Filtrar» envían `?vendedor=`). */
 export function FiltroVendedora({
   vendedores,
   actual,
@@ -9,11 +10,8 @@ export function FiltroVendedora({
   actual: string;
 }) {
   return (
-    <form role="search" method="get" className="flex flex-wrap items-end gap-2">
+    <FormFiltros className="flex flex-wrap items-end gap-2" textoBoton="Filtrar">
       <SelectorVendedora vendedores={vendedores} actual={actual} />
-      <button type="submit" className="boton-secundario">
-        Filtrar
-      </button>
-    </form>
+    </FormFiltros>
   );
 }

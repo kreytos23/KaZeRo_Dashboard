@@ -214,8 +214,15 @@ function FechaEscritorio({
             <IconoCalendario />
           </button>
         </Popover.Trigger>
-        {/* Lo que se envía: el ISO (el campo visible no lleva name). */}
-        <input type="hidden" name={name} value={iso} disabled={disabled} />
+        {/* Lo que se envía: el ISO (el campo visible no lleva name). `data-fecha` dice si lo escrito está a
+            medias (el ISO es '' aunque haya texto): FormFiltros no navega con una fecha incompleta. */}
+        <input
+          type="hidden"
+          name={name}
+          value={iso}
+          disabled={disabled}
+          data-fecha={texto.trim() !== '' && !iso ? 'a-medias' : 'lista'}
+        />
       </div>
       <Popover.Portal>
         <Popover.Content

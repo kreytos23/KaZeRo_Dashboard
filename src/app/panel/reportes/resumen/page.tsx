@@ -3,6 +3,7 @@ import { formatoMXN } from '@/domain/dinero';
 import { fechaCorta, hoyMX } from '@/domain/fechas';
 import { periodoDeUrl, type FilaTop } from '@/domain/resumen';
 import { Campo, Selector } from '@/features/ui/Campo';
+import { FormFiltros } from '@/features/ui/FormFiltros';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { resumenDePeriodo } from '@/server/reportes/resumen';
 
@@ -64,24 +65,33 @@ export default async function Resumen({
   const uno = (v: string | string[] | undefined) => (typeof v === 'string' ? v : null);
   const hoy = hoyMX();
   const periodo = periodoDeUrl({ periodo: uno(sp.periodo), desde: uno(sp.desde), hasta: uno(sp.hasta) }, hoy);
+  // Los filtros navegan sin recargar y el campo de fecha guarda su valor: al cambiar a un periodo fijo se rehace
+  // con sus fechas. En «rango» (aunque no valga) no: así no se pierden el foco ni lo escrito.
+  const fechas = uno(sp.periodo) === 'rango' ? 'rango' : `${periodo.desde}-${periodo.hasta}`;
   const r = await conDbLectura((db) => resumenDePeriodo(db, { ...periodo, hoy }));
   const pct = r.baseMargenCentavos > 0 ? (r.margenCentavos / r.baseMargenCentavos) * 100 : null;
   // m-2: sin base ni piezas sin costo no hubo ventas en el periodo; «Sin costos» sería falso.
   const sinMargen = r.baseMargenCentavos === 0 && r.piezasSinCosto === 0 ? 'Sin ventas' : 'Sin costos';
   return (
     <div className="flex flex-col gap-6">
-      <form
-        role="search"
-        method="get"
-        className="flex max-w-full min-w-0 flex-wrap items-end gap-2 [&>div]:max-w-full [&>div]:min-w-0"
-      >
+      {/* Fuera de «rango» las fechas solo muestran el periodo: el servidor las ignora (periodoDeUrl). */}
+      <FormFiltros className="flex max-w-full min-w-0 flex-wrap items-end gap-2 [&>div]:max-w-full [&>div]:min-w-0">
         <Selector etiqueta="Periodo" name="periodo" defaultValue={periodo.clave} opciones={OPCIONES} />
-        <Campo etiqueta="Desde" name="desde" type="date" defaultValue={periodo.desde} />
-        <Campo etiqueta="Hasta" name="hasta" type="date" defaultValue={periodo.hasta} />
-        <button type="submit" className="boton-secundario">
-          Ver
-        </button>
-      </form>
+        <Campo
+          key={`desde-${fechas}`}
+          etiqueta="Desde"
+          name="desde"
+          type="date"
+          defaultValue={periodo.desde}
+        />
+        <Campo
+          key={`hasta-${fechas}`}
+          etiqueta="Hasta"
+          name="hasta"
+          type="date"
+          defaultValue={periodo.hasta}
+        />
+      </FormFiltros>
       {periodo.invalido && <p className="aviso-atencion">Ese rango no es válido: se muestra este mes.</p>}
       <p className="text-dato text-tinta-suave">
         Del {fechaCorta(periodo.desde)} al {fechaCorta(periodo.hasta)}

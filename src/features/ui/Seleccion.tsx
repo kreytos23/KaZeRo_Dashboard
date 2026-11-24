@@ -57,6 +57,10 @@ export function useAlReiniciarFormulario(ancla: { current: HTMLElement | null },
  *    selector del teléfono.
  *  - Escritorio (puntero fino y ≥1024 px, tras montar): listbox de Radix con teclado completo y animación.
  * En ambos casos el formulario envía lo mismo: `name` → valor (el de escritorio lo lleva un `<input hidden>`).
+ * Y en ambos un `<form onChange>` se entera de que la persona eligió: el nativo dispara su `change`; en escritorio
+ * Radix (2.4.1) lo dispara, con burbujeo, desde su `<select>` oculto tras pintar el valor nuevo, solo por elección
+ * de la persona (al montar no dispara y al reiniciar el formulario lo dispara sin burbujeo). Por eso aquí no se
+ * despacha uno propio: llegarían dos. FormFiltros depende de esto; la E2E de reportes en escritorio lo cubre.
  */
 export function Seleccion({
   id,
