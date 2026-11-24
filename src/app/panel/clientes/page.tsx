@@ -11,7 +11,7 @@ import { accionCrearCliente } from './acciones';
 
 export const metadata = { title: 'Clientes' };
 
-const POR_PAGINA = 50;
+const POR_PAGINA = 10;
 
 export default async function PaginaClientes({
   searchParams,
