@@ -19,6 +19,8 @@ const region = (page: Page, nombre: string) => page.getByRole('region', { name: 
 const estadoDelPedido = (page: Page, texto: string) => page.getByText(texto, { exact: true }).first();
 
 test('pago agrupado: reparto sugerido, aviso de duplicado y deshacer el pago', async ({ page }, info) => {
+  // Flujo largo (unas 12 navegaciones y varios guardados): ~30 s en CI, justo el límite por omisión.
+  test.slow();
   const m = marcaDe(info);
   // Prefijo de pieza propio «PG»: ningún otro spec lo usa.
   const vendedora = `Perla PG ${m}`;
