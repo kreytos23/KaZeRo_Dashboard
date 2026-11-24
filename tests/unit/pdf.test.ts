@@ -152,17 +152,15 @@ describe('PDF de exhibidores', () => {
     exhibidorId: '00000000-0000-4000-8000-000000000001',
     nombre: 'Salón Prueba',
     vendedorNombre: 'Perla Ejemplo',
-    piezas: {
-      alInicio: 2,
-      enviadas: 1,
-      vendidas: 1,
-      regresadas: 0,
-      porCancelacion: 0,
-      otros: -1,
-      alCierre: 1,
-    },
-    dinero: { alInicio: 1000, cobrado: 500, entregado: 200, ajustes: 0, alCierre: 1300 },
-    piezasAlCierre: [{ codigo: 'AB01', descripcion: 'Arete', precioCentavos: 10000 }],
+    piezasAlCierre: [
+      { codigo: 'ZZ01', descripcion: 'Arete sintético', precioCentavos: 10000 },
+      {
+        codigo: 'ZZ02',
+        descripcion:
+          'Collar sintético con una descripción larga que debe pasar a una segunda línea en la tabla',
+        precioCentavos: 22500,
+      },
+    ],
     ventas: [
       {
         pedidoId: '00000000-0000-4000-8000-000000000002',
@@ -176,12 +174,20 @@ describe('PDF de exhibidores', () => {
       },
     ],
   };
-  it('una hoja: bytes de un PDF', async () => {
-    const bytes = await pdfExhibidores({ mes: '2026-10-01', enCurso: false, hojas: [hoja] }, [hoja]);
-    expect(cabecera(bytes)).toBe('%PDF-');
+  const r = { mes: '2026-10-01', enCurso: false, hoy: '2026-11-24', hojas: [hoja] };
+  it('una hoja, con y sin ventas del mes: bytes de un PDF', async () => {
+    expect(cabecera(await pdfExhibidores(r, [hoja]))).toBe('%PDF-');
+    expect(cabecera(await pdfExhibidores(r, [hoja], { ventas: true }))).toBe('%PDF-');
+  });
+  it('una hoja sin piezas al cierre también se genera', async () => {
+    const vacia = { ...hoja, piezasAlCierre: [], ventas: [] };
+    expect(cabecera(await pdfExhibidores(r, [vacia], { ventas: true }))).toBe('%PDF-');
   });
   it('sin hojas: también genera el PDF', async () => {
-    const bytes = await pdfExhibidores({ mes: '2026-10-01', enCurso: true, hojas: [] }, []);
+    const bytes = await pdfExhibidores(
+      { mes: '2026-11-01', enCurso: true, hoy: '2026-11-24', hojas: [] },
+      [],
+    );
     expect(cabecera(bytes)).toBe('%PDF-');
   });
   it('nombre con y sin exhibidor', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { diasEntre, hoyMX, parsearFechaISO, saludoSegunHora } from '@/domain/fechas';
+import { diasEntre, fechaLarga, hoyMX, parsearFechaISO, saludoSegunHora } from '@/domain/fechas';
 
 describe('fechas de negocio', () => {
   it('acepta fechas reales', () => {
@@ -36,4 +36,16 @@ describe('saludoSegunHora (hora de México, UTC-6 todo el año)', () => {
     // 03:00 UTC es aún la noche anterior en CDMX (21:00), no la madrugada.
     ['2026-10-09T03:00:00Z', 'Buenas noches'],
   ])('%s → %s', (iso, esperado) => expect(saludoSegunHora(new Date(iso))).toBe(esperado));
+});
+
+describe('fechaLarga', () => {
+  it.each([
+    ['2026-11-24', '24 de noviembre de 2026'],
+    ['2026-01-01', '1 de enero de 2026'],
+    ['2027-12-31', '31 de diciembre de 2027'],
+  ])('%s → %s', (iso, esperado) => expect(fechaLarga(iso)).toBe(esperado));
+  it('sirve con la fecha de negocio de hoy en México', () => {
+    // 2026-11-25 03:00 UTC aún es el 24 de noviembre en CDMX.
+    expect(fechaLarga(hoyMX(new Date('2026-11-25T03:00:00Z')))).toBe('24 de noviembre de 2026');
+  });
 });

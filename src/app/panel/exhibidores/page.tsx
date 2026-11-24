@@ -71,7 +71,7 @@ export default async function PaginaExhibidores({
         />
         <button className="boton-secundario">Filtrar</button>
       </form>
-      <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4">
+      <ul className="tarjeta flex flex-col divide-y overflow-hidden empty:hidden divide-borde px-4">
         {exhibidores.map((e) => (
           <li
             key={e.id}

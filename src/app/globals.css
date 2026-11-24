@@ -449,7 +449,10 @@
   color: var(--color-secundario-fuerte);
 }
 
+/* Fila de una lista `tarjeta … px-4`: sale al borde de la tarjeta para que el realce la cubra entera. */
 @utility fila-enlace {
+  margin-inline: calc(--spacing(4) * -1);
+  padding-inline: --spacing(4);
   transition: background-color var(--duration-quick) var(--ease-smooth-out);
   @media (hover: hover) {
     &:hover {
