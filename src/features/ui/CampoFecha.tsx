@@ -158,6 +158,10 @@ function FechaEscritorio({
   className: string;
 } & AriaCampo) {
   const entrada = useRef<HTMLInputElement>(null);
+  const oculto = useRef<HTMLInputElement>(null);
+  // Elegir en el calendario no pasa por un campo editable: no hay `change` nativo. Se avisa a mano, una vez
+  // pintado el ISO nuevo, para que un formulario que escucha `change` (p. ej. FormFiltros) se entere.
+  const avisarCambio = useRef(false);
   const [texto, setTexto] = useState(isoAVista(iso));
   const [abierto, setAbierto] = useState(false);
   const bloqueado = disabled || readOnly;
@@ -167,6 +171,12 @@ function FechaEscritorio({
     entrada.current?.setCustomValidity(errorDeFecha(texto, min, max));
   }, [texto, min, max]);
 
+  useEffect(() => {
+    if (!avisarCambio.current) return;
+    avisarCambio.current = false;
+    oculto.current?.dispatchEvent(new Event('change', { bubbles: true }));
+  }, [iso]);
+
   const hoy = hoyMX();
   const seleccionada = isoADate(iso);
   const minimo = min ? isoADate(min) : undefined;
@@ -174,6 +184,7 @@ function FechaEscritorio({
   const hoyEnRango = (!min || hoy >= min) && (!max || hoy <= max);
 
   function elegir(nuevo: string) {
+    avisarCambio.current = nuevo !== iso;
     alCambiar(nuevo);
     setTexto(isoAVista(nuevo));
     setAbierto(false);
@@ -214,8 +225,16 @@ function FechaEscritorio({
             <IconoCalendario />
           </button>
         </Popover.Trigger>
-        {/* Lo que se envía: el ISO (el campo visible no lleva name). */}
-        <input type="hidden" name={name} value={iso} disabled={disabled} />
+        {/* Lo que se envía: el ISO (el campo visible no lleva name). `data-fecha` dice si lo escrito está a
+            medias (el ISO es '' aunque haya texto): FormFiltros no navega con una fecha incompleta. */}
+        <input
+          ref={oculto}
+          type="hidden"
+          name={name}
+          value={iso}
+          disabled={disabled}
+          data-fecha={texto.trim() !== '' && !iso ? 'a-medias' : 'lista'}
+        />
       </div>
       <Popover.Portal>
         <Popover.Content
@@ -255,6 +274,7 @@ function FechaEscritorio({
               <button
                 type="button"
                 onClick={() => {
+                  avisarCambio.current = true;
                   alCambiar('');
                   setTexto('');
                   setAbierto(false);

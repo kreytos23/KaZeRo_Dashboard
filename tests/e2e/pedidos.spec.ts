@@ -44,7 +44,9 @@ async function elegirCliente(page: Page, nombre: string) {
  * en el panel «Filtros» (sus campos solo existen con él abierto) con «Ver resultados».
  */
 async function filtrar(page: Page, rellenar: (ambito: Ambito) => Promise<void>) {
-  if (!(await page.getByRole('button', { name: /^Filtros \(\d+\)$/ }).isVisible())) {
+  // Por proyecto y no con isVisible(): esa comprobación no espera y, si la página aún no termina de montar, toma
+  // el camino de escritorio en el celular y se queda esperando un campo que vive en el diálogo cerrado.
+  if (test.info().project.name !== 'movil') {
     await rellenar(page);
     await page.getByRole('button', { name: 'Filtrar' }).click();
     return;

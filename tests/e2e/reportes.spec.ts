@@ -69,9 +69,9 @@ test.describe('reportes', () => {
     await expect(tarjeta(page, vendedora)).toContainText('$99.00');
     await expect(tarjeta(page, otra)).toBeVisible();
 
+    // El filtro se aplica al elegir, sin «Filtrar».
     await elegirOpcion(page, 'Asociado', vendedora, true);
-    await page.getByRole('button', { name: 'Filtrar' }).click();
-    await expect(page).toHaveURL(/vendedor=/);
+    await expect(page).toHaveURL(new RegExp(`vendedor=${vendedoraId}`));
     await expect(page.getByText(`Clienta Rep ${sufijo}`)).toBeVisible();
     await expect(page.getByText(`Clienta Otra ${sufijo}`)).toHaveCount(0);
     await expect(page.getByText('Por cobrar: $99.00', { exact: true })).toBeVisible();
