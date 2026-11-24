@@ -236,9 +236,10 @@ describe('resumen del periodo', () => {
     expect(r.topCategorias).toEqual([{ nombre: 'Aretes', centavos: 20000 }]);
   });
 
-  it('M-6: por cobrar = deudores; ubicaciones sin vendidas, con exhibidor y Kazero', async () => {
-    await alta('RS10', 4000);
-    await alta('RS11', 4000);
+  it('M-6: por cobrar = deudores; ubicaciones y su valor sin vendidas, con exhibidor y Kazero', async () => {
+    // Precios distintos para que el valor por ubicación no cuadre por casualidad.
+    await alta('RS10', 4000, 13000);
+    await alta('RS11', 4000, 12000);
     await alta('RS12', 4000);
     await alta('RS14', 4000);
     const exhibidorId = await app((db) =>
@@ -253,9 +254,11 @@ describe('resumen del periodo', () => {
     const deudores = await app((db) => reporteDeudores(db, { hoy }));
     expect(deudores.totalCentavos).toBe(10000);
     expect(r.porCobrarCentavos).toBe(deudores.totalCentavos);
+    // RS12 quedó vendida y no cuenta; RS14 está apartada en una nota abierta y sigue en inventario.
     expect(r.ubicaciones).toEqual([
-      { etiqueta: 'Exhibidor Salón Prueba', piezas: 1 },
-      { etiqueta: 'Kazero', piezas: 2 },
+      { etiqueta: 'Exhibidor Salón Prueba', piezas: 1, valorCentavos: 12000 },
+      { etiqueta: 'Kazero', piezas: 2, valorCentavos: 23000 },
     ]);
+    expect(r.inventario).toEqual({ piezas: 3, valorCentavos: 35000 });
   });
 });
