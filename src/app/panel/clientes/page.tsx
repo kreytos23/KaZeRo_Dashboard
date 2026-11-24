@@ -41,7 +41,7 @@ export default async function PaginaClientes({
         <Campo etiqueta="Filtrar clientes" name="q" type="search" defaultValue={q} maxLength={120} />
         <button className="boton-secundario self-end">Filtrar</button>
       </form>
-      <ul className="tarjeta flex flex-col divide-y empty:hidden divide-borde px-4">
+      <ul className="tarjeta flex flex-col divide-y overflow-hidden empty:hidden divide-borde px-4">
         {clientes.map((c) => (
           <li
             key={c.id}
