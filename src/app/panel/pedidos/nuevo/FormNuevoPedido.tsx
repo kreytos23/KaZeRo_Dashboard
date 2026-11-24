@@ -61,6 +61,8 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
   const [codigo, setCodigo] = useState('');
   const [cuentaTarjeta, setCuentaTarjeta] = useState(true);
   const [manual, setManual] = useState('');
+  // L-7: la vista previa usa la fecha elegida (con 6 meses sin comprar, la nota empieza una tarjeta nueva).
+  const [fecha, setFecha] = useState(hoy);
   const [previa, setPrevia] = useState<PreviaPedido | null>(null);
   const enviado = useRef(false);
 
@@ -77,10 +79,10 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
     const ctl = new AbortController();
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(urlConsultaPrevia({ clienteId: cliente?.id ?? null, codigos, cuentaTarjeta }), {
-          cache: 'no-store',
-          signal: ctl.signal,
-        });
+        const r = await fetch(
+          urlConsultaPrevia({ clienteId: cliente?.id ?? null, codigos, cuentaTarjeta, fecha }),
+          { cache: 'no-store', signal: ctl.signal },
+        );
         if (r.status === 401) return router.replace('/login');
         if (r.ok) setPrevia((await r.json()) as PreviaPedido);
       } catch {
@@ -91,7 +93,7 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
       clearTimeout(t);
       ctl.abort();
     };
-  }, [cliente?.id, codigos, cuentaTarjeta, router]);
+  }, [cliente?.id, codigos, cuentaTarjeta, fecha, router]);
 
   // La vista previa puede ir un paso atrás de lo que el usuario ya cambió: solo se usa lo que sigue vigente.
   const previaDelCliente = previa && previa.cliente?.id === cliente?.id ? previa : null;
@@ -135,7 +137,15 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
           value={vendedorId}
           onChange={setVendedorElegido}
         />
-        <Campo etiqueta="Fecha" name="fecha" type="date" defaultValue={hoy} max={hoy} required />
+        <Campo
+          etiqueta="Fecha"
+          name="fecha"
+          type="date"
+          defaultValue={hoy}
+          max={hoy}
+          required
+          alCambiarFecha={setFecha}
+        />
 
         <div className="flex items-end gap-2">
           <div className="flex-1">

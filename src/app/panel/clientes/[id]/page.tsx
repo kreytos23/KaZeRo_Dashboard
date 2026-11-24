@@ -119,7 +119,7 @@ export default async function FichaCliente({ params }: { params: Promise<{ id: s
           {/* Las notas de «Venta de mostrador» no cuentan en tarjeta: su ficha no la muestra. */}
           {!c.esMostrador && (
             <div className="order-2">
-              <TarjetaLealtad tarjeta={resumen.tarjeta} />
+              <TarjetaLealtad tarjeta={resumen.tarjeta} vencimiento={resumen.vencimiento} />
             </div>
           )}
           <div className="order-4 flex max-w-2xl flex-col gap-3">
