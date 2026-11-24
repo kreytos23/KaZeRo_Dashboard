@@ -15,6 +15,8 @@ export interface TarjetaPrevia {
   ciclo: number;
   posicion: number;
   pctBps: number;
+  /** L-7: la anterior venció (6 meses o más sin comprar) y esta nota empieza una tarjeta nueva. */
+  nueva: boolean;
 }
 export interface PreviaPedido {
   /** En el orden pedido, sin repetidos. */

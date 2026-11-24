@@ -1,6 +1,9 @@
+import { sumarMeses } from './fechas';
+
 /**
  * Tarjeta de lealtad (R-20 a R-28; R-29 derogada 2026-10-23). Lógica pura: la usa el servicio (autoridad) y la UI (vista previa).
  * Las compras previas de la tarjeta de papel (L-1, 2026-11-16) ocupan los lugares 1..n de la primera tarjeta.
+ * L-7 (2026-11-24): con 6 meses o más sin comprar, la siguiente nota empieza una tarjeta nueva.
  */
 export interface ReglasLealtad {
   /** R-21: posiciones por ciclo. */
@@ -16,14 +19,51 @@ export interface Posicion {
   posicion: number;
 }
 
+/** L-7: meses de calendario sin comprar tras los que la tarjeta vence. */
+export const MESES_VENCIMIENTO = 6;
+
+/** L-7: día en que vence la tarjeta (la regla de `date + interval '6 months'` de Postgres). */
+export function vencimientoTarjeta(ultimaCompra: string): string {
+  return sumarMeses(ultimaCompra, MESES_VENCIMIENTO);
+}
+
+/** L-7: la nota con fecha `fecha` vence la tarjeta si cae el mismo día seis meses después de la última compra o más tarde. */
+export function tarjetaVencida(ultimaCompra: string | null, fecha: string): boolean {
+  return ultimaCompra !== null && fecha >= vencimientoTarjeta(ultimaCompra);
+}
+
 /**
- * D-2 (Plan 3.1): la tarjeta actual es la vuelta más alta con algún pedido vigente. Se toma su lugar libre más
- * bajo (un lugar cancelado de la tarjeta actual se reutiliza); si está llena, vuelta nueva en el 1. Los huecos
- * de vueltas anteriores NO se rellenan.
+ * L-7: la última compra es la fecha más reciente entre las notas vigentes que cuentan para la tarjeta (de cualquier
+ * vuelta) y la fecha de las compras previas. Las fechas son 'AAAA-MM-DD': se comparan como texto.
  */
-export function siguientePosicion(ocupadas: readonly Posicion[], reglas = REGLAS_LEALTAD): Posicion {
+export function ultimaCompra(fechas: readonly (string | null | undefined)[]): string | null {
+  let max: string | null = null;
+  for (const f of fechas) if (f && (max === null || f > max)) max = f;
+  return max;
+}
+
+/** L-7: la última compra y la fecha de la nota que se va a crear. */
+export interface Vencimiento {
+  ultimaCompra: string | null;
+  fecha: string;
+}
+
+/** Sin vencimiento: la migración del Excel reproduce la hoja tal cual, sin la regla L-7. */
+export const SIN_VENCIMIENTO: Vencimiento = { ultimaCompra: null, fecha: '' };
+
+/**
+ * D-2 (Plan 3.1): la tarjeta actual es la vuelta más alta con algún pedido vigente (las previas son la vuelta 1).
+ * Se toma su lugar libre más bajo (un lugar cancelado de la tarjeta actual se reutiliza); si está llena, vuelta
+ * nueva en el 1. Los huecos de vueltas anteriores NO se rellenan. L-7: si la tarjeta venció, vuelta nueva en el 1.
+ */
+export function siguientePosicion(
+  ocupadas: readonly Posicion[],
+  vencimiento: Vencimiento,
+  reglas = REGLAS_LEALTAD,
+): Posicion {
   if (!ocupadas.length) return { ciclo: 1, posicion: 1 };
   const actual = ocupadas.reduce((m, o) => Math.max(m, o.ciclo), 1);
+  if (tarjetaVencida(vencimiento.ultimaCompra, vencimiento.fecha)) return { ciclo: actual + 1, posicion: 1 };
   const usadas = new Set(ocupadas.filter((o) => o.ciclo === actual).map((o) => o.posicion));
   for (let posicion = 1; posicion <= reglas.tamanoCiclo; posicion++)
     if (!usadas.has(posicion)) return { ciclo: actual, posicion };

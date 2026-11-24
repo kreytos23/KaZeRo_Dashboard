@@ -35,13 +35,14 @@ describe('GET /api/pedidos/previa', () => {
     expect(previsualizar).not.toHaveBeenCalled();
   });
   it('válida: 200 sin caché con la vista previa', async () => {
-    const r = await pedir(`?cliente=${U}&codigos=AF12,AF13&tarjeta=1`);
+    const r = await pedir(`?cliente=${U}&codigos=AF12,AF13&tarjeta=1&fecha=2026-11-20`);
     expect(r.status).toBe(200);
     expect(r.headers.get('cache-control')).toBe('private, no-store');
     expect(await r.json()).toEqual({ piezas: [], faltantes: [], cliente: null, tarjeta: null });
+    // L-7: la fecha elegida llega a la vista previa (decide si la tarjeta venció).
     expect(previsualizar).toHaveBeenCalledWith(
       {},
-      { clienteId: U, codigos: ['AF12', 'AF13'], cuentaTarjeta: true },
+      { clienteId: U, codigos: ['AF12', 'AF13'], cuentaTarjeta: true, fecha: '2026-11-20' },
     );
   });
   it('si la base falla: 500 JSON sin caché y sin filtrar el mensaje', async () => {

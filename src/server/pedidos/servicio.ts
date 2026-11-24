@@ -14,7 +14,13 @@ import {
 } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
-import { conPrevias, descuentoLealtad, siguientePosicion, type Posicion } from '@/domain/lealtad';
+import {
+  conPrevias,
+  descuentoLealtad,
+  siguientePosicion,
+  ultimaCompra,
+  type Posicion,
+} from '@/domain/lealtad';
 import {
   MAX_PIEZAS_PEDIDO,
   calcularTotales,
@@ -191,11 +197,12 @@ export async function crearPedidoEnTx(tx: Ejecutor, d: Omit<DatosPedido, 'key'>)
   if (v.cuentaTarjeta) {
     // L-1: la clienta ya está bloqueada (paso 1), así que sus compras previas no cambian a mitad de la nota.
     const [c] = await tx
-      .select({ previas: cliente.comprasPrevias })
+      .select({ previas: cliente.comprasPrevias, previasFecha: cliente.comprasPreviasFecha })
       .from(cliente)
       .where(eq(cliente.id, v.clienteId));
+    // L-7: las mismas filas dan la última compra (la `fecha` de las notas vigentes que cuentan, de cualquier vuelta).
     const ocupadas = await tx
-      .select({ ciclo: pedido.cicloTarjeta, posicion: pedido.posicionTarjeta })
+      .select({ ciclo: pedido.cicloTarjeta, posicion: pedido.posicionTarjeta, fecha: pedido.fecha })
       .from(pedido)
       .where(
         and(
@@ -209,6 +216,8 @@ export async function crearPedidoEnTx(tx: Ejecutor, d: Omit<DatosPedido, 'key'>)
         ocupadas.map((o) => ({ ciclo: o.ciclo!, posicion: o.posicion! })),
         c?.previas ?? 0,
       ),
+      // L-7: 6 meses o más sin comprar → tarjeta nueva. Sin notas, cuenta la fecha de las compras previas.
+      { ultimaCompra: ultimaCompra([c?.previasFecha, ...ocupadas.map((o) => o.fecha)]), fecha },
     );
     pctBps = descuentoLealtad({ cuentaTarjeta: true, posicion: posicion.posicion }).pctBps;
   }

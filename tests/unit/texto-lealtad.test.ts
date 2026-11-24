@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { armarTarjeta } from '@/domain/lealtad';
 import {
+  avisoVencimiento,
   etiquetaCasilla,
   pieTarjeta,
   textoLealtadGuardada,
@@ -12,6 +13,7 @@ const tarjeta = (extra: Partial<TarjetaPrevia> = {}): TarjetaPrevia => ({
   ciclo: 1,
   posicion: 5,
   pctBps: 1000,
+  nueva: false,
   ...extra,
 });
 
@@ -108,4 +110,41 @@ describe('pieTarjeta', () => {
     [9, '9 de 10 · falta 1 para el 20 %'],
     [10, '10 de 10 · tarjeta completa'],
   ])('%i ocupadas', (n, texto) => expect(pieTarjeta(con(n))).toBe(texto));
+});
+
+describe('L-7: vencimiento de la tarjeta', () => {
+  it('la vista previa avisa que la nota empieza una tarjeta nueva', () => {
+    expect(
+      textoLealtadPrevia(tarjeta({ ciclo: 2, posicion: 1, pctBps: 0, nueva: true }), {
+        cuentaTarjeta: true,
+        hayCliente: true,
+      }),
+    ).toBe('Pedido 1 de su tarjeta nueva: la anterior venció (6 meses o más sin comprar).');
+  });
+  it('la ficha avisa cuando ya venció, con la fecha de la última compra', () => {
+    expect(
+      avisoVencimiento({ ultimaCompra: '2026-05-17', vence: '2026-11-17', vencida: true }, armarTarjeta([])),
+    ).toBe(
+      'Tarjeta vencida: más de 6 meses sin comprar (última compra: 17 de mayo de 2026). Su próxima nota empieza una tarjeta nueva.',
+    );
+  });
+  it('si no ha vencido, dice cuándo vence, solo con alguna compra en la tarjeta actual', () => {
+    const v = { ultimaCompra: '2026-10-02', vence: '2027-04-02', vencida: false };
+    expect(avisoVencimiento(v, armarTarjeta([], 2))).toBe('Vence el 2 de abril de 2027.');
+    expect(avisoVencimiento(v, armarTarjeta([]))).toBeNull();
+  });
+  it('con la tarjeta llena no dice cuándo vence: la siguiente nota ya empieza otra', () => {
+    const v = { ultimaCompra: '2026-10-02', vence: '2027-04-02', vencida: false };
+    expect(avisoVencimiento(v, armarTarjeta([], 9))).toBe('Vence el 2 de abril de 2027.');
+    const llena = armarTarjeta(
+      [{ ciclo: 1, posicion: 10, estado: 'liquidado', folio: 7, conSaldo: false }],
+      9,
+    );
+    expect(avisoVencimiento(v, llena)).toBeNull();
+  });
+  it('sin compras no hay aviso', () => {
+    expect(
+      avisoVencimiento({ ultimaCompra: null, vence: null, vencida: false }, armarTarjeta([])),
+    ).toBeNull();
+  });
 });

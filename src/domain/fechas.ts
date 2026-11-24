@@ -37,3 +37,36 @@ export function diasEntre(a: string, b: string): number {
     Date.UTC(Number(iso.slice(0, 4)), Number(iso.slice(5, 7)) - 1, Number(iso.slice(8, 10)));
   return Math.round((utc(b) - utc(a)) / 86_400_000);
 }
+
+/**
+ * `fecha + interval 'n months'` de Postgres sobre fechas de negocio: el mismo día `n` meses después y, si ese mes
+ * no lo tiene, su último día. Los meses se suman de una vez (31 oct + 6 = 30 abr; 31 ago + 7 = 31 mar).
+ */
+export function sumarMeses(iso: string, meses: number): string {
+  const total = Number(iso.slice(0, 4)) * 12 + Number(iso.slice(5, 7)) - 1 + meses;
+  const anio = Math.floor(total / 12);
+  const mes = total - anio * 12; // 0..11
+  const ultimo = new Date(Date.UTC(anio, mes + 1, 0)).getUTCDate();
+  const dia = Math.min(Number(iso.slice(8, 10)), ultimo);
+  return `${String(anio).padStart(4, '0')}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+}
+
+const MESES = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/** '2026-05-17' → '17 de mayo de 2026' (fecha de negocio, sin zona horaria). */
+export function fechaLarga(iso: string): string {
+  return `${Number(iso.slice(8, 10))} de ${MESES[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}`;
+}
