@@ -24,7 +24,7 @@ export default async function ReporteExhibidores({
   const exhibidorId = uuidOpcional(typeof sp.exhibidor === 'string' ? sp.exhibidor : null) ?? '';
   // Solo «1» enciende las ventas del mes (apagadas por omisión); funciona sin JS por ser un formulario GET.
   const ventas = incluirVentas(sp.ventas);
-  const r = await conDbLectura((db) => reporteExhibidores(db, { mes, hoy }));
+  const r = await conDbLectura((db) => reporteExhibidores(db, { mes, hoy, ventas }));
   const hojas = exhibidorId ? r.hojas.filter((h) => h.exhibidorId === exhibidorId) : r.hojas;
   const consulta = new URLSearchParams({ mes: mes.slice(0, 7) });
   if (exhibidorId) consulta.set('exhibidor', exhibidorId);
@@ -65,7 +65,7 @@ export default async function ReporteExhibidores({
       </div>
       {r.enCurso && <p className="aviso-atencion">Mes en curso: al {fechaLarga(r.hoy)}</p>}
       {hojas.length === 0 ? (
-        <EstadoVacio titulo="Sin piezas ni movimiento en este mes." detalle="Elige otro mes o exhibidor." />
+        <EstadoVacio titulo="Sin piezas en el exhibidor este mes." detalle="Elige otro mes o exhibidor." />
       ) : (
         <div className="grid items-start gap-4 lg:grid-cols-2">
           {hojas.map((h) => (

@@ -1,18 +1,10 @@
-import { and, asc, eq, inArray, isNotNull, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, lt, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
-import { entregaExhibidor, pago, vExhibidor, vMovimientoPieza, vPedido, vPieza } from '@/db/schema';
+import { vExhibidor, vMovimientoPieza, vPedido, vPieza } from '@/db/schema';
 import { mesDe, mesSiguiente, type Mes } from '@/domain/comisiones';
 import { numericACentavos } from '@/domain/dinero';
 import { hoyMX } from '@/domain/fechas';
-import {
-  cuadreDinero,
-  cuadrePiezas,
-  hojaSale,
-  notasVendidas,
-  piezasAlCierre,
-  type MovDinero,
-  type MovExhibidor,
-} from '@/domain/reporte-exhibidor';
+import { hojaSale, notasVendidas, piezasAlCierre, type MovExhibidor } from '@/domain/reporte-exhibidor';
 
 export interface HojaExhibidor {
   exhibidorId: string;
@@ -50,22 +42,23 @@ function agrupar<T, K>(filas: readonly T[], llave: (f: T) => K): Map<K, T[]> {
 }
 
 /**
- * Todas las hojas de un mes, en cuatro consultas: una joyería tiene pocos exhibidores y el filtro por exhibidor
- * se hace en quien llama. X-1: columnas explícitas, sin costo ni datos de la clienta.
+ * Todas las hojas de un mes, en tres consultas como mucho (exhibidores, movimientos y, si hubo ventas, sus notas):
+ * una joyería tiene pocos exhibidores y el filtro por exhibidor se hace en quien llama. Sale la hoja con piezas al
+ * cierre o, con `ventas`, la que vendió en el mes (`hojaSale`). X-1: columnas explícitas, sin costo ni datos de la
+ * clienta.
  */
 export async function reporteExhibidores(
   db: Ejecutor,
-  o: { mes: Mes; hoy?: string },
+  o: { mes: Mes; hoy?: string; ventas?: boolean },
 ): Promise<ReporteExhibidores> {
   const hoy = o.hoy ?? hoyMX();
   const corte = mesSiguiente(o.mes);
-  const [exhibidores, movs, cobros, entregas] = await Promise.all([
+  const [exhibidores, movs] = await Promise.all([
     db
       .select({
         id: vExhibidor.id,
         nombre: vExhibidor.nombre,
         vendedorNombre: vExhibidor.vendedorNombre,
-        estado: vExhibidor.estado,
       })
       .from(vExhibidor)
       .orderBy(asc(vExhibidor.nombre)),
@@ -92,40 +85,9 @@ export async function reporteExhibidores(
         ),
       )
       .orderBy(asc(vMovimientoPieza.orden)),
-    db
-      .select({ exhibidorId: pago.exhibidorId, fecha: pago.fecha, monto: pago.monto })
-      .from(pago)
-      .where(and(isNotNull(pago.exhibidorId), isNull(pago.anuladoAt), lt(pago.fecha, corte))),
-    db
-      .select({
-        exhibidorId: entregaExhibidor.exhibidorId,
-        tipo: entregaExhibidor.tipo,
-        fecha: entregaExhibidor.fecha,
-        monto: entregaExhibidor.monto,
-      })
-      .from(entregaExhibidor)
-      .where(lt(entregaExhibidor.fecha, corte)),
   ]);
 
   const movsPorExhibidor = agrupar(movs, (m) => m.exhibidorId!);
-  const dineroPorExhibidor = agrupar<MovDinero & { exhibidorId: string }, string>(
-    [
-      ...cobros.map((c) => ({
-        exhibidorId: c.exhibidorId!,
-        tipo: 'cobro' as const,
-        fecha: c.fecha,
-        centavos: numericACentavos(c.monto),
-      })),
-      ...entregas.map((e) => ({
-        exhibidorId: e.exhibidorId,
-        tipo: e.tipo,
-        fecha: e.fecha,
-        centavos: numericACentavos(e.monto),
-      })),
-    ],
-    (m) => m.exhibidorId,
-  );
-
   const notasPorExhibidor = new Map(
     exhibidores.map((e) => {
       const propios: MovExhibidor[] = movsPorExhibidor.get(e.id) ?? [];
@@ -151,10 +113,9 @@ export async function reporteExhibidores(
 
   const hojas = exhibidores.flatMap((e) => {
     const propios = movsPorExhibidor.get(e.id) ?? [];
-    const piezas = cuadrePiezas(propios, o.mes);
-    const dinero = cuadreDinero(dineroPorExhibidor.get(e.id) ?? [], o.mes);
     const quedan = new Set(piezasAlCierre(propios, o.mes));
-    if (!hojaSale(piezas, dinero, { abierto: e.estado === 'abierto', piezasAlCierre: quedan.size }))
+    const vendidas = notasPorExhibidor.get(e.id)!;
+    if (!hojaSale({ piezasAlCierre: quedan.size, notasDelMes: vendidas.size, ventas: o.ventas ?? false }))
       return [];
     const datosPieza = new Map(propios.map((m) => [m.piezaId, m]));
     return [
@@ -170,7 +131,7 @@ export async function reporteExhibidores(
             precioCentavos: numericACentavos(m.precio),
           }))
           .sort((a, b) => a.codigo.localeCompare(b.codigo, 'es')),
-        ventas: [...notasPorExhibidor.get(e.id)!]
+        ventas: [...vendidas]
           .flatMap(([id, n]) => {
             const nota = notaPorId.get(id);
             if (!nota) return [];

@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   if (!mes) return Response.json({ error: 'mes_invalido' }, { status: 400, headers: SIN_CACHE });
   const exhibidorId = uuidOpcional(url.get('exhibidor')); // inválido → todos
   const ventas = incluirVentas(url.get('ventas'));
-  const r = await conDbLectura((db) => reporteExhibidores(db, { mes }));
+  const r = await conDbLectura((db) => reporteExhibidores(db, { mes, ventas }));
   const hojas = exhibidorId ? r.hojas.filter((h) => h.exhibidorId === exhibidorId) : r.hojas;
   const bytes = await pdfExhibidores(r, hojas, { ventas });
   return respuestaPdf(

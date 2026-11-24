@@ -28,8 +28,8 @@ const r = StyleSheet.create({
   datos: { marginBottom: 8, fontSize: 10 },
   exhibidor: { fontFamily: 'Helvetica-Bold' },
   datoSuave: { color: '#555' },
-  tabla: { borderLeftWidth: 0.5, borderColor: BORDE },
-  // Cada fila cierra abajo y la cabecera (que se repite por página) cierra arriba: ningún corte queda abierto.
+  // Cada fila cierra abajo y la cabecera (que se repite por página) cierra arriba: ningún corte queda abierto. El
+  // borde izquierdo va en la primera celda de cada fila y no en la tabla, para no dejar una rayita al partirse.
   fila: { flexDirection: 'row', minHeight: 24, borderBottomWidth: 0.5, borderColor: BORDE },
   filaCab: { minHeight: 30, borderTopWidth: 0.5, fontFamily: 'Helvetica-Bold' },
   celda: {
@@ -39,12 +39,13 @@ const r = StyleSheet.create({
     paddingVertical: 3,
     justifyContent: 'center',
   },
+  primeraCelda: { borderLeftWidth: 0.5 },
   entrega: { marginTop: 28, textAlign: 'right', fontSize: 11 },
 });
 
 function Celdas({ textos, cabecera }: { textos: string[]; cabecera?: boolean }) {
   return COLUMNAS.map((c, i) => (
-    <View key={c.titulo} style={[r.celda, { width: c.ancho }]}>
+    <View key={c.titulo} style={[r.celda, i === 0 ? r.primeraCelda : {}, { width: c.ancho }]}>
       <Text style={{ textAlign: cabecera ? 'center' : 'derecha' in c ? 'right' : 'left' }}>{textos[i]}</Text>
     </View>
   ));
@@ -52,7 +53,7 @@ function Celdas({ textos, cabecera }: { textos: string[]; cabecera?: boolean }) 
 
 function Relacion({ h }: { h: HojaExhibidor }) {
   return (
-    <View style={r.tabla}>
+    <View>
       {/* `fixed`: la cabecera se repite en cada página que ocupe la tabla. */}
       <View style={[r.fila, r.filaCab]} wrap={false} fixed>
         <Celdas cabecera textos={COLUMNAS.map((c) => c.titulo)} />
@@ -172,7 +173,7 @@ export function ExhibidoresPdf({
         <Page size="LETTER" style={estilos.pagina}>
           <Cabecera logo={logo} />
           <Text style={r.datoSuave}>{periodo}</Text>
-          <Text style={estilos.vacio}>Sin piezas ni movimiento en el mes.</Text>
+          <Text style={estilos.vacio}>Sin piezas en el exhibidor este mes.</Text>
           <Pie />
         </Page>
       ) : (

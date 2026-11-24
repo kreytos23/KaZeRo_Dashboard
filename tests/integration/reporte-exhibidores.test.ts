@@ -8,6 +8,7 @@ import { hoyMX } from '@/domain/fechas';
 import { crearCliente } from '@/server/clientes/servicio';
 import { registrarVentaExhibidor } from '@/server/exhibidores/dinero';
 import { crearExhibidor, enviarPiezas, regresarPiezas } from '@/server/exhibidores/servicio';
+import { registrarPagoDePedido } from '@/server/pagos/servicio';
 import { cancelarPedido } from '@/server/pedidos/servicio';
 import { altaPieza } from '@/server/piezas/servicio';
 import { reporteExhibidores } from '@/server/reportes/exhibidores';
@@ -48,8 +49,8 @@ const venta = (codigos: string[], cobradoCentavos: number) =>
       metodo: 'efectivo',
     }),
   );
-const hoja = async () => {
-  const r = await app((db) => reporteExhibidores(db, { mes, hoy }));
+const hoja = async (ventas = false) => {
+  const r = await app((db) => reporteExhibidores(db, { mes, hoy, ventas }));
   return r.hojas.find((h) => h.exhibidorId === exhibidorId)!;
 };
 const piezasFicha = () =>
@@ -85,7 +86,7 @@ describe('reporte mensual de exhibidores', () => {
   it('X-3: la venta con saldo sale por nota, con cobrado y saldo', async () => {
     await enviar('RX04', 'RX05');
     const v = await venta(['RX04', 'RX05'], 5000);
-    const h = await hoja();
+    const h = await hoja(true);
     expect(h.ventas).toHaveLength(1);
     expect(h.ventas[0]).toMatchObject({
       pedidoId: v.pedidoId,
@@ -120,9 +121,33 @@ describe('reporte mensual de exhibidores', () => {
   it('si se vendió todo, la hoja sale por la venta del mes aunque no queden piezas', async () => {
     await enviar('RX07');
     const v = await venta(['RX07'], 3000);
-    const h = await hoja();
+    const h = await hoja(true);
     expect(h.piezasAlCierre).toEqual([]);
     expect(h.ventas.map((x) => x.pedidoId)).toEqual([v.pedidoId]);
+    // Sin pedir las ventas, una hoja sin piezas no sale.
+    expect(await hoja()).toBeUndefined();
+  });
+
+  it('un exhibidor con solo un cobro en el mes y sin piezas no tiene hoja', async () => {
+    await enviar('RX08');
+    const v = await venta(['RX08'], 0);
+    const cobros = await app((db) =>
+      crearExhibidor(db, { vendedorId, nombre: 'Salón Cobros', fechaEnvio: '2026-10-01' }),
+    );
+    await app((db) =>
+      registrarPagoDePedido(db, {
+        key: randomUUID(),
+        adminId,
+        pedidoId: v.pedidoId,
+        montoCentavos: 2000,
+        metodo: 'efectivo',
+        pagador: 'cliente',
+        exhibidorId: cobros,
+      }),
+    );
+    const r = await app((db) => reporteExhibidores(db, { mes, hoy, ventas: true }));
+    expect(r.hojas.find((x) => x.exhibidorId === cobros)).toBeUndefined();
+    expect(r.hojas.find((x) => x.exhibidorId === exhibidorId)).toBeDefined();
   });
 
   it('un exhibidor abierto sin movimiento en el mes pero con piezas sí tiene hoja; antes de enviarlas no', async () => {
@@ -135,7 +160,7 @@ describe('reporte mensual de exhibidores', () => {
     expect(anterior.hojas.find((x) => x.exhibidorId === exhibidorId)).toBeUndefined();
   });
 
-  it('un exhibidor sin piezas ni movimiento no tiene hoja', async () => {
+  it('un exhibidor sin piezas ni ventas no tiene hoja', async () => {
     const r = await app((db) => reporteExhibidores(db, { mes, hoy }));
     expect(r.hojas.find((x) => x.exhibidorId === exhibidorId)).toBeUndefined();
   });
@@ -144,7 +169,7 @@ describe('reporte mensual de exhibidores', () => {
     await alta('RX10', 4321);
     await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['RX10'] }));
     await venta(['RX10'], 0);
-    const texto = JSON.stringify(await hoja());
+    const texto = JSON.stringify(await hoja(true));
     expect(texto).not.toContain('Sintética');
     expect(texto).not.toContain('5550000000');
     expect(texto.toLowerCase()).not.toContain('costo');

@@ -7,6 +7,7 @@ import { iniciarLogin, verificarSegundoFactor } from '@/server/auth/servicio';
 import { generarCodigoTotp } from '@/server/auth/totp';
 import { crearCliente } from '@/server/clientes/servicio';
 import { crearPedido } from '@/server/pedidos/servicio';
+import { registrarVentaExhibidor } from '@/server/exhibidores/dinero';
 import { crearExhibidor, enviarPiezas } from '@/server/exhibidores/servicio';
 import { altaPieza } from '@/server/piezas/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
@@ -171,7 +172,7 @@ describe('PDF de exhibidores', () => {
     const exhibidorId = await app((db) =>
       crearExhibidor(db, { vendedorId, nombre: 'Salón Prueba', fechaEnvio: '2026-10-01' }),
     );
-    // La hoja solo existe si el exhibidor tiene piezas o actividad en el mes: se le envía una pieza hoy.
+    // La hoja solo existe si el exhibidor tiene piezas al cierre (o ventas, si se piden): se le envía una pieza hoy.
     await app((db) =>
       altaPieza(db, {
         codigo: 'EX01',
@@ -193,12 +194,50 @@ describe('PDF de exhibidores', () => {
 
   it('?ventas=1 incluye las ventas del mes y cualquier otro valor cuenta como apagado', async () => {
     cookieActual = await sesionCompleta();
+    const adminId = await adminDePrueba();
+    const vendedorId = await app((db) =>
+      crearVendedor(db, { nombre: 'Perla Ejemplo', tipo: 'revendedora', comisionPct: '10.00' }),
+    );
+    const exhibidorId = await app((db) =>
+      crearExhibidor(db, { vendedorId, nombre: 'Salón Prueba', fechaEnvio: '2026-10-01' }),
+    );
+    for (const codigo of ['EV01', 'EV02'])
+      await app((db) =>
+        altaPieza(db, {
+          codigo,
+          categoria: 'Aretes',
+          descripcion: 'Arete',
+          costoCentavos: 0,
+          precioCentavos: 10000,
+        }),
+      );
+    await app((db) => enviarPiezas(db, { exhibidorId, codigos: ['EV01', 'EV02'] }));
+    // Se vende una y queda la otra: la hoja sale con y sin ventas, y solo cambia la sección «Ventas del mes».
+    await app((db) =>
+      registrarVentaExhibidor(db, {
+        key: randomUUID(),
+        adminId,
+        exhibidorId,
+        codigos: ['EV01'],
+        clienteId: null,
+        cobradoCentavos: 0,
+        metodo: 'efectivo',
+      }),
+    );
+    const mesActual = hoyMX().slice(0, 7);
     const { GET } = await import('@/app/panel/reportes/exhibidores/pdf/route');
-    for (const v of ['1', '0', 'si', ''] as const) {
-      const res = await GET(new Request(`${ruta}?mes=2026-10&ventas=${v}`));
+    // Mismo contenido → mismo tamaño: la fecha de creación del PDF tiene longitud fija.
+    const tamano = async (v: string) => {
+      const res = await GET(new Request(`${ruta}?mes=${mesActual}&ventas=${v}`));
       expect(res.status).toBe(200);
-      expect(await bytes(res)).toBe('%PDF-');
-    }
+      const b = new Uint8Array(await res.arrayBuffer());
+      expect(new TextDecoder().decode(b.slice(0, 5))).toBe('%PDF-');
+      return b.byteLength;
+    };
+    const apagado = await tamano('0');
+    expect(await tamano('1')).toBeGreaterThan(apagado);
+    expect(await tamano('si')).toBe(apagado);
+    expect(await tamano('')).toBe(apagado);
   });
 
   it('un mes inválido → 400, sin llegar a la consulta', async () => {

@@ -10,7 +10,10 @@ test('Reportes abre el Resumen y un rango inválido avisa', async ({ page }) => 
   await expect(page.getByRole('heading', { name: 'Top asociados' })).toBeVisible();
   // Total del inventario no vendido en pesos (puede ser $0.00 en una base vacía) y su desglose por ubicación.
   const inventario = page.getByRole('region', { name: 'Inventario hoy' });
-  await expect(inventario.getByText(/^\$[\d,]+\.\d{2}$/).first()).toBeVisible();
+  // Acotado al párrafo del total: si desaparece, no lo suple el monto de una ubicación.
+  const total = inventario.locator('p').filter({ hasText: /· \d+ piezas?$/ });
+  await expect(total.getByText(/^\$[\d,]+\.\d{2}$/)).toBeVisible();
+  await expect(total.getByText(/^· \d+ piezas?$/)).toBeVisible();
   await expect(inventario.getByRole('heading', { name: 'Piezas por ubicación' })).toBeVisible();
   await irA(page, '/panel/reportes/resumen?periodo=rango&desde=2026-02-30&hasta=2026-03-01');
   await expect(page.getByText('Ese rango no es válido')).toBeVisible();

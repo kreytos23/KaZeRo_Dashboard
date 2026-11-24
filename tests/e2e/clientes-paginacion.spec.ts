@@ -11,7 +11,9 @@ test('la lista de clientes se pagina de 10 en 10 y conserva el filtro en los enl
   // Prefijo único por proyecto y reintento (`PagEx`, `PagERx`…): el filtro por él aísla estas 11 clientas.
   const prefijo = `Pag${m}x`;
   const numeros = Array.from({ length: 11 }, (_, i) => String(i + 1).padStart(2, '0'));
-  await Promise.all(numeros.map((n) => sembrarCliente(`${prefijo} ${n}`)));
+  // En lotes de 10, como antes: no se lanzan todas las altas a la vez contra la base.
+  for (let i = 0; i < numeros.length; i += 10)
+    await Promise.all(numeros.slice(i, i + 10).map((n) => sembrarCliente(`${prefijo} ${n}`)));
 
   await irA(page, `/panel/clientes?q=${prefijo}`);
   const filas = page.getByRole('link', { name: new RegExp(`^${prefijo} \\d{2}$`) });
