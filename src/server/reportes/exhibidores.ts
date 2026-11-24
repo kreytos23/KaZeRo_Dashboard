@@ -7,11 +7,9 @@ import { hoyMX } from '@/domain/fechas';
 import {
   cuadreDinero,
   cuadrePiezas,
-  hojaConActividad,
+  hojaSale,
   notasVendidas,
   piezasAlCierre,
-  type CuadreDinero,
-  type CuadrePiezas,
   type MovDinero,
   type MovExhibidor,
 } from '@/domain/reporte-exhibidor';
@@ -20,8 +18,6 @@ export interface HojaExhibidor {
   exhibidorId: string;
   nombre: string;
   vendedorNombre: string;
-  piezas: CuadrePiezas;
-  dinero: CuadreDinero;
   piezasAlCierre: { codigo: string; descripcion: string; precioCentavos: number }[];
   ventas: {
     pedidoId: string;
@@ -38,6 +34,8 @@ export interface HojaExhibidor {
 export interface ReporteExhibidores {
   mes: Mes;
   enCurso: boolean;
+  /** Fecha de generación (México): la «Fecha de entrega» de la hoja y el corte del mes en curso. */
+  hoy: string;
   hojas: HojaExhibidor[];
 }
 
@@ -63,7 +61,12 @@ export async function reporteExhibidores(
   const corte = mesSiguiente(o.mes);
   const [exhibidores, movs, cobros, entregas] = await Promise.all([
     db
-      .select({ id: vExhibidor.id, nombre: vExhibidor.nombre, vendedorNombre: vExhibidor.vendedorNombre })
+      .select({
+        id: vExhibidor.id,
+        nombre: vExhibidor.nombre,
+        vendedorNombre: vExhibidor.vendedorNombre,
+        estado: vExhibidor.estado,
+      })
       .from(vExhibidor)
       .orderBy(asc(vExhibidor.nombre)),
     db
@@ -150,16 +153,15 @@ export async function reporteExhibidores(
     const propios = movsPorExhibidor.get(e.id) ?? [];
     const piezas = cuadrePiezas(propios, o.mes);
     const dinero = cuadreDinero(dineroPorExhibidor.get(e.id) ?? [], o.mes);
-    if (!hojaConActividad(piezas, dinero)) return [];
     const quedan = new Set(piezasAlCierre(propios, o.mes));
+    if (!hojaSale(piezas, dinero, { abierto: e.estado === 'abierto', piezasAlCierre: quedan.size }))
+      return [];
     const datosPieza = new Map(propios.map((m) => [m.piezaId, m]));
     return [
       {
         exhibidorId: e.id,
         nombre: e.nombre,
         vendedorNombre: e.vendedorNombre,
-        piezas,
-        dinero,
         piezasAlCierre: [...quedan]
           .map((id) => datosPieza.get(id)!)
           .map((m) => ({
@@ -189,5 +191,5 @@ export async function reporteExhibidores(
       },
     ];
   });
-  return { mes: o.mes, enCurso: o.mes >= mesDe(hoy), hojas };
+  return { mes: o.mes, enCurso: o.mes >= mesDe(hoy), hoy, hojas };
 }

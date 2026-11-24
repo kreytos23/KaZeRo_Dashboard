@@ -1,5 +1,6 @@
 import { conDbLectura } from '@/db/client';
 import { mesDeUrl } from '@/domain/comisiones';
+import { incluirVentas } from '@/domain/reporte-exhibidor';
 import { uuidOpcional } from '@/server/acciones';
 import { sesionDeApi } from '@/server/auth/sesion-actual';
 import { pdfExhibidores } from '@/server/pdf/generar';
@@ -18,9 +19,10 @@ export async function GET(req: Request) {
   const mes = mesDeUrl(url.get('mes'));
   if (!mes) return Response.json({ error: 'mes_invalido' }, { status: 400, headers: SIN_CACHE });
   const exhibidorId = uuidOpcional(url.get('exhibidor')); // inválido → todos
+  const ventas = incluirVentas(url.get('ventas'));
   const r = await conDbLectura((db) => reporteExhibidores(db, { mes }));
   const hojas = exhibidorId ? r.hojas.filter((h) => h.exhibidorId === exhibidorId) : r.hojas;
-  const bytes = await pdfExhibidores(r, hojas);
+  const bytes = await pdfExhibidores(r, hojas, { ventas });
   return respuestaPdf(
     bytes,
     nombreArchivoExhibidores(mes.slice(0, 7), exhibidorId ? hojas[0]?.nombre : null),

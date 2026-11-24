@@ -109,3 +109,20 @@ export function hojaConActividad(p: CuadrePiezas, d: CuadreDinero): boolean {
     d.ajustes !== 0
   );
 }
+
+/**
+ * La hoja sirve para entregar las piezas: sale la de un exhibidor abierto con piezas al cierre aunque no haya
+ * tenido movimiento en el mes, y la de cualquiera con actividad en él (piezas o dinero).
+ */
+export function hojaSale(
+  p: CuadrePiezas,
+  d: CuadreDinero,
+  o: { abierto: boolean; piezasAlCierre: number },
+): boolean {
+  return (o.abierto && o.piezasAlCierre > 0) || hojaConActividad(p, d);
+}
+
+/** Parámetro `ventas` de la página y del PDF: solo «1» incluye las ventas del mes; lo demás cuenta como apagado. */
+export function incluirVentas(v: unknown): boolean {
+  return v === '1';
+}

@@ -12,6 +12,27 @@ export function fechaCorta(iso: string): string {
   return iso.split('-').reverse().join('/');
 }
 
+const MESES_MINUSCULA = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/** '2026-11-24' → '24 de noviembre de 2026' (fecha de negocio, sin zona horaria). */
+export function fechaLarga(iso: string): string {
+  const [a, m, d] = iso.split('-');
+  return `${Number(d)} de ${MESES_MINUSCULA[Number(m) - 1]} de ${a}`;
+}
+
 const DIA_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' });
 
 /** Fecha de negocio de hoy (YYYY-MM-DD) en la zona horaria del negocio. */

@@ -4,6 +4,8 @@ import {
   cuadreDinero,
   cuadrePiezas,
   hojaConActividad,
+  hojaSale,
+  incluirVentas,
   notasVendidas,
   piezasAlCierre,
   type MovExhibidor,
@@ -170,5 +172,37 @@ describe('hoja con actividad', () => {
     expect(hojaConActividad({ ...p, alInicio: 1 }, d)).toBe(true);
     expect(hojaConActividad(p, { ...d, alInicio: 100 })).toBe(true);
     expect(hojaConActividad(p, { ...d, ajustes: -5 })).toBe(true);
+  });
+});
+
+describe('qué hojas salen', () => {
+  const p = {
+    alInicio: 0,
+    enviadas: 0,
+    vendidas: 0,
+    regresadas: 0,
+    porCancelacion: 0,
+    otros: 0,
+    alCierre: 0,
+  };
+  const d = { alInicio: 0, cobrado: 0, entregado: 0, ajustes: 0, alCierre: 0 };
+  it('un exhibidor abierto con piezas al cierre sale aunque no tenga movimiento en el mes', () => {
+    expect(hojaSale(p, d, { abierto: true, piezasAlCierre: 2 })).toBe(true);
+  });
+  it('abierto y sin piezas ni actividad no sale', () => {
+    expect(hojaSale(p, d, { abierto: true, piezasAlCierre: 0 })).toBe(false);
+  });
+  it('cerrado: solo sale si tuvo actividad', () => {
+    expect(hojaSale(p, d, { abierto: false, piezasAlCierre: 2 })).toBe(false);
+    expect(hojaSale({ ...p, vendidas: 1 }, d, { abierto: false, piezasAlCierre: 0 })).toBe(true);
+    expect(hojaSale(p, { ...d, cobrado: 100 }, { abierto: false, piezasAlCierre: 0 })).toBe(true);
+  });
+});
+
+describe('casilla «Incluir ventas del mes»', () => {
+  it('solo «1» la enciende; cualquier otro valor (o ninguno) cuenta como apagada', () => {
+    expect(incluirVentas('1')).toBe(true);
+    for (const v of [null, undefined, '', '0', 'si', 'true', '1 ', ['1']])
+      expect(incluirVentas(v)).toBe(false);
   });
 });

@@ -171,7 +171,7 @@ describe('PDF de exhibidores', () => {
     const exhibidorId = await app((db) =>
       crearExhibidor(db, { vendedorId, nombre: 'Salón Prueba', fechaEnvio: '2026-10-01' }),
     );
-    // La hoja solo existe si el exhibidor tuvo actividad en el mes: se le envía una pieza hoy.
+    // La hoja solo existe si el exhibidor tiene piezas o actividad en el mes: se le envía una pieza hoy.
     await app((db) =>
       altaPieza(db, {
         codigo: 'EX01',
@@ -189,6 +189,16 @@ describe('PDF de exhibidores', () => {
     expect(res.headers.get('content-disposition')).toBe(
       `attachment; filename="exhibidores-${mesActual}-salon-prueba.pdf"`,
     );
+  });
+
+  it('?ventas=1 incluye las ventas del mes y cualquier otro valor cuenta como apagado', async () => {
+    cookieActual = await sesionCompleta();
+    const { GET } = await import('@/app/panel/reportes/exhibidores/pdf/route');
+    for (const v of ['1', '0', 'si', ''] as const) {
+      const res = await GET(new Request(`${ruta}?mes=2026-10&ventas=${v}`));
+      expect(res.status).toBe(200);
+      expect(await bytes(res)).toBe('%PDF-');
+    }
   });
 
   it('un mes inválido → 400, sin llegar a la consulta', async () => {
