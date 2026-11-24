@@ -125,7 +125,7 @@ describe('L-7: vencimiento de la tarjeta', () => {
     expect(
       avisoVencimiento({ ultimaCompra: '2026-05-17', vence: '2026-11-17', vencida: true }, armarTarjeta([])),
     ).toBe(
-      'Tarjeta vencida: más de 6 meses sin comprar (última compra: 17 de mayo de 2026). Su próxima nota empieza una tarjeta nueva.',
+      'Tarjeta vencida: 6 meses o más sin comprar (última compra: 17 de mayo de 2026). Su próxima nota empieza una tarjeta nueva.',
     );
   });
   it('si no ha vencido, dice cuándo vence, solo con alguna compra en la tarjeta actual', () => {

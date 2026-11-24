@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { eq, sql } from 'drizzle-orm';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { pgCode } from '@/db/errors';
 import { conDbUrl } from '@/db/pool';
 import { vCliente, vPedido } from '@/db/schema';
 import { hoyMX, sumarMeses } from '@/domain/fechas';
@@ -139,6 +140,18 @@ describe('L-7: vencimiento de la tarjeta al crear la nota', () => {
     expect(await nota('2026-07-10')).toMatchObject({ cicloTarjeta: 1, posicionTarjeta: 5 });
   });
 
+  it('con notas, la fecha de las previas no cuenta aunque sea más reciente: manda la nota', async () => {
+    await corregir(2);
+    await previasDel('2025-12-01');
+    expect(await nota('2026-01-10')).toMatchObject({ cicloTarjeta: 1, posicionTarjeta: 3 });
+    // Unas previas fechadas después de la última nota (p. ej. una corrección del dueño) no renuevan la tarjeta.
+    await previasDel('2026-06-01');
+    expect((await previa('2026-07-10')).tarjeta).toMatchObject({ ciclo: 2, posicion: 1, nueva: true });
+    const r = await app((db) => resumenCliente(db, clienteId, '2026-07-10'));
+    expect(r.vencimiento).toMatchObject({ ultimaCompra: '2026-01-10', vencida: true });
+    expect(await nota('2026-07-10')).toMatchObject({ cicloTarjeta: 2, posicionTarjeta: 1 });
+  });
+
   it('una nota cancelada no cuenta como última compra', async () => {
     await nota('2026-01-10');
     const b = await nota('2026-06-01');
@@ -215,12 +228,14 @@ describe('L-7: fecha de las compras previas (trigger)', () => {
     expect(r.rows[0]!.f).toBe(hoyMX());
   });
 
-  it('kazero_app no puede escribirla', async () => {
-    await expect(
-      app((db) =>
-        db.execute(sql`UPDATE cliente SET compras_previas_fecha = '2020-01-01' WHERE id = ${clienteId}`),
-      ),
-    ).rejects.toThrow();
+  it('kazero_app no puede escribirla (42501)', async () => {
+    const codigo = await app((db) =>
+      db.execute(sql`UPDATE cliente SET compras_previas_fecha = '2020-01-01' WHERE id = ${clienteId}`),
+    ).then(
+      () => 'ok',
+      (e: unknown) => pgCode(e) ?? 'sin-codigo',
+    );
+    expect(codigo).toBe('42501');
   });
 });
 

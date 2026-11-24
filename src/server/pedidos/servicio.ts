@@ -216,8 +216,14 @@ export async function crearPedidoEnTx(tx: Ejecutor, d: Omit<DatosPedido, 'key'>)
         ocupadas.map((o) => ({ ciclo: o.ciclo!, posicion: o.posicion! })),
         c?.previas ?? 0,
       ),
-      // L-7: 6 meses o más sin comprar → tarjeta nueva. Sin notas, cuenta la fecha de las compras previas.
-      { ultimaCompra: ultimaCompra([c?.previasFecha, ...ocupadas.map((o) => o.fecha)]), fecha },
+      // L-7: 6 meses o más sin comprar → tarjeta nueva. Solo sin notas que cuenten vale la fecha de las previas.
+      {
+        ultimaCompra: ultimaCompra(
+          ocupadas.map((o) => o.fecha),
+          c?.previasFecha,
+        ),
+        fecha,
+      },
     );
     pctBps = descuentoLealtad({ cuentaTarjeta: true, posicion: posicion.posicion }).pctBps;
   }

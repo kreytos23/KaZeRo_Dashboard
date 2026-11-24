@@ -33,13 +33,17 @@ export function tarjetaVencida(ultimaCompra: string | null, fecha: string): bool
 }
 
 /**
- * L-7: la última compra es la fecha más reciente entre las notas vigentes que cuentan para la tarjeta (de cualquier
- * vuelta) y la fecha de las compras previas. Las fechas son 'AAAA-MM-DD': se comparan como texto.
+ * L-7: la última compra es la fecha más reciente de las notas vigentes que cuentan para la tarjeta (de cualquier
+ * vuelta). Solo si no hay ninguna cuenta la fecha de las compras previas; con alguna nota, esa fecha se ignora.
+ * Las fechas son 'AAAA-MM-DD': se comparan como texto.
  */
-export function ultimaCompra(fechas: readonly (string | null | undefined)[]): string | null {
+export function ultimaCompra(
+  fechasNotas: readonly (string | null | undefined)[],
+  fechaPrevias: string | null | undefined,
+): string | null {
   let max: string | null = null;
-  for (const f of fechas) if (f && (max === null || f > max)) max = f;
-  return max;
+  for (const f of fechasNotas) if (f && (max === null || f > max)) max = f;
+  return max ?? fechaPrevias ?? null;
 }
 
 /** L-7: la última compra y la fecha de la nota que se va a crear. */

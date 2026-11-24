@@ -64,7 +64,8 @@ function CamposVenta({ hoy }: { hoy: string }) {
   const [mostrador, setMostrador] = useState(false);
   const [cliente, setCliente] = useState<ClienteElegido | null>(null);
   const [cobradoManual, setCobradoManual] = useState<string | null>(null);
-  const [previa, setPrevia] = useState<PreviaPedido | null>(null);
+  // La vista previa se guarda con la fecha que se consultó: el descuento de la tarjeta depende de ella (L-7).
+  const [consultada, setConsultada] = useState<{ previa: PreviaPedido; fecha: string } | null>(null);
   // L-7: la fecha de la venta decide si la tarjeta de la clienta venció (y con ello el total que se cobra).
   const [fecha, setFecha] = useState(hoy);
 
@@ -81,7 +82,7 @@ function CamposVenta({ hoy }: { hoy: string }) {
           { cache: 'no-store', signal: ctl.signal },
         );
         if (r.status === 401) return router.replace('/login');
-        if (r.ok) setPrevia((await r.json()) as PreviaPedido);
+        if (r.ok) setConsultada({ previa: (await r.json()) as PreviaPedido, fecha });
       } catch {
         /* abortada o sin red: se conserva la última vista previa */
       }
@@ -92,7 +93,9 @@ function CamposVenta({ hoy }: { hoy: string }) {
     };
   }, [clave, clienteId, mostrador, fecha, router]);
 
-  // La vista previa puede ir un paso atrás de lo que ya se cambió: solo se usa si sigue vigente.
+  // La vista previa puede ir un paso atrás de lo que ya se cambió: solo se usa si sigue vigente. Consultada con
+  // otra fecha está pendiente, igual que mientras carga.
+  const previa = consultada?.fecha === fecha ? consultada.previa : null;
   const vigente = clave !== '' && previa !== null && (mostrador || previa.cliente?.id === cliente?.id);
   const precios = vigente
     ? previa.piezas

@@ -62,7 +62,7 @@ export function avisoVencimiento(
   t: Tarjeta,
 ): string | null {
   if (v.vencida && v.ultimaCompra)
-    return `Tarjeta vencida: más de ${MESES_VENCIMIENTO} meses sin comprar (última compra: ${fechaLarga(v.ultimaCompra)}). Su próxima nota empieza una tarjeta nueva.`;
+    return `Tarjeta vencida: ${MESES_VENCIMIENTO} meses o más sin comprar (última compra: ${fechaLarga(v.ultimaCompra)}). Su próxima nota empieza una tarjeta nueva.`;
   if (!v.vence || t.ocupadas === 0 || t.ocupadas >= t.casillas.length) return null;
   return `Vence el ${fechaLarga(v.vence)}.`;
 }

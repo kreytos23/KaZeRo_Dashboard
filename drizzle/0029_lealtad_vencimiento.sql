@@ -34,8 +34,17 @@ CREATE TRIGGER cliente_previas_fecha BEFORE UPDATE OF compras_previas ON cliente
   FOR EACH ROW WHEN (OLD.compras_previas IS DISTINCT FROM NEW.compras_previas)
   EXECUTE FUNCTION kz_fecha_compras_previas();
 --> statement-breakpoint
--- 4. Con el backfill hecho, toda clienta con previas tiene fecha.
-ALTER TABLE "cliente" ADD CONSTRAINT "cliente_previas_con_fecha" CHECK ("cliente"."compras_previas" = 0 OR "cliente"."compras_previas_fecha" IS NOT NULL);
+-- 4. Con el backfill hecho, toda clienta con previas tiene fecha. Idempotente, como la columna.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'cliente_previas_con_fecha' AND conrelid = 'public.cliente'::regclass
+  ) THEN
+    ALTER TABLE "cliente" ADD CONSTRAINT "cliente_previas_con_fecha" CHECK ("cliente"."compras_previas" = 0 OR "cliente"."compras_previas_fecha" IS NOT NULL);
+  END IF;
+END
+$$;
 --> statement-breakpoint
 -- 5. v_cliente de 0028 con compras_previas_fecha al final (CREATE OR REPLACE solo admite columnas nuevas al final).
 --    kazero_app ya tiene SELECT sobre v_cliente y cliente (0003) y no recibe UPDATE de la columna: la escribe el

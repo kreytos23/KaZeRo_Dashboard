@@ -176,12 +176,24 @@ describe('tarjetaVencida (L-7: 6 meses o más sin comprar)', () => {
 });
 
 describe('ultimaCompra', () => {
-  it('la fecha más reciente, ignorando las vacías', () => {
-    expect(ultimaCompra(['2026-03-01', null, '2026-07-09', undefined, '2026-05-30'])).toBe('2026-07-09');
+  it('la fecha más reciente de las notas, ignorando las vacías', () => {
+    expect(ultimaCompra(['2026-03-01', null, '2026-07-09', undefined, '2026-05-30'], null)).toBe(
+      '2026-07-09',
+    );
   });
-  it('sin fechas → null', () => {
-    expect(ultimaCompra([])).toBeNull();
-    expect(ultimaCompra([null, undefined])).toBeNull();
+  it('sin notas que cuenten → la fecha de las compras previas', () => {
+    expect(ultimaCompra([], '2026-11-17')).toBe('2026-11-17');
+    expect(ultimaCompra([null, undefined], '2026-11-17')).toBe('2026-11-17');
+  });
+  it('con alguna nota, la fecha de las previas se ignora aunque sea más reciente', () => {
+    expect(ultimaCompra(['2026-03-01'], '2026-11-17')).toBe('2026-03-01');
+  });
+  it('con alguna nota, la fecha de las previas se ignora aunque sea más antigua', () => {
+    expect(ultimaCompra(['2026-03-01'], '2025-01-10')).toBe('2026-03-01');
+  });
+  it('sin notas ni previas → null', () => {
+    expect(ultimaCompra([], null)).toBeNull();
+    expect(ultimaCompra([null], undefined)).toBeNull();
   });
 });
 

@@ -110,7 +110,10 @@ export async function previsualizarPedido(
   let tarjeta: PreviaPedido['tarjeta'] = null;
   if (fila && o.cuentaTarjeta) {
     // La misma cuenta que crearPedidoEnTx (servicio.ts): ocupadas, previas y última compra.
-    const ultima = ultimaCompra([fila.comprasPreviasFecha, ...ocupadas.map((x) => x.fecha)]);
+    const ultima = ultimaCompra(
+      ocupadas.map((x) => x.fecha),
+      fila.comprasPreviasFecha,
+    );
     const ocupadasConPrevias = conPrevias(
       ocupadas.map((x) => ({ ciclo: x.ciclo!, posicion: x.posicion! })),
       fila.comprasPrevias,
@@ -269,7 +272,10 @@ export async function resumenCliente(db: Ejecutor, clienteId: string, hoy = hoyM
   ]);
   const comprasPrevias = datos[0]?.previas ?? 0;
   // L-7: a hoy, ¿ya venció? Entonces su tarjeta actual está vacía: la próxima nota empieza una nueva.
-  const ultima = ultimaCompra([datos[0]?.previasFecha, ...tarjeta.map((t) => t.fecha)]);
+  const ultima = ultimaCompra(
+    tarjeta.map((t) => t.fecha),
+    datos[0]?.previasFecha,
+  );
   const vencida = tarjetaVencida(ultima, hoy);
   return {
     pedidos,
