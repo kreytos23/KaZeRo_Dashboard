@@ -4,6 +4,7 @@ import {
   MSG_MOSTRADOR_SIN_PREVIAS,
   MSG_PREVIAS_CON_NOTAS,
   MSG_PREVIAS_RANGO,
+  MSG_PREVIAS_SIN_FECHA,
   MSG_PREVIAS_SIN_MOTIVO,
 } from '@/server/clientes/mensajes';
 import {
@@ -234,6 +235,7 @@ const MENSAJES: Record<string, string> = {
   cliente_mostrador_sin_previas: MSG_MOSTRADOR_SIN_PREVIAS,
   cliente_previas_sin_motivo: MSG_PREVIAS_SIN_MOTIVO,
   cliente_previas_con_notas: MSG_PREVIAS_CON_NOTAS,
+  cliente_previas_con_fecha: MSG_PREVIAS_SIN_FECHA,
   pedido_lugar_previo: MSG_LUGAR_PREVIO,
 };
 

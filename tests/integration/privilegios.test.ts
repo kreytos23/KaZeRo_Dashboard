@@ -148,6 +148,7 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       'updated_at',
       // 2026-11-16 (0028): compras de la tarjeta de papel; el trigger exige motivo y que no haya notas en la tarjeta 1.
       'compras_previas',
+      // compras_previas_fecha (0029, L-7) NO está: la escribe el trigger de la BD, no la app.
     ];
     expect(orden(updates)).toEqual(
       [

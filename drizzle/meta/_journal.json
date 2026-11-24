@@ -204,6 +204,13 @@
       "when": 1794888289296,
       "tag": "0028_compras_previas_reglas",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1795501975535,
+      "tag": "0029_lealtad_vencimiento",
+      "breakpoints": true
     }
   ]
 }

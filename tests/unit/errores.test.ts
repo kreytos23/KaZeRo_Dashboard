@@ -15,6 +15,14 @@ describe('traducción de errores de Postgres', () => {
       traducirErrorPg(envuelto({ code: '23514', constraint: 'pieza_transicion' }))?.campo,
     ).toBeUndefined();
   });
+  it('L-7: la clienta con previas sin fecha tiene mensaje (la fecha la pone la BD)', () => {
+    expect(
+      traducirErrorPg(envuelto({ code: '23514', constraint: 'cliente_previas_con_fecha' })),
+    ).toMatchObject({
+      codigo: 'cliente_previas_con_fecha',
+      message: 'Falta la fecha de las compras previas. Recarga la página.',
+    });
+  });
   it('traduce la violación de código único', () => {
     const e = traducirErrorPg(envuelto({ code: '23505', constraint: 'pieza_codigo_uq' }));
     expect(e).toBeInstanceOf(ErrorNegocio);
