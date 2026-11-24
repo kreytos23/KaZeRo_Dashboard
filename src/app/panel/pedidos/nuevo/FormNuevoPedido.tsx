@@ -61,7 +61,11 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
   const [codigo, setCodigo] = useState('');
   const [cuentaTarjeta, setCuentaTarjeta] = useState(true);
   const [manual, setManual] = useState('');
-  const [previa, setPrevia] = useState<PreviaPedido | null>(null);
+  // L-7: la vista previa usa la fecha elegida (con 6 meses sin comprar, la nota empieza una tarjeta nueva).
+  const [fecha, setFecha] = useState(hoy);
+  // La vista previa se guarda con la fecha que se consultó: la tarjeta depende de ella (L-7).
+  const [consultada, setConsultada] = useState<{ previa: PreviaPedido; fecha: string } | null>(null);
+  const previa = consultada?.previa ?? null;
   const enviado = useRef(false);
 
   // El éxito redirige desde el servidor y este formulario se desmonta: ahí se avisa al buscador.
@@ -77,12 +81,12 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
     const ctl = new AbortController();
     const t = setTimeout(async () => {
       try {
-        const r = await fetch(urlConsultaPrevia({ clienteId: cliente?.id ?? null, codigos, cuentaTarjeta }), {
-          cache: 'no-store',
-          signal: ctl.signal,
-        });
+        const r = await fetch(
+          urlConsultaPrevia({ clienteId: cliente?.id ?? null, codigos, cuentaTarjeta, fecha }),
+          { cache: 'no-store', signal: ctl.signal },
+        );
         if (r.status === 401) return router.replace('/login');
-        if (r.ok) setPrevia((await r.json()) as PreviaPedido);
+        if (r.ok) setConsultada({ previa: (await r.json()) as PreviaPedido, fecha });
       } catch {
         /* abortada o sin red: se conserva la última vista previa */
       }
@@ -91,10 +95,12 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
       clearTimeout(t);
       ctl.abort();
     };
-  }, [cliente?.id, codigos, cuentaTarjeta, router]);
+  }, [cliente?.id, codigos, cuentaTarjeta, fecha, router]);
 
   // La vista previa puede ir un paso atrás de lo que el usuario ya cambió: solo se usa lo que sigue vigente.
   const previaDelCliente = previa && previa.cliente?.id === cliente?.id ? previa : null;
+  // L-7: la tarjeta consultada con otra fecha está pendiente, igual que mientras carga.
+  const tarjetaPrevia = consultada?.fecha === fecha ? (previaDelCliente?.tarjeta ?? null) : null;
   const vendedorId =
     vendedorElegido ?? vendedorPorDefecto(vendedores, previaDelCliente?.cliente ?? clienteInicial);
   const piezasDe = (c: string) => previa?.piezas.find((x) => x.codigo === c);
@@ -106,7 +112,7 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
   // Totales con la MISMA función que usa el servidor (spec §3.1). Solo cuentan las piezas disponibles.
   const totales = calcularTotales(
     disponibles.map((p) => numericACentavos(p.precio)),
-    cuentaTarjeta ? (previaDelCliente?.tarjeta?.pctBps ?? 0) : 0,
+    cuentaTarjeta ? (tarjetaPrevia?.pctBps ?? 0) : 0,
     manualCentavos,
   );
 
@@ -135,7 +141,15 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
           value={vendedorId}
           onChange={setVendedorElegido}
         />
-        <Campo etiqueta="Fecha" name="fecha" type="date" defaultValue={hoy} max={hoy} required />
+        <Campo
+          etiqueta="Fecha"
+          name="fecha"
+          type="date"
+          defaultValue={hoy}
+          max={hoy}
+          required
+          alCambiarFecha={setFecha}
+        />
 
         <div className="flex items-end gap-2">
           <div className="flex-1">
@@ -253,7 +267,7 @@ export function FormNuevoPedido({ vendedores, clienteInicial, hoy }: Props) {
 
         <ResumenTotales
           totales={totales}
-          textoLealtad={textoLealtadPrevia(previaDelCliente?.tarjeta ?? null, {
+          textoLealtad={textoLealtadPrevia(tarjetaPrevia, {
             cuentaTarjeta,
             hayCliente: !!cliente,
           })}

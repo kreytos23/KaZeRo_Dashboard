@@ -1,4 +1,5 @@
-import type { Casilla, Tarjeta } from '@/domain/lealtad';
+import { fechaLarga } from '@/domain/fechas';
+import { MESES_VENCIMIENTO, type Casilla, type Tarjeta } from '@/domain/lealtad';
 import { formatoFolio, formatoPct, numericAPctBps } from '@/domain/pedidos';
 import type { TarjetaPrevia } from './tipos';
 
@@ -10,6 +11,8 @@ export function textoLealtadPrevia(
   if (!o.cuentaTarjeta) return 'No cuenta para la tarjeta de lealtad.';
   if (!o.hayCliente || !t) return 'Elige un cliente para ver su tarjeta.';
   // La vuelta de la tarjeta es interna (Plan 3.1): no se muestra.
+  if (t.nueva)
+    return `Pedido ${t.posicion} de su tarjeta nueva: la anterior venció (${MESES_VENCIMIENTO} meses o más sin comprar).`;
   const quien = `Pedido ${t.posicion} de su tarjeta`;
   return t.pctBps > 0 ? `${quien}: −${formatoPct(t.pctBps)}` : `${quien}.`;
 }
@@ -48,4 +51,18 @@ export function pieTarjeta(t: Tarjeta): string {
   if (!premio) return `${t.ocupadas} de ${total} · tarjeta completa`;
   const faltan = premio.posicion - t.ocupadas;
   return `${t.ocupadas} de ${total} · ${faltan === 1 ? 'falta 1' : `faltan ${faltan}`} para el ${formatoPct(premio.pctBps)}`;
+}
+
+/**
+ * L-7: aviso de la ficha. Vencida: la tarjeta se muestra vacía y la próxima nota empieza una nueva. Vigente: cuándo
+ * vence, solo si la tarjeta actual tiene alguna compra y no está llena (llena, la siguiente nota ya empieza otra).
+ */
+export function avisoVencimiento(
+  v: { ultimaCompra: string | null; vence: string | null; vencida: boolean },
+  t: Tarjeta,
+): string | null {
+  if (v.vencida && v.ultimaCompra)
+    return `Tarjeta vencida: ${MESES_VENCIMIENTO} meses o más sin comprar (última compra: ${fechaLarga(v.ultimaCompra)}). Su próxima nota empieza una tarjeta nueva.`;
+  if (!v.vence || t.ocupadas === 0 || t.ocupadas >= t.casillas.length) return null;
+  return `Vence el ${fechaLarga(v.vence)}.`;
 }

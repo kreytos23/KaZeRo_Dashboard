@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { formatoFolio, formatoPct } from '@/domain/pedidos';
 import type { Casilla, Tarjeta } from '@/domain/lealtad';
 import { Anillo, Collar, Flor } from './iconos-lealtad';
-import { etiquetaCasilla, pieTarjeta } from './texto-lealtad';
+import { avisoVencimiento, etiquetaCasilla, pieTarjeta } from './texto-lealtad';
 
 function Icono({ k }: { k: Casilla }) {
   let color = 'text-borde-campo';
@@ -15,8 +15,18 @@ function Icono({ k }: { k: Casilla }) {
   return <Flor llena={k.estado !== 'libre'} className={clase} />;
 }
 
-/** Tarjeta de lealtad (R-25, D-4). Server Component sin JS: una sola fila de 10 lugares, la tarjeta actual; los lugares de papel salen como «anterior». */
-export function TarjetaLealtad({ tarjeta }: { tarjeta: Tarjeta }) {
+/**
+ * Tarjeta de lealtad (R-25, D-4). Server Component sin JS: una sola fila de 10 lugares, la tarjeta actual; los lugares
+ * de papel salen como «anterior». L-7: vencida, se ve vacía con el aviso; vigente, dice cuándo vence.
+ */
+export function TarjetaLealtad({
+  tarjeta,
+  vencimiento,
+}: {
+  tarjeta: Tarjeta;
+  vencimiento: { ultimaCompra: string | null; vence: string | null; vencida: boolean };
+}) {
+  const aviso = avisoVencimiento(vencimiento, tarjeta);
   return (
     <section aria-labelledby="tarjeta-lealtad" className="tarjeta @container flex flex-col gap-3 p-4">
       <h2 id="tarjeta-lealtad" className="text-lg font-semibold">
@@ -66,6 +76,14 @@ export function TarjetaLealtad({ tarjeta }: { tarjeta: Tarjeta }) {
         ))}
       </ol>
       <p className="text-meta text-tinta-suave">{pieTarjeta(tarjeta)}</p>
+      {aviso &&
+        (vencimiento.vencida ? (
+          <p className="rounded-lg border border-aviso-borde bg-aviso-fondo px-3 py-2 text-dato text-aviso">
+            {aviso}
+          </p>
+        ) : (
+          <p className="text-meta text-tinta-suave">{aviso}</p>
+        ))}
     </section>
   );
 }

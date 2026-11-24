@@ -4,7 +4,7 @@ import {
   type CeldaHoja,
   type PedidoTarjeta,
 } from '../../../scripts/migrar-excel/plan-tarjeta';
-import { siguientePosicion } from '../../../src/domain/lealtad';
+import { SIN_VENCIMIENTO, siguientePosicion } from '../../../src/domain/lealtad';
 
 const ped = (
   id: string,
@@ -59,11 +59,14 @@ describe('asignarTarjeta', () => {
     expect(r.asignados.get('p2')).toEqual({ ciclo: 1, posicion: 3 });
     expect(r.marcadores).toEqual([{ ciclo: 1, posicion: 2, fecha: '2026-01-10' }]);
     expect(
-      siguientePosicion([
-        { ciclo: 1, posicion: 1 },
-        { ciclo: 1, posicion: 2 },
-        { ciclo: 1, posicion: 3 },
-      ]),
+      siguientePosicion(
+        [
+          { ciclo: 1, posicion: 1 },
+          { ciclo: 1, posicion: 2 },
+          { ciclo: 1, posicion: 3 },
+        ],
+        SIN_VENCIMIENTO,
+      ),
     ).toEqual({ ciclo: 1, posicion: 4 });
   });
 

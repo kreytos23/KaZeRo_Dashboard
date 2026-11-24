@@ -131,6 +131,9 @@ export const cliente = pgTable(
     esMostrador: boolean('es_mostrador').notNull().default(false),
     // Compras de la tarjeta de papel (2026-11-16, L-1): ocupan los lugares 1..n de la primera tarjeta, sin nota.
     comprasPrevias: integer('compras_previas').notNull().default(0),
+    // L-7 (2026-11-24): día en que se registraron las compras previas; la última compra si no hay notas. La pone
+    // el trigger de 0029 (kazero_app no la escribe).
+    comprasPreviasFecha: date('compras_previas_fecha'),
   },
   (t) => [
     largo('cliente_nombre_largo', t.nombre, 1, 120),
@@ -145,6 +148,7 @@ export const cliente = pgTable(
     check('cliente_notas_largo', sql`char_length(${t.notas}) <= 2000`),
     check('cliente_compras_previas_rango', sql`${t.comprasPrevias} BETWEEN 0 AND 9`),
     check('cliente_mostrador_sin_previas', sql`NOT ${t.esMostrador} OR ${t.comprasPrevias} = 0`),
+    check('cliente_previas_con_fecha', sql`${t.comprasPrevias} = 0 OR ${t.comprasPreviasFecha} IS NOT NULL`),
   ],
 );
 

@@ -51,6 +51,8 @@ export const vCliente = pgView('v_cliente', {
   esMostrador: boolean('es_mostrador').notNull(),
   // 2026-11-16 (0028), al final: compras de la tarjeta de papel.
   comprasPrevias: integer('compras_previas').notNull(),
+  // L-7 (0029), al final: cuándo se registraron las compras previas.
+  comprasPreviasFecha: date('compras_previas_fecha'),
 }).existing();
 
 export const vPieza = pgView('v_pieza', {

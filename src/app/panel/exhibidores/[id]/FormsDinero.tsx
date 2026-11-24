@@ -37,11 +37,19 @@ function codigosDeTexto(t: string): string[] {
 }
 
 /** Método y fecha, comunes a la venta, el abono y la entrega. */
-function CamposMetodoFecha({ hoy }: { hoy: string }) {
+function CamposMetodoFecha({ hoy, alCambiarFecha }: { hoy: string; alCambiarFecha?: (iso: string) => void }) {
   return (
     <>
       <Selector etiqueta="Método" name="metodo" required defaultValue="efectivo" opciones={METODOS} />
-      <Campo etiqueta="Fecha" name="fecha" type="date" defaultValue={hoy} max={hoy} required />
+      <Campo
+        etiqueta="Fecha"
+        name="fecha"
+        type="date"
+        defaultValue={hoy}
+        max={hoy}
+        required
+        alCambiarFecha={alCambiarFecha}
+      />
     </>
   );
 }
@@ -56,7 +64,10 @@ function CamposVenta({ hoy }: { hoy: string }) {
   const [mostrador, setMostrador] = useState(false);
   const [cliente, setCliente] = useState<ClienteElegido | null>(null);
   const [cobradoManual, setCobradoManual] = useState<string | null>(null);
-  const [previa, setPrevia] = useState<PreviaPedido | null>(null);
+  // La vista previa se guarda con la fecha que se consultó: el descuento de la tarjeta depende de ella (L-7).
+  const [consultada, setConsultada] = useState<{ previa: PreviaPedido; fecha: string } | null>(null);
+  // L-7: la fecha de la venta decide si la tarjeta de la clienta venció (y con ello el total que se cobra).
+  const [fecha, setFecha] = useState(hoy);
 
   const lista = codigosDeTexto(codigos);
   const clave = lista.join(',');
@@ -67,11 +78,11 @@ function CamposVenta({ hoy }: { hoy: string }) {
     const t = setTimeout(async () => {
       try {
         const r = await fetch(
-          urlConsultaPrevia({ clienteId, codigos: clave.split(','), cuentaTarjeta: !mostrador }),
+          urlConsultaPrevia({ clienteId, codigos: clave.split(','), cuentaTarjeta: !mostrador, fecha }),
           { cache: 'no-store', signal: ctl.signal },
         );
         if (r.status === 401) return router.replace('/login');
-        if (r.ok) setPrevia((await r.json()) as PreviaPedido);
+        if (r.ok) setConsultada({ previa: (await r.json()) as PreviaPedido, fecha });
       } catch {
         /* abortada o sin red: se conserva la última vista previa */
       }
@@ -80,9 +91,11 @@ function CamposVenta({ hoy }: { hoy: string }) {
       clearTimeout(t);
       ctl.abort();
     };
-  }, [clave, clienteId, mostrador, router]);
+  }, [clave, clienteId, mostrador, fecha, router]);
 
-  // La vista previa puede ir un paso atrás de lo que ya se cambió: solo se usa si sigue vigente.
+  // La vista previa puede ir un paso atrás de lo que ya se cambió: solo se usa si sigue vigente. Consultada con
+  // otra fecha está pendiente, igual que mientras carga.
+  const previa = consultada?.fecha === fecha ? consultada.previa : null;
   const vigente = clave !== '' && previa !== null && (mostrador || previa.cliente?.id === cliente?.id);
   const precios = vigente
     ? previa.piezas
@@ -131,7 +144,7 @@ function CamposVenta({ hoy }: { hoy: string }) {
           La nota queda con saldo de {formatoMXN(total - cobradoCentavos)}.
         </p>
       )}
-      <CamposMetodoFecha hoy={hoy} />
+      <CamposMetodoFecha hoy={hoy} alCambiarFecha={setFecha} />
     </>
   );
 }

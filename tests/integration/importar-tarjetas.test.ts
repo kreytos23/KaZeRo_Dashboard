@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { aplicarTarjetas, simularTarjetas } from '../../scripts/importar-tarjetas/bd';
 import type { FilaTarjeta } from '../../scripts/importar-tarjetas/leer';
 import { conDbUrl } from '@/db/pool';
+import { hoyMX } from '@/domain/fechas';
 import { crearCliente } from '@/server/clientes/servicio';
 import { crearVendedor } from '@/server/vendedores/servicio';
 import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
@@ -49,6 +50,16 @@ describe('importación de tarjetas', () => {
     expect(await leer()).toEqual([
       { nombre: 'Ána UNO', previas: 4, con_vendedora: true },
       { nombre: 'Bea Dos', previas: 9, con_vendedora: true },
+    ]);
+    // L-7: la creada y la actualizada reciben la fecha de sus compras previas, hoy en México.
+    const fechas = await conDbUrl(urlOwner(), (db) =>
+      db.execute(
+        sql`SELECT nombre, compras_previas_fecha::text AS fecha FROM cliente WHERE NOT es_mostrador ORDER BY nombre`,
+      ),
+    ).then((r) => r.rows);
+    expect(fechas).toEqual([
+      { nombre: 'Ána UNO', fecha: hoyMX() },
+      { nombre: 'Bea Dos', fecha: hoyMX() },
     ]);
     const otra = await simularTarjetas(urlOwner(), filas);
     expect(otra).toMatchObject({ crear: [], actualizar: [], sinCambios: 2 });

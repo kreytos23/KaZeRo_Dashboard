@@ -34,8 +34,14 @@ export function useErrorDe(name: string, idControl: string) {
 export function Campo({
   etiqueta,
   id,
+  alCambiarFecha,
   ...props
-}: { etiqueta: string; name: string } & InputHTMLAttributes<HTMLInputElement>) {
+}: {
+  etiqueta: string;
+  name: string;
+  /** Solo `type="date"`: la fecha ISO cada vez que cambia ('' = vacía o incompleta). */
+  alCambiarFecha?: (iso: string) => void;
+} & InputHTMLAttributes<HTMLInputElement>) {
   const propio = useId();
   const idControl = id ?? propio;
   const { error, aria } = useErrorDe(props.name, idControl);
@@ -56,6 +62,7 @@ export function Campo({
           required={props.required}
           disabled={props.disabled}
           readOnly={props.readOnly}
+          alCambiar={alCambiarFecha}
           {...aria}
         />
       ) : (

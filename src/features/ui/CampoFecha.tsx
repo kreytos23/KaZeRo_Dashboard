@@ -40,10 +40,13 @@ export function CampoFecha({
   disabled,
   readOnly,
   className = '',
+  alCambiar,
   ...aria
 }: {
   id: string;
   name: string;
+  /** Avisa de cada cambio de la fecha ISO ('' = vacía o incompleta), p. ej. para una vista previa. */
+  alCambiar?: (iso: string) => void;
   /** Nombre del campo, para el título accesible del calendario. */
   etiqueta: string;
   defaultValue?: string;
@@ -56,7 +59,11 @@ export function CampoFecha({
 } & AriaCampo) {
   const escritorio = useEscritorio();
   // Fuente de verdad: la fecha ISO ('' = vacía). El texto escrito en escritorio se deriva de ella al terminar.
-  const [iso, setIso] = useState(defaultValue);
+  const [iso, setIsoPropio] = useState(defaultValue);
+  const setIso = (v: string) => {
+    setIsoPropio(v);
+    alCambiar?.(v);
+  };
   // Un reinicio del formulario cambia la `key` del campo de escritorio: su texto vuelve a derivarse de `iso`.
   const [reinicios, setReinicios] = useState(0);
   const ancla = useRef<HTMLSpanElement>(null);

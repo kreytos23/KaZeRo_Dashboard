@@ -1,4 +1,4 @@
-import { siguientePosicion } from '../../src/domain/lealtad';
+import { SIN_VENCIMIENTO, siguientePosicion } from '../../src/domain/lealtad';
 
 export interface PedidoTarjeta {
   id: string;
@@ -143,7 +143,8 @@ export function asignarTarjeta(c: EntradaTarjeta): SalidaTarjeta {
     .filter((p) => p.tipo === 'kzr')
     .sort((a, b) => a.fecha.localeCompare(b.fecha) || a.id.localeCompare(b.id));
   for (const p of kzr) {
-    const pos = siguientePosicion(ocupadas);
+    // La hoja es historia: se reproduce sin el vencimiento L-7 (las notas ya hechas no se recalculan, R-27).
+    const pos = siguientePosicion(ocupadas, SIN_VENCIMIENTO);
     asignados.set(p.id, pos);
     ocupadas.push(pos);
     sin.delete(p.id);

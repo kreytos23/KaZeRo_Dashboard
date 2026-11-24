@@ -69,7 +69,7 @@ describe('lecturas de pedidos', () => {
     ]);
     expect(r.faltantes).toEqual(['NOPE']);
     expect(r.cliente).toMatchObject({ id: ctx.clienteId, nombre: 'Tanya' });
-    expect(r.tarjeta).toEqual({ ciclo: 1, posicion: 2, pctBps: 0 });
+    expect(r.tarjeta).toEqual({ ciclo: 1, posicion: 2, pctBps: 0, nueva: false });
   });
 
   it('vista previa: en el lugar 5 con otra nota con saldo da 10 % (R-29 derogada); sin cliente no hay tarjeta', async () => {
@@ -82,7 +82,7 @@ describe('lecturas de pedidos', () => {
     const r = await app((db) =>
       previsualizarPedido(db, { clienteId: ctx.clienteId, codigos: [], cuentaTarjeta: true }),
     );
-    expect(r.tarjeta).toEqual({ ciclo: 1, posicion: 5, pctBps: 1000 });
+    expect(r.tarjeta).toEqual({ ciclo: 1, posicion: 5, pctBps: 1000, nueva: false });
     expect(
       (await app((db) => previsualizarPedido(db, { clienteId: null, codigos: [], cuentaTarjeta: true })))
         .tarjeta,

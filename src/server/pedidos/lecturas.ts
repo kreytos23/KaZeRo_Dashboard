@@ -3,8 +3,16 @@ import type { Ejecutor } from '@/db/pool';
 import { vAplicacionPago, vCliente, vPedido, vPedidoItem, vPieza, vSaldoFavor } from '@/db/schema';
 import { normalizarCodigo } from '@/domain/codigos';
 import { numericACentavos } from '@/domain/dinero';
-import { armarTarjeta, conPrevias, descuentoLealtad, siguientePosicion } from '@/domain/lealtad';
-import { parsearFechaISO } from '@/domain/fechas';
+import {
+  armarTarjeta,
+  conPrevias,
+  descuentoLealtad,
+  siguientePosicion,
+  tarjetaVencida,
+  ultimaCompra,
+  vencimientoTarjeta,
+} from '@/domain/lealtad';
+import { hoyMX, parsearFechaISO } from '@/domain/fechas';
 import { MAX_PIEZAS_PEDIDO, parsearFolio } from '@/domain/pedidos';
 import { escaparLike, normalizar } from '@/domain/texto';
 import type { PreviaPedido } from '@/features/pedidos/tipos';
@@ -40,8 +48,10 @@ export type PedidoFila = {
 
 export async function previsualizarPedido(
   db: Ejecutor,
-  o: { clienteId: string | null; codigos: string[]; cuentaTarjeta: boolean },
+  o: { clienteId: string | null; codigos: string[]; cuentaTarjeta: boolean; fecha?: string | null },
 ): Promise<PreviaPedido> {
+  // L-7: la fecha elegida en el formulario decide si la tarjeta venció; sin fecha, hoy (como el servidor al crear).
+  const fecha = o.fecha ?? hoyMX();
   const codigos = [...new Set(o.codigos.map(normalizarCodigo).filter(Boolean))].slice(0, MAX_PIEZAS_PEDIDO);
   const [piezas, apartadas, clientes, ocupadas] = await Promise.all([
     codigos.length
@@ -72,6 +82,7 @@ export async function previsualizarPedido(
             nombre: vCliente.nombre,
             vendedorHabitualId: vCliente.vendedorHabitualId,
             comprasPrevias: vCliente.comprasPrevias,
+            comprasPreviasFecha: vCliente.comprasPreviasFecha,
           })
           .from(vCliente)
           .where(eq(vCliente.id, o.clienteId))
@@ -79,7 +90,7 @@ export async function previsualizarPedido(
       : [],
     o.clienteId && o.cuentaTarjeta
       ? db
-          .select({ ciclo: vPedido.cicloTarjeta, posicion: vPedido.posicionTarjeta })
+          .select({ ciclo: vPedido.cicloTarjeta, posicion: vPedido.posicionTarjeta, fecha: vPedido.fecha })
           .from(vPedido)
           .where(
             and(
@@ -98,14 +109,23 @@ export async function previsualizarPedido(
     : null;
   let tarjeta: PreviaPedido['tarjeta'] = null;
   if (fila && o.cuentaTarjeta) {
-    const pos = siguientePosicion(
-      conPrevias(
-        ocupadas.map((x) => ({ ciclo: x.ciclo!, posicion: x.posicion! })),
-        fila.comprasPrevias,
-      ),
+    // La misma cuenta que crearPedidoEnTx (servicio.ts): ocupadas, previas y última compra.
+    const ultima = ultimaCompra(
+      ocupadas.map((x) => x.fecha),
+      fila.comprasPreviasFecha,
     );
+    const ocupadasConPrevias = conPrevias(
+      ocupadas.map((x) => ({ ciclo: x.ciclo!, posicion: x.posicion! })),
+      fila.comprasPrevias,
+    );
+    const pos = siguientePosicion(ocupadasConPrevias, { ultimaCompra: ultima, fecha });
     const l = descuentoLealtad({ cuentaTarjeta: true, posicion: pos.posicion });
-    tarjeta = { ciclo: pos.ciclo, posicion: pos.posicion, pctBps: l.pctBps };
+    tarjeta = {
+      ciclo: pos.ciclo,
+      posicion: pos.posicion,
+      pctBps: l.pctBps,
+      nueva: ocupadasConPrevias.length > 0 && tarjetaVencida(ultima, fecha),
+    };
   }
   return {
     piezas: codigos.flatMap((c) => {
@@ -219,8 +239,8 @@ export async function listarPedidos(db: Ejecutor, f: FiltrosPedidos = {}): Promi
     .offset(Math.max(Math.trunc(f.offset ?? 0), 0));
 }
 
-/** Cinco consultas en paralelo, sin importar cuántos pedidos tenga el cliente. */
-export async function resumenCliente(db: Ejecutor, clienteId: string) {
+/** Cinco consultas en paralelo, sin importar cuántos pedidos tenga el cliente. `hoy`: fecha de negocio (pruebas). */
+export async function resumenCliente(db: Ejecutor, clienteId: string, hoy = hoyMX()) {
   const [pedidos, pendiente, favor, tarjeta, datos] = await Promise.all([
     listarPedidos(db, { clienteId, limite: 50 }),
     db
@@ -235,6 +255,7 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
         estado: vPedido.estado,
         folio: vPedido.folio,
         saldo: vPedido.saldo,
+        fecha: vPedido.fecha,
       })
       .from(vPedido)
       .where(
@@ -244,9 +265,18 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
           ne(vPedido.estado, 'cancelado'),
         ),
       ),
-    db.select({ previas: vCliente.comprasPrevias }).from(vCliente).where(eq(vCliente.id, clienteId)),
+    db
+      .select({ previas: vCliente.comprasPrevias, previasFecha: vCliente.comprasPreviasFecha })
+      .from(vCliente)
+      .where(eq(vCliente.id, clienteId)),
   ]);
   const comprasPrevias = datos[0]?.previas ?? 0;
+  // L-7: a hoy, ¿ya venció? Entonces su tarjeta actual está vacía: la próxima nota empieza una nueva.
+  const ultima = ultimaCompra(
+    tarjeta.map((t) => t.fecha),
+    datos[0]?.previasFecha,
+  );
+  const vencida = tarjetaVencida(ultima, hoy);
   return {
     pedidos,
     saldoPendiente: pendiente[0]!.s,
@@ -254,15 +284,16 @@ export async function resumenCliente(db: Ejecutor, clienteId: string) {
     comprasPrevias,
     // L-5: `tarjeta` ya son las notas vigentes que cuentan; ninguna en el ciclo 1 → se pueden corregir.
     previasEditables: !tarjeta.some((t) => t.ciclo === 1),
+    vencimiento: { ultimaCompra: ultima, vence: ultima && vencimientoTarjeta(ultima), vencida },
     tarjeta: armarTarjeta(
-      tarjeta.map((t) => ({
+      (vencida ? [] : tarjeta).map((t) => ({
         ciclo: t.ciclo!,
         posicion: t.posicion!,
         estado: t.estado as 'abierto' | 'liquidado',
         folio: t.folio,
         conSaldo: numericACentavos(t.saldo) > 0,
       })),
-      comprasPrevias,
+      vencida ? 0 : comprasPrevias,
     ),
   };
 }
