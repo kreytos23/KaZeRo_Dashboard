@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { useRef, useTransition, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, useRef, useTransition, type FormEvent, type ReactNode } from 'react';
 import { consultaDeFiltros, fechasListas, urlDeFiltros } from './filtros-form';
 import { useHidratado } from './hidratado';
 
@@ -46,8 +46,17 @@ export function FormFiltros({
     iniciar(() => router.replace(urlDeFiltros(ruta, consulta), { scroll: false }));
   }
 
-  // Se lee en el turno siguiente: los campos ocultos (select y fecha de escritorio) se actualizan al re-pintar.
-  const alCambiar = () => setTimeout(() => navegar(false), 0);
+  // `change` NATIVO (no el onChange de React, que en un campo de texto salta a cada tecla): el select oculto de
+  // Radix, la fecha nativa al completarse, el texto de fecha al salir del campo y el calendario de escritorio
+  // (CampoFecha lo despacha). Se lee en el turno siguiente: los campos ocultos se actualizan al re-pintar.
+  const alCambiarFiltro = useEffectEvent(() => navegar(false));
+  useEffect(() => {
+    const form = formulario.current;
+    if (!form) return;
+    const alCambiar = () => setTimeout(alCambiarFiltro, 0);
+    form.addEventListener('change', alCambiar);
+    return () => form.removeEventListener('change', alCambiar);
+  }, []);
   const alEnviar = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     navegar(true);
@@ -59,7 +68,6 @@ export function FormFiltros({
       role="search"
       method="get"
       className={className}
-      onChange={alCambiar}
       onSubmit={alEnviar}
       aria-busy={pendiente || undefined}
       data-hidratado={hidratado ? 'si' : 'no'}
