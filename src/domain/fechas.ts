@@ -12,6 +12,27 @@ export function fechaCorta(iso: string): string {
   return iso.split('-').reverse().join('/');
 }
 
+const MESES_MINUSCULA = [
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
+];
+
+/** '2026-11-24' → '24 de noviembre de 2026' (fecha de negocio, sin zona horaria). */
+export function fechaLarga(iso: string): string {
+  const [a, m, d] = iso.split('-');
+  return `${Number(d)} de ${MESES_MINUSCULA[Number(m) - 1]} de ${a}`;
+}
+
 const DIA_MX = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' });
 
 /** Fecha de negocio de hoy (YYYY-MM-DD) en la zona horaria del negocio. */
@@ -49,24 +70,4 @@ export function sumarMeses(iso: string, meses: number): string {
   const ultimo = new Date(Date.UTC(anio, mes + 1, 0)).getUTCDate();
   const dia = Math.min(Number(iso.slice(8, 10)), ultimo);
   return `${String(anio).padStart(4, '0')}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-}
-
-const MESES = [
-  'enero',
-  'febrero',
-  'marzo',
-  'abril',
-  'mayo',
-  'junio',
-  'julio',
-  'agosto',
-  'septiembre',
-  'octubre',
-  'noviembre',
-  'diciembre',
-];
-
-/** '2026-05-17' → '17 de mayo de 2026' (fecha de negocio, sin zona horaria). */
-export function fechaLarga(iso: string): string {
-  return `${Number(iso.slice(8, 10))} de ${MESES[Number(iso.slice(5, 7)) - 1]} de ${iso.slice(0, 4)}`;
 }

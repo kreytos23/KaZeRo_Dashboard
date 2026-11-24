@@ -113,16 +113,29 @@ export default async function Resumen({
         <Top titulo="Top categorías" filas={r.topCategorias} />
         <Top titulo="Top clientas" filas={r.topClientas} />
       </div>
-      <section className="tarjeta flex flex-col gap-3 p-4">
-        <h2 className="text-monto font-semibold">Piezas por ubicación hoy</h2>
+      <section className="tarjeta flex flex-col gap-4 p-4" aria-labelledby="inventario-hoy">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 id="inventario-hoy" className="text-monto font-semibold">
+            Inventario hoy
+          </h2>
+          {/* Σ precio de venta de lo que no se ha vendido (sin vendidas, regalos ni defectos). */}
+          <p className="tabular-nums">
+            <span className="text-destacado font-bold">{formatoMXN(r.inventario.valorCentavos)}</span>{' '}
+            <span className="text-meta text-tinta-suave">
+              · {r.inventario.piezas} {r.inventario.piezas === 1 ? 'pieza' : 'piezas'}
+            </span>
+          </p>
+        </div>
+        <h3 className="text-dato font-semibold">Piezas por ubicación</h3>
         {r.ubicaciones.length === 0 ? (
           <p className="text-dato text-tinta-suave">No hay piezas en inventario.</p>
         ) : (
           <ul className="grid gap-x-8 gap-y-1 text-dato sm:grid-cols-2 lg:grid-cols-3">
             {r.ubicaciones.map((u) => (
-              <li key={u.etiqueta} className="flex justify-between gap-3 py-1">
-                <span className="min-w-0 truncate">{u.etiqueta}</span>
-                <span className="tabular-nums">{u.piezas}</span>
+              <li key={u.etiqueta} className="flex items-baseline gap-3 py-1 tabular-nums">
+                <span className="min-w-0 flex-1 truncate">{u.etiqueta}</span>
+                <span className="text-tinta-suave">{u.piezas}</span>
+                <span className="text-right whitespace-nowrap">{formatoMXN(u.valorCentavos)}</span>
               </li>
             ))}
           </ul>

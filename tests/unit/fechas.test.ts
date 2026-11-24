@@ -57,9 +57,13 @@ describe("sumarMeses (igual que `fecha + interval 'n months'` de Postgres)", () 
 });
 
 describe('fechaLarga', () => {
-  it('«17 de mayo de 2026», sin cero a la izquierda', () => {
-    expect(fechaLarga('2026-05-17')).toBe('17 de mayo de 2026');
-    expect(fechaLarga('2027-01-05')).toBe('5 de enero de 2027');
-    expect(fechaLarga('2026-12-31')).toBe('31 de diciembre de 2026');
+  it.each([
+    ['2026-11-24', '24 de noviembre de 2026'],
+    ['2026-01-01', '1 de enero de 2026'],
+    ['2027-12-31', '31 de diciembre de 2027'],
+  ])('%s → %s', (iso, esperado) => expect(fechaLarga(iso)).toBe(esperado));
+  it('sirve con la fecha de negocio de hoy en México', () => {
+    // 2026-11-25 03:00 UTC aún es el 24 de noviembre en CDMX.
+    expect(fechaLarga(hoyMX(new Date('2026-11-25T03:00:00Z')))).toBe('24 de noviembre de 2026');
   });
 });

@@ -21,7 +21,13 @@ export async function pdfComisiones(r: ReporteComisiones): Promise<Uint8Array> {
   return new Uint8Array(await renderToBuffer(<ComisionesPdf r={r} logo={logo} />));
 }
 
-export async function pdfExhibidores(r: ReporteExhibidores, hojas: HojaExhibidor[]): Promise<Uint8Array> {
+export async function pdfExhibidores(
+  r: ReporteExhibidores,
+  hojas: HojaExhibidor[],
+  o: { ventas?: boolean } = {},
+): Promise<Uint8Array> {
   const logo = await logoPng();
-  return new Uint8Array(await renderToBuffer(<ExhibidoresPdf r={r} hojas={hojas} logo={logo} />));
+  return new Uint8Array(
+    await renderToBuffer(<ExhibidoresPdf r={r} hojas={hojas} logo={logo} ventas={o.ventas ?? false} />),
+  );
 }

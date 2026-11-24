@@ -19,12 +19,13 @@ export interface Resumen {
   topCategorias: { nombre: string; centavos: number }[];
   topClientas: FilaConId[];
   porCobrarCentavos: number;
-  ubicaciones: { etiqueta: string; piezas: number }[];
+  ubicaciones: { etiqueta: string; piezas: number; valorCentavos: number }[];
+  /** Lo que sigue en inventario hoy (mismo filtro que las ubicaciones): piezas y Σ precio de venta. */
+  inventario: { piezas: number; valorCentavos: number };
 }
 
 export type FilaConId = Required<FilaTop>;
 
-const sumar = (m: Map<string, number>, llave: string, n: number) => m.set(llave, (m.get(llave) ?? 0) + n);
 /** m-1: por id, no por nombre: dos clientas (o asociados) homónimas son dos filas. */
 const sumarPorId = (m: Map<string, FilaConId>, id: string, nombre: string, n: number) => {
   const f = m.get(id);
@@ -98,6 +99,7 @@ export async function resumenDePeriodo(
         exhibidorNombre: vPieza.exhibidorNombre,
         vendedorNombre: vPieza.vendedorCustodiaNombre,
         piezas: count(),
+        valor: sql<string>`coalesce(sum(${vPieza.precio}), 0)`,
       })
       .from(vPieza)
       .where(notInArray(vPieza.estado, ['vendida', 'regalo', 'defecto']))
@@ -139,18 +141,24 @@ export async function resumenDePeriodo(
   const r = resumirLineas(vendidas);
 
   // Dos exhibidores (o vendedoras) con el mismo nombre comparten etiqueta: se suman en una sola fila.
-  const porUbicacion = new Map<string, number>();
-  for (const u of ubicaciones)
-    sumar(
-      porUbicacion,
-      etiquetaUbicacion({
-        ubicacion: u.ubicacion,
-        exhibidorNombre: u.exhibidorNombre,
-        vendedorNombre: u.vendedorNombre,
-        estado: '',
-      }),
-      u.piezas,
-    );
+  const porUbicacion = new Map<string, { piezas: number; valorCentavos: number }>();
+  const inventario = { piezas: 0, valorCentavos: 0 };
+  for (const u of ubicaciones) {
+    const etiqueta = etiquetaUbicacion({
+      ubicacion: u.ubicacion,
+      exhibidorNombre: u.exhibidorNombre,
+      vendedorNombre: u.vendedorNombre,
+      estado: '',
+    });
+    const valorCentavos = numericACentavos(u.valor);
+    const f = porUbicacion.get(etiqueta) ?? { piezas: 0, valorCentavos: 0 };
+    porUbicacion.set(etiqueta, {
+      piezas: f.piezas + u.piezas,
+      valorCentavos: f.valorCentavos + valorCentavos,
+    });
+    inventario.piezas += u.piezas;
+    inventario.valorCentavos += valorCentavos;
+  }
 
   return {
     ventasCentavos,
@@ -164,7 +172,8 @@ export async function resumenDePeriodo(
     topClientas: top5(clientas.values()),
     porCobrarCentavos: deudores.totalCentavos,
     ubicaciones: [...porUbicacion]
-      .map(([etiqueta, piezas]) => ({ etiqueta, piezas }))
+      .map(([etiqueta, f]) => ({ etiqueta, ...f }))
       .sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es')),
+    inventario,
   };
 }
