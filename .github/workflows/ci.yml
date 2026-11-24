@@ -107,10 +107,17 @@ jobs:
           path: next-build.tar
           retention-days: 1
 
-  e2e:
+  e2e-parte:
     # No espera a integracion: corren en paralelo y el despliegue exige ambas.
+    # Tres runners en paralelo, cada uno con su Postgres y su servidor: Playwright reparte los archivos de prueba
+    # (--shard) y, dentro de cada runner, escritorio y móvil corren a la vez (scripts/test-neon.ts).
+    name: e2e (${{ matrix.parte }}/3)
     needs: [build]
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        parte: [1, 2, 3]
     # Imagen oficial de Playwright con Chromium y sus dependencias del sistema ya instaladas: instalar las
     # dependencias con apt en cada corrida costaba ~5 min. La versión sale de package.json (job build).
     container:
@@ -135,14 +142,24 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with: { name: next-build }
       - run: tar -xf next-build.tar && rm next-build.tar
-      - run: pnpm test:e2e
+      - run: pnpm test:e2e --shard=${{ matrix.parte }}/3
         env:
           # Dentro de un container, los servicios se alcanzan por su nombre.
           KAZERO_PG_PRUEBAS_URL: postgresql://postgres:postgres@postgres:5432/postgres
           KAZERO_PG_WSPROXY: wsproxy:80
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with: { name: playwright-report, path: playwright-report, retention-days: 7 }
+        with: { name: 'playwright-report-${{ matrix.parte }}', path: 'playwright-report*', retention-days: 7 }
+
+  # Check obligatorio de main: «e2e» resume las partes, así la protección de la rama no cambia.
+  e2e:
+    needs: [e2e-parte]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Todas las partes de e2e pasaron
+        run: test "${{ needs.e2e-parte.result }}" = success
 
   deploy-preview:
     needs: [e2e, integracion]
