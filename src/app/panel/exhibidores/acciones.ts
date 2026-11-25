@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { conDb } from '@/db/client';
 import type { EstadoAccion } from '@/features/ui/estado';
 import { formatoFolio } from '@/domain/pedidos';
-import { centavosDe, ejecutarAccion, texto, uuidDe, versionDe } from '@/server/acciones';
+import { centavosDe, ejecutarAccion, texto, uuidDe, uuidOpcionalDe, versionDe } from '@/server/acciones';
 import { partirCodigos } from '@/features/exhibidores/codigos';
 import { montoAjusteCentavos } from '@/features/exhibidores/dinero-ui';
 import { revalidarPedido } from '../pedidos/revalidar';
@@ -111,11 +111,13 @@ export async function accionEditarExhibidor(_: EstadoAccion, fd: FormData): Prom
         motivo: texto(fd, 'motivo'),
         nombre: texto(fd, 'nombre'),
         fechaEnvio: texto(fd, 'fechaEnvio').slice(0, 20),
+        vendedorId: uuidOpcionalDe(fd, 'vendedorId'), // bloqueado en la ficha = no viaja = no cambia
       }),
     );
     if (cambios === 0) return 'Sin cambios.';
     revalidarPiezas(exhibidorId); // la ficha de pieza muestra el nombre del exhibidor
-    revalidatePath('/panel/vendedores/[id]', 'page');
+    revalidatePath('/panel/vendedores/[id]', 'page'); // el patrón cubre al asociado anterior y al nuevo
+    revalidatePath('/panel/reportes/exhibidores');
     return 'Cambios guardados.';
   });
 }

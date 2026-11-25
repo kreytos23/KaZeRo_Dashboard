@@ -166,6 +166,16 @@ describe('privilegios de kazero_app (mínimo privilegio)', () => {
       ].sort(),
     );
   });
+  it('0030: puede cambiar el asociado de un exhibidor y consultar la regla; el trigger nadie lo invoca a mano', async () => {
+    const r = await conDbUrl(urlOwner(), (db) =>
+      db.execute<{ columna: boolean; regla: boolean; regla_publica: boolean; disparador: boolean }>(sql`
+        SELECT has_column_privilege('kazero_app', 'public.exhibidor', 'vendedor_id', 'UPDATE') AS columna,
+               has_function_privilege('kazero_app', 'public.kz_exhibidor_con_ventas_o_dinero(uuid)', 'EXECUTE') AS regla,
+               has_function_privilege('public', 'public.kz_exhibidor_con_ventas_o_dinero(uuid)', 'EXECUTE') AS regla_publica,
+               has_function_privilege('kazero_app', 'public.kz_exhibidor_cambio_asociado()', 'EXECUTE') AS disparador`),
+    );
+    expect(r.rows[0]).toEqual({ columna: true, regla: true, regla_publica: false, disparador: false });
+  });
   it('matriz EXACTA de privilegios de tabla de kazero_app en todo public', async () => {
     const r = await conDbUrl(urlOwner(), (db) =>
       db.execute<{ p: string }>(sql`

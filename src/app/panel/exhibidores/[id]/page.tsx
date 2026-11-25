@@ -7,7 +7,7 @@ import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero'
 import { hoyMX } from '@/domain/fechas';
 import { formatoFolio } from '@/domain/pedidos';
 import { HistorialCambios } from '@/features/auditoria/HistorialCambios';
-import { Campo, CampoCasilla } from '@/features/ui/Campo';
+import { Campo, CampoCasilla, Selector } from '@/features/ui/Campo';
 import { CampoMotivo } from '@/features/ui/CampoMotivo';
 import { PorEntregar } from '@/features/exhibidores/PorEntregar';
 import { FormEntregaLote, FormRegresoLote } from '@/features/piezas/FormsLotePiezas';
@@ -21,9 +21,10 @@ import { AvisoIndiceSucio } from '@/search/AvisoIndiceSucio';
 import { historialDeCambios } from '@/server/auditoria/servicio';
 import { requerirSesion } from '@/server/auth/sesion-actual';
 import { historialDineroExhibidor, ventasDeExhibidor } from '@/server/exhibidores/lecturas-dinero';
+import { MSG_ASOCIADO_CON_VENTAS } from '@/server/exhibidores/mensajes';
 import { obtenerExhibidor } from '@/server/exhibidores/servicio';
 import { piezasDisponiblesEnKazero } from '@/server/piezas/custodia';
-import { obtenerVendedor } from '@/server/vendedores/servicio';
+import { listarVendedores } from '@/server/vendedores/servicio';
 import { fechaCorta } from '../../pedidos/etiquetas';
 import { accionCerrar, accionEditarExhibidor, accionEnviar, accionRegresar } from '../acciones';
 import { FormAbono, FormAjuste, FormEntrega, FormVenta } from './FormsDinero';
@@ -34,22 +35,21 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
   await requerirSesion();
   const id = z.uuid().safeParse((await params).id);
   if (!id.success) notFound();
-  const [e, cambios, historial, ventas, vendedor, elegibles] = await conDbLectura(async (db) => {
+  const [e, cambios, historial, ventas, vendedores, elegibles] = await conDbLectura(async (db) => {
     const [ex, ...resto] = await Promise.all([
       obtenerExhibidor(db, id.data),
       historialDeCambios(db, 'exhibidor', id.data),
       historialDineroExhibidor(db, id.data),
       ventasDeExhibidor(db, id.data),
+      listarVendedores(db),
     ]);
-    // Solo esto depende del exhibidor leído; los elegibles para enviar, solo si sigue abierto.
-    const [vend, elegibles] = await Promise.all([
-      ex ? obtenerVendedor(db, ex.vendedorId) : null,
-      ex?.estado === 'abierto' ? piezasDisponiblesEnKazero(db) : [],
-    ]);
-    return [ex, ...resto, vend, elegibles] as const;
+    // Solo esto depende del exhibidor leído: los elegibles para enviar, si sigue abierto.
+    const elegibles = ex?.estado === 'abierto' ? await piezasDisponiblesEnKazero(db) : [];
+    return [ex, ...resto, elegibles] as const;
   });
   if (!e) notFound();
   const abierto = e.estado === 'abierto';
+  const vendedor = vendedores.find((v) => v.id === e.vendedorId);
   const hoy = hoyMX();
   const porEntregar = numericACentavos(e.porEntregar);
   const ajustes = numericACentavos(e.ajustes);
@@ -69,12 +69,29 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
       <FormAccion
         accion={accionEditarExhibidor}
         textoBoton="Guardar cambios"
+        etiqueta="Editar exhibidor"
         className="mt-3 flex flex-col gap-3"
       >
         <Fragment key={e.version}>
           <input type="hidden" name="exhibidorId" value={e.id} />
           <input type="hidden" name="version" value={e.version} />
           <Campo etiqueta="Nombre" name="nombre" defaultValue={e.nombre} required maxLength={120} />
+          {/* key: si entra una venta con la ficha abierta, olvida lo que se iba a elegir. */}
+          <Selector
+            key={String(e.conVentasODinero)}
+            etiqueta="Asociado"
+            name="vendedorId"
+            opciones={vendedores
+              .filter((v) => v.activo || v.id === e.vendedorId)
+              .map((v) => ({ valor: v.id, texto: v.nombre }))}
+            defaultValue={e.vendedorId}
+            disabled={e.conVentasODinero}
+            ayuda={
+              e.conVentasODinero
+                ? MSG_ASOCIADO_CON_VENTAS
+                : 'Cámbialo solo si se asignó por error; pide motivo. Las piezas se quedan en el exhibidor.'
+            }
+          />
           <Campo
             etiqueta="Fecha de envío"
             name="fechaEnvio"
@@ -82,13 +99,20 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
             defaultValue={e.fechaEnvio}
             required
           />
-          <CampoMotivo />
+          <CampoMotivo
+            valor={{
+              name: 'vendedorId',
+              original: e.vendedorId,
+              aviso: 'Cambiaste el asociado: explica por qué.',
+            }}
+          />
         </Fragment>
       </FormAccion>
     </details>
   ) : (
     <p className="order-10 text-meta text-tinta-suave">
-      Un exhibidor cerrado es un registro histórico: su nombre y su fecha de envío ya no se editan.
+      Un exhibidor cerrado es un registro histórico: su nombre, su asociado y su fecha de envío ya no se
+      editan.
     </p>
   );
   return (
