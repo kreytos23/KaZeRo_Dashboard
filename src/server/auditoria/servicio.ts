@@ -3,6 +3,7 @@ import type { Ejecutor } from '@/db/pool';
 import { vAuditoria } from '@/db/schema';
 import {
   agruparHistorial,
+  mensajeMotivoFaltante,
   requiereMotivo,
   validarMotivo,
   type Cambio,
@@ -31,7 +32,7 @@ export function motivoPara(
   cambios: readonly Cambio[],
   texto: string | null | undefined,
 ): string | null {
-  const r = validarMotivo(texto, requiereMotivo(entidad, cambios));
+  const r = validarMotivo(texto, requiereMotivo(entidad, cambios), mensajeMotivoFaltante(entidad, cambios));
   if (!r.ok) throw new ErrorNegocio('motivo', r.error, 'motivo');
   return r.motivo;
 }

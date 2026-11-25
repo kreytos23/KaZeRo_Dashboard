@@ -26,6 +26,10 @@ describe('formato del historial de cambios', () => {
       expect(ETIQUETA_CAMPO[c]).toBeTruthy();
     expect(CAMPOS_DINERO.pedido).toEqual(['total', 'descuento_manual_monto']);
   });
+  it('el asociado de un exhibidor se muestra con su etiqueta y los dos nombres', () => {
+    expect(ETIQUETA_CAMPO.vendedor).toBe('Asociado');
+    expect(textoCambio('vendedor', 'Perla Ejemplo', 'Rosa Ejemplo')).toBe('Perla Ejemplo → Rosa Ejemplo');
+  });
   it('todo campo de dinero tiene etiqueta', () => {
     for (const campos of Object.values(CAMPOS_DINERO))
       for (const c of campos) expect(ETIQUETA_CAMPO[c]).toBeTruthy();

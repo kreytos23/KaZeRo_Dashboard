@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, getViewSelectedFields, inArray, sql } from 'drizzle-orm';
 import type { Ejecutor } from '@/db/pool';
 import { exhibidor, movimientoPieza, pieza, vExhibidor, vPieza, vendedor } from '@/db/schema';
 import { formatoMXN } from '@/domain/dinero';
@@ -8,8 +8,14 @@ import { parsearFechaISO } from '@/domain/fechas';
 import { fijarContextoAuditoria, motivoPara } from '@/server/auditoria/servicio';
 import { ErrorNegocio, conErroresDeNegocio, conflictoVersion } from '@/server/errores';
 import { porEntregarCentavos } from '@/server/exhibidores/lecturas-dinero';
-import { MSG_EXHIBIDOR_CERRADO, mensajeCierreConDinero } from '@/server/exhibidores/mensajes';
+import {
+  MSG_ASOCIADO_CON_VENTAS,
+  MSG_EXHIBIDOR_CERRADO,
+  MSG_EXHIBIDOR_NO_SE_EDITA,
+  mensajeCierreConDinero,
+} from '@/server/exhibidores/mensajes';
 import { apartadasDeExhibidor } from '@/server/pedidos/lecturas';
+import { exigirVendedorActivo } from '@/server/vendedores/servicio';
 
 export const MAX_CODIGOS = 500;
 
@@ -38,7 +44,17 @@ function datosValidos(d: { nombre: string; fechaEnvio: string }) {
   return { nombre, fechaEnvio };
 }
 
-/** D5: solo nombre y fecha de envío, y solo mientras está abierto (uno cerrado es registro histórico). */
+/** ¿Ya tuvo ventas o dinero? La regla vive en la BD (0030): la misma para el trigger, el servicio y la ficha. */
+const conVentasODinero = (id: typeof exhibidor.id | typeof vExhibidor.id) =>
+  sql<boolean>`public.kz_exhibidor_con_ventas_o_dinero(${id})`;
+
+/**
+ * D5: solo mientras está abierto (uno cerrado es registro histórico). Nombre, fecha de envío y, si no ha tenido ventas
+ * ni dinero, su asociado (2026-11-25: corregir uno asignado por error; con motivo). `vendedorId` ausente = no cambia.
+ *
+ * Venta, nota, abono, entrega, ajuste y cierre bloquean el exhibidor igual que aquí: o esta edición ya los ve, o ellos
+ * ya ven el asociado nuevo. El trigger exhibidor_cambio_asociado repite la regla bajo un bloqueo más fuerte.
+ */
 export async function editarExhibidor(
   db: Ejecutor,
   d: {
@@ -48,6 +64,7 @@ export async function editarExhibidor(
     motivo?: string | null;
     nombre: string;
     fechaEnvio: string;
+    vendedorId?: string | null;
   },
 ): Promise<{ cambios: number }> {
   const v = datosValidos(d);
@@ -59,6 +76,7 @@ export async function editarExhibidor(
           version: exhibidor.version,
           nombre: exhibidor.nombre,
           fechaEnvio: exhibidor.fechaEnvio,
+          vendedorId: exhibidor.vendedorId,
         })
         .from(exhibidor)
         .where(eq(exhibidor.id, d.exhibidorId))
@@ -66,20 +84,30 @@ export async function editarExhibidor(
       if (!actual) throw new ErrorNegocio('no_encontrado', 'El exhibidor no existe.');
       // Primero la versión: un cliente con datos viejos debe ver el conflicto, no "cerrado".
       if (actual.version !== d.version) throw conflictoVersion();
-      if (actual.estado === 'cerrado')
-        throw new ErrorNegocio('exhibidor_cerrado', 'Un exhibidor cerrado ya no se edita.');
+      if (actual.estado === 'cerrado') throw new ErrorNegocio('exhibidor_cerrado', MSG_EXHIBIDOR_NO_SE_EDITA);
+      const vendedorId = d.vendedorId ?? actual.vendedorId;
       const cambios = calcularCambios(
-        { nombre: actual.nombre, fecha_envio: actual.fechaEnvio },
-        { nombre: v.nombre, fecha_envio: v.fechaEnvio },
+        { nombre: actual.nombre, fecha_envio: actual.fechaEnvio, vendedor_id: actual.vendedorId },
+        { nombre: v.nombre, fecha_envio: v.fechaEnvio, vendedor_id: vendedorId },
       );
       if (cambios.length === 0) return { cambios: 0 };
+      if (vendedorId !== actual.vendedorId) {
+        // Consulta aparte, con el exhibidor ya bloqueado: ve lo que confirmó quien lo tenía.
+        const [x] = await tx
+          .select({ usado: conVentasODinero(exhibidor.id) })
+          .from(exhibidor)
+          .where(eq(exhibidor.id, d.exhibidorId));
+        if (x!.usado)
+          throw new ErrorNegocio('exhibidor_asociado_con_ventas', MSG_ASOCIADO_CON_VENTAS, 'vendedorId');
+        await exigirVendedorActivo(tx, vendedorId);
+      }
       await fijarContextoAuditoria(tx, {
         adminId: d.adminId,
         motivo: motivoPara('exhibidor', cambios, d.motivo),
       });
       const filas = await tx
         .update(exhibidor)
-        .set({ ...v, version: sql`${exhibidor.version} + 1` })
+        .set({ ...v, vendedorId, version: sql`${exhibidor.version} + 1` })
         .where(and(eq(exhibidor.id, d.exhibidorId), eq(exhibidor.version, d.version)))
         .returning({ id: exhibidor.id });
       if (filas.length === 0) throw conflictoVersion();
@@ -328,7 +356,11 @@ export function listarExhibidores(db: Ejecutor, o: { vendedorId?: string }): Pro
 
 /** Tres consultas fijas (resumen, piezas y apartadas), sin importar cuántas piezas tenga. */
 export async function obtenerExhibidor(db: Ejecutor, id: string) {
-  const [e] = await db.select().from(vExhibidor).where(eq(vExhibidor.id, id)).limit(1);
+  const [e] = await db
+    .select({ ...getViewSelectedFields(vExhibidor), conVentasODinero: conVentasODinero(vExhibidor.id) })
+    .from(vExhibidor)
+    .where(eq(vExhibidor.id, id))
+    .limit(1);
   if (!e) return null;
   const [piezas, apartadas] = await Promise.all([
     db

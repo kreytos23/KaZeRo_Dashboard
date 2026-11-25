@@ -23,6 +23,19 @@ describe('traducción de errores de Postgres', () => {
       message: 'Falta la fecha de las compras previas. Recarga la página.',
     });
   });
+  it.each([
+    [
+      'exhibidor_asociado_con_ventas',
+      'Este exhibidor ya tiene ventas o dinero: su asociado no se puede cambiar.',
+      'vendedorId',
+    ],
+    ['exhibidor_asociado_sin_motivo', 'Escribe el motivo: cambiaste el asociado.', 'motivo'],
+    ['exhibidor_asociado_cerrado', 'Un exhibidor cerrado ya no se edita.', undefined],
+  ])('traduce la regla del asociado del exhibidor %s (0030)', (constraint, mensaje, campo) => {
+    const e = traducirErrorPg(envuelto({ code: 'P0001', constraint }));
+    expect(e).toMatchObject({ codigo: constraint, message: mensaje });
+    expect(e?.campo).toBe(campo);
+  });
   it('traduce la violación de código único', () => {
     const e = traducirErrorPg(envuelto({ code: '23505', constraint: 'pieza_codigo_uq' }));
     expect(e).toBeInstanceOf(ErrorNegocio);
