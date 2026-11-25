@@ -211,6 +211,13 @@
       "when": 1795501975535,
       "tag": "0029_lealtad_vencimiento",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1795632534676,
+      "tag": "0030_exhibidor_cambiar_asociado",
+      "breakpoints": true
     }
   ]
 }
