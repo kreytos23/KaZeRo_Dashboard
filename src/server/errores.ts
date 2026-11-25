@@ -1,4 +1,5 @@
 import { pgCode, pgConstraint } from '@/db/errors';
+import { MSG_MOTIVO_ASOCIADO } from '@/domain/auditoria';
 import {
   MSG_LUGAR_PREVIO,
   MSG_MOSTRADOR_SIN_PREVIAS,
@@ -8,8 +9,10 @@ import {
   MSG_PREVIAS_SIN_MOTIVO,
 } from '@/server/clientes/mensajes';
 import {
+  MSG_ASOCIADO_CON_VENTAS,
   MSG_COBRO_SIN_SALDO_FAVOR,
   MSG_EXHIBIDOR_CERRADO,
+  MSG_EXHIBIDOR_NO_SE_EDITA,
   MSG_FECHA_FUTURA,
   MSG_MOTIVO_AJUSTE,
   MSG_NOTA_LARGA,
@@ -69,6 +72,8 @@ const CAMPOS: Record<string, string> = {
   cliente_usuario_red_largo: 'usuarioRed',
   cliente_notas_largo: 'notas',
   exhibidor_nombre_largo: 'nombre',
+  exhibidor_asociado_con_ventas: 'vendedorId',
+  exhibidor_asociado_sin_motivo: 'motivo',
   movimiento_nota_largo: 'nota',
   auditoria_motivo_dinero: 'motivo',
   auditoria_motivo_largo: 'motivo',
@@ -237,6 +242,10 @@ const MENSAJES: Record<string, string> = {
   cliente_previas_con_notas: MSG_PREVIAS_CON_NOTAS,
   cliente_previas_con_fecha: MSG_PREVIAS_SIN_FECHA,
   pedido_lugar_previo: MSG_LUGAR_PREVIO,
+  // Asociado de un exhibidor (0030): el servicio valida antes; estos son la última barrera.
+  exhibidor_asociado_con_ventas: MSG_ASOCIADO_CON_VENTAS,
+  exhibidor_asociado_sin_motivo: MSG_MOTIVO_ASOCIADO,
+  exhibidor_asociado_cerrado: MSG_EXHIBIDOR_NO_SE_EDITA,
 };
 
 function mensajesPg(err: unknown): string[] {

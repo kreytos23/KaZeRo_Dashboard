@@ -10,7 +10,6 @@ import {
   pedidoItem,
   pieza,
   saldoFavorMov,
-  vendedor,
 } from '@/db/schema';
 import { centavosANumeric, formatoMXN, numericACentavos } from '@/domain/dinero';
 import { hoyMX, parsearFechaISO } from '@/domain/fechas';
@@ -40,6 +39,7 @@ import {
 import { conIdempotencia } from '@/server/idempotencia';
 import { exigirCustodiaDe } from '@/server/piezas/custodia';
 import { retirarEnTx, validarNotaRetiro, type Titular } from '@/server/saldo-favor/servicio';
+import { exigirVendedorActivo } from '@/server/vendedores/servicio';
 import {
   apartarPiezas,
   bloquearCliente,
@@ -132,13 +132,6 @@ function validarPedido(d: Omit<DatosPedido, 'key'>) {
     descuentoMotivo: descuento.motivo,
     notas: validarNotas(d.notas),
   };
-}
-
-/** Vendedor existente y activo (D-1). Sin bloqueo: una desactivación concurrente puede pasar (aceptado, Plan 2). */
-export async function exigirVendedorActivo(tx: Ejecutor, vendedorId: string): Promise<void> {
-  const [v] = await tx.select({ activo: vendedor.activo }).from(vendedor).where(eq(vendedor.id, vendedorId));
-  if (!v) throw new ErrorNegocio('no_encontrado', 'El asociado no existe.', 'vendedorId');
-  if (!v.activo) throw new ErrorNegocio('vendedor_inactivo', 'El asociado está inactivo.', 'vendedorId');
 }
 
 /**

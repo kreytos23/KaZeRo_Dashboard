@@ -26,6 +26,16 @@ export const CAMPOS_DINERO: Readonly<Record<EntidadAuditada, readonly string[]>>
   pedido: ['total', 'descuento_manual_monto'],
 };
 
+/**
+ * Campos que no son dinero pero cuyo cambio también exige motivo.
+ * DEBE coincidir con kz_exhibidor_cambio_asociado (drizzle/0030_exhibidor_cambiar_asociado.sql).
+ */
+const CAMPOS_CON_MOTIVO: Partial<Record<EntidadAuditada, readonly string[]>> = {
+  exhibidor: ['vendedor_id'],
+};
+export const MSG_MOTIVO_MONTO = 'Escribe el motivo: cambiaste un monto.';
+export const MSG_MOTIVO_ASOCIADO = 'Escribe el motivo: cambiaste el asociado.';
+
 /** Campos que cambian, en el orden de `despues`. Los valores llegan ya canónicos ('149.00', uuid, 'true'). */
 export function calcularCambios(
   antes: Readonly<Record<string, Valor>>,
@@ -37,7 +47,16 @@ export function calcularCambios(
 }
 
 export function requiereMotivo(entidad: EntidadAuditada, cambios: readonly Cambio[]): boolean {
-  return cambios.some((c) => CAMPOS_DINERO[entidad].includes(c.campo));
+  return cambios.some((c) => CAMPOS_DINERO[entidad].includes(c.campo)) || cambiaAsociado(entidad, cambios);
+}
+
+function cambiaAsociado(entidad: EntidadAuditada, cambios: readonly Cambio[]): boolean {
+  return cambios.some((c) => CAMPOS_CON_MOTIVO[entidad]?.includes(c.campo));
+}
+
+/** Qué se le dice a quien no escribió el motivo. */
+export function mensajeMotivoFaltante(entidad: EntidadAuditada, cambios: readonly Cambio[]): string {
+  return cambiaAsociado(entidad, cambios) ? MSG_MOTIVO_ASOCIADO : MSG_MOTIVO_MONTO;
 }
 
 export type ResultadoMotivo = { ok: true; motivo: string | null } | { ok: false; error: string };
@@ -46,7 +65,7 @@ export type ResultadoMotivo = { ok: true; motivo: string | null } | { ok: false;
 export function validarMotivo(
   texto: string | null | undefined,
   requerido: boolean,
-  faltante = 'Escribe el motivo: cambiaste un monto.',
+  faltante = MSG_MOTIVO_MONTO,
 ): ResultadoMotivo {
   const motivo = (texto ?? '').trim();
   if ([...motivo].length > MAX_MOTIVO)

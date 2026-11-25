@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   agruparHistorial,
   calcularCambios,
+  mensajeMotivoFaltante,
   montoCambio,
   requiereMotivo,
   validarMotivo,
@@ -48,6 +49,17 @@ describe('motivo (R-09)', () => {
     expect(requiereMotivo('vendedor', cambio('nombre'))).toBe(false);
     expect(requiereMotivo('cliente', cambio('telefono'))).toBe(false);
     expect(requiereMotivo('categoria', cambio('nombre'))).toBe(false);
+  });
+  it('cambiar el asociado de un exhibidor lo exige, con su propio mensaje; su nombre o fecha no', () => {
+    expect(requiereMotivo('exhibidor', cambio('vendedor_id'))).toBe(true);
+    expect(mensajeMotivoFaltante('exhibidor', cambio('vendedor_id'))).toBe(
+      'Escribe el motivo: cambiaste el asociado.',
+    );
+    expect(requiereMotivo('exhibidor', [...cambio('nombre'), ...cambio('fecha_envio')])).toBe(false);
+    // La vendedora de un pedido y la habitual de una clienta siguen sin exigirlo.
+    expect(requiereMotivo('pedido', cambio('vendedor_id'))).toBe(false);
+    expect(requiereMotivo('cliente', cambio('vendedor_habitual_id'))).toBe(false);
+    expect(mensajeMotivoFaltante('pieza', cambio('precio'))).toBe('Escribe el motivo: cambiaste un monto.');
   });
   it('validarMotivo: recorta, exige si hace falta y limita a 200 caracteres (code points)', () => {
     expect(validarMotivo('  Subió el proveedor ', true)).toEqual({ ok: true, motivo: 'Subió el proveedor' });

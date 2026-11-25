@@ -79,6 +79,8 @@ export function Selector({
   opciones,
   defaultValue,
   required,
+  disabled,
+  ayuda,
   value,
   onChange,
 }: {
@@ -87,6 +89,9 @@ export function Selector({
   opciones: readonly { valor: string; texto: string }[];
   defaultValue?: string;
   required?: boolean;
+  disabled?: boolean;
+  /** Texto bajo el control (p. ej. por qué no se puede cambiar), ligado a él con aria-describedby. */
+  ayuda?: string;
   /** Controlado (opcional): úsalo con `onChange`, no con `defaultValue`. */
   value?: string;
   onChange?: (valor: string) => void;
@@ -107,8 +112,17 @@ export function Selector({
         value={value}
         onChange={onChange}
         required={required}
+        disabled={disabled}
         {...aria}
+        aria-describedby={
+          [ayuda && `${id}-ayuda`, aria['aria-describedby']].filter(Boolean).join(' ') || undefined
+        }
       />
+      {ayuda && (
+        <p id={`${id}-ayuda`} className="text-meta text-tinta-suave">
+          {ayuda}
+        </p>
+      )}
       <MensajeError idControl={id} error={error} />
     </div>
   );

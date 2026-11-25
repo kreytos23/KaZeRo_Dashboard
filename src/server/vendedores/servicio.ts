@@ -117,6 +117,13 @@ export function actualizarVendedor(
   );
 }
 
+/** Vendedor existente y activo (D-1). Sin bloqueo: una desactivación concurrente puede pasar (aceptado, Plan 2). */
+export async function exigirVendedorActivo(tx: Ejecutor, vendedorId: string): Promise<void> {
+  const [v] = await tx.select({ activo: vendedor.activo }).from(vendedor).where(eq(vendedor.id, vendedorId));
+  if (!v) throw new ErrorNegocio('no_encontrado', 'El asociado no existe.', 'vendedorId');
+  if (!v.activo) throw new ErrorNegocio('vendedor_inactivo', 'El asociado está inactivo.', 'vendedorId');
+}
+
 export function listarVendedores(db: Ejecutor, o: { soloActivos?: boolean } = {}): Promise<VendedorFila[]> {
   return db
     .select(columnas)
