@@ -60,7 +60,7 @@ test('un exhibidor con una venta tiene el asociado bloqueado y explica por qué'
   const asociado = form.getByLabel('Asociado', { exact: true });
   await expect(asociado).toBeDisabled();
   await expect(asociado).toHaveAccessibleDescription(
-    'Este exhibidor ya tiene ventas o dinero: su asociado no se puede cambiar.',
+    'Este exhibidor ya tiene ventas, apartados o dinero: su asociado no se puede cambiar.',
   );
   // Lo demás se sigue editando.
   const nombre = `Vitrina con venta ${marcaDe(info)}`;

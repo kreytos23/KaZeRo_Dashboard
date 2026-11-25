@@ -26,7 +26,7 @@ describe('traducción de errores de Postgres', () => {
   it.each([
     [
       'exhibidor_asociado_con_ventas',
-      'Este exhibidor ya tiene ventas o dinero: su asociado no se puede cambiar.',
+      'Este exhibidor ya tiene ventas, apartados o dinero: su asociado no se puede cambiar.',
       'vendedorId',
     ],
     ['exhibidor_asociado_sin_motivo', 'Escribe el motivo: cambiaste el asociado.', 'motivo'],

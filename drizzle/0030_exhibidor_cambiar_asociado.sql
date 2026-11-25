@@ -30,7 +30,8 @@ GRANT EXECUTE ON FUNCTION public.kz_exhibidor_con_ventas_o_dinero(uuid) TO kazer
 --    SHARE, que no choca con este UPDATE. FOR UPDATE sí choca: espera a toda transacción que ya insertó algo de este
 --    exhibidor (y la revisión siguiente, con instantánea nueva, la ve) y hace esperar a la que venga después. Aquí no
 --    se bloquean piezas ni se toma el candado consultivo del dinero, así que no hay ciclo con quien tiene una pieza o
---    ese candado y espera al exhibidor.
+--    ese candado y espera al exhibidor. Residual: SQL directo que inserta un pago y después su aplicación puede dar
+--    40P01 contra este cambio; Postgres revierte una de las dos y la app la traduce a «Intenta de nuevo».
 CREATE OR REPLACE FUNCTION public.kz_exhibidor_cambio_asociado() RETURNS trigger
   LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp
   AS $$

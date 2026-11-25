@@ -28,7 +28,7 @@ import { reiniciarConAdmin, urlApp, urlOwner } from './utilidades';
 // Corregir el asociado de un exhibidor (2026-11-25). Datos SINTÉTICOS.
 const app = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlApp(), fn);
 const owner = <T>(fn: Parameters<typeof conDbUrl<T>>[1]) => conDbUrl(urlOwner(), fn);
-const CON_VENTAS = 'Este exhibidor ya tiene ventas o dinero: su asociado no se puede cambiar.';
+const CON_VENTAS = 'Este exhibidor ya tiene ventas, apartados o dinero: su asociado no se puede cambiar.';
 let adminId = '';
 let perlaId = '';
 let rosaId = '';

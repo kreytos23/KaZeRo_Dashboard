@@ -4,7 +4,7 @@
 export const MSG_EXHIBIDOR_CERRADO = 'El exhibidor está cerrado.';
 export const MSG_EXHIBIDOR_NO_SE_EDITA = 'Un exhibidor cerrado ya no se edita.';
 export const MSG_ASOCIADO_CON_VENTAS =
-  'Este exhibidor ya tiene ventas o dinero: su asociado no se puede cambiar.';
+  'Este exhibidor ya tiene ventas, apartados o dinero: su asociado no se puede cambiar.';
 export const MSG_FECHA_FUTURA = 'La fecha no puede ser futura.';
 export const MSG_NOTA_LARGA = 'La nota admite hasta 200 caracteres.';
 export const MSG_MOTIVO_AJUSTE = 'Escribe el motivo del ajuste (hasta 200 caracteres).';

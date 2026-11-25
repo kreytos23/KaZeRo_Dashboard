@@ -100,6 +100,7 @@ export default async function FichaExhibidor({ params }: { params: Promise<{ id:
             required
           />
           <CampoMotivo
+            key={`motivo-${e.conVentasODinero}`}
             valor={{
               name: 'vendedorId',
               original: e.vendedorId,
